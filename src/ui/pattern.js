@@ -37,18 +37,19 @@ export function createPatternView({
   registry,
   onAudition,
   onStatus,
+  initialMode = 'audition',
 }) {
   let cursorRow = 0;
   let cursorChannel = 0;
   let cursorField = 'note';
-  let mode = 'audition';
+  let mode = initialMode === 'edit' ? 'edit' : 'audition';
   let octave = 4;
   let step = 1;
   let pendingHex = null;
   let feedback = null;
 
   const modeButton = Button({
-    label: t('status.audisi'),
+    label: t(mode === 'edit' ? 'status.edit' : 'status.audisi'),
     variant: 'default',
     onClick: () => toggleMode(),
   });
@@ -77,7 +78,7 @@ export function createPatternView({
   ]);
 
   const scroller = el('div', {
-    class: 'pattern-grid is-audition',
+    class: `pattern-grid ${mode === 'edit' ? 'is-edit' : 'is-audition'}`,
     role: 'grid',
     tabindex: '0',
     'aria-label': t('pattern.gridLabel'),

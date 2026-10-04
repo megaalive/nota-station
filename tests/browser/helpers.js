@@ -9,7 +9,19 @@ export async function waitForApp(page) {
   await expect(page.locator('[data-action="statusbar"]')).toBeVisible();
 }
 
-export async function gotoApp(page) {
-  await page.goto('./');
+export async function gotoApp(page, { firstRun = false } = {}) {
+  if (firstRun) {
+    await page.goto('./');
+    await page.evaluate(() => {
+      localStorage.removeItem('notastation.welcome.completed');
+      localStorage.removeItem('notastation.keymapPreset');
+    });
+    await page.reload();
+  } else {
+    await page.addInitScript(() => {
+      localStorage.setItem('notastation.welcome.completed', '1');
+    });
+    await page.goto('./');
+  }
   await waitForApp(page);
 }

@@ -4,6 +4,7 @@
 import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
 import { commandError, createCommandRegistry } from './core/commands.js';
 import { createHistory } from './core/history.js';
+import { createTemplateProject } from './core/templates.js';
 import {
   activePattern,
   createBlankProject,
@@ -21,15 +22,22 @@ import {
 import { createPalette } from './ui/palette.js';
 import { createPatternView } from './ui/pattern.js';
 import { createShell } from './ui/shell.js';
+import { createWelcome } from './ui/welcome.js';
 
 const i18n = createI18n(readInitialLocale());
 const registry = createCommandRegistry();
 const store = window.localStorage;
 const THEMES = ['light', 'dark', 'high-contrast'];
+const KEYMAPS = ['songwriter', 'openmpt'];
+const WELCOME_COMPLETED_KEY = 'notastation.welcome.completed';
+const KEYMAP_STORAGE_KEY = 'notastation.keymapPreset';
 
 let theme = readInitialTheme();
 let buildInfo = null;
-const history = createHistory(createBlankProject());
+const history = createHistory(applyProjectPreferences(createBlankProject(), {
+  locale: i18n.getLocale(),
+  keymap: readInitialKeymap(),
+}));
 let project = history.current();
 let shell = null;
 let patternView = null;
@@ -77,6 +85,29 @@ function setLocale(next) {
   // harus membuat ulang node-nya, bukan sekadar memasang ulang node lama.
   if (shell) mountShell(shell.getActiveTab());
   return true;
+}
+
+function readInitialKeymap() {
+  const stored = store?.getItem(KEYMAP_STORAGE_KEY);
+  return KEYMAPS.includes(stored) ? stored : 'songwriter';
+}
+
+function applyProjectPreferences(nextProject, {
+  locale = i18n.getLocale(),
+  keymap = readInitialKeymap(),
+} = {}) {
+  if (!KEYMAPS.includes(keymap)) {
+    throw commandError('E_KEYMAP_UNKNOWN', `Preset keymap tidak dikenal: ${keymap}`);
+  }
+  return {
+    ...nextProject,
+    settings: {
+      ...nextProject.settings,
+      language: locale,
+      keymapPreset: keymap,
+      theme,
+    },
+  };
 }
 
 function readInitialTheme() {
@@ -170,6 +201,19 @@ function registerCommands() {
       run: (args) => {
         requireCommandArgs('playback.seek', args);
         return audio.seek(project, activePattern(project), Number(args.tick));
+      },
+    },
+    {
+      id: 'project.loadTemplate',
+      group: 'Project',
+      labelKey: 'project.loadTemplate',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('project.loadTemplate', args);
+        return loadTemplateProject(args.templateId, {
+          locale: args.locale ?? i18n.getLocale(),
+          keymap: args.keymap ?? readInitialKeymap(),
+        });
       },
     },
     {
@@ -328,17 +372,39 @@ function exportDebugJson({ download = true } = {}) {
 function importDebugJsonText(text) {
   // Parse + validasi selesai dulu. Kalau gagal, project/history/audio tidak disentuh.
   const nextProject = parseDebugProject(text);
-  audio.stop();
-  history.reset(nextProject);
-  project = nextProject;
-  setSaveStatus('status.jsonImported');
-  syncTransportUi();
-  patternView?.refresh();
+  replaceProject(nextProject, 'status.jsonImported');
   return {
     projectId: project.id,
     schemaVersion: project.schemaVersion,
     noteCount: activePattern(project).notes.length,
   };
+}
+
+function loadTemplateProject(templateId, {
+  locale = i18n.getLocale(),
+  keymap = readInitialKeymap(),
+} = {}) {
+  const nextProject = applyProjectPreferences(createTemplateProject(templateId), { locale, keymap });
+  store?.setItem(KEYMAP_STORAGE_KEY, keymap);
+  replaceProject(nextProject, 'status.notSaved');
+  return {
+    templateId,
+    projectId: project.id,
+    title: project.title,
+    noteCount: activePattern(project).notes.length,
+    keymap: project.settings.keymapPreset,
+  };
+}
+
+function replaceProject(nextProject, statusKey) {
+  audio.stop();
+  history.reset(nextProject);
+  project = nextProject;
+
+  // Recreate Pattern view supaya mode awal mengikuti keymap project baru.
+  const activeTab = shell?.getActiveTab() ?? 'pattern';
+  mountShell(activeTab);
+  setSaveStatus(statusKey);
 }
 
 function openDebugJsonPicker() {
@@ -456,6 +522,7 @@ function renderWorkspace(tab, root) {
     registry,
     onAudition: auditionPitch,
     onStatus: (status) => shell?.setPatternStatus(status),
+    initialMode: project.settings.keymapPreset === 'openmpt' ? 'edit' : 'audition',
   });
   return true;
 }
@@ -525,6 +592,32 @@ function isTextInputTarget(target) {
   return !['range', 'checkbox', 'radio', 'button', 'submit', 'reset'].includes(type);
 }
 
+function openWelcomeIfNeeded() {
+  if (store?.getItem(WELCOME_COMPLETED_KEY) === '1') return false;
+
+  const welcome = createWelcome({
+    t: (key, vars) => i18n.t(key, vars),
+    initialLocale: i18n.getLocale(),
+    initialKeymap: readInitialKeymap(),
+    initialTemplate: 'pop-4-4',
+    onSubmit: ({ locale, keymap, templateId }) => {
+      setLocale(locale);
+      registry.execute('project.loadTemplate', { templateId, locale, keymap });
+      store?.setItem(WELCOME_COMPLETED_KEY, '1');
+    },
+    onSkip: () => {
+      registry.execute('project.loadTemplate', {
+        templateId: 'blank',
+        locale: i18n.getLocale(),
+        keymap: readInitialKeymap(),
+      });
+      store?.setItem(WELCOME_COMPLETED_KEY, '1');
+    },
+  });
+  welcome.open();
+  return true;
+}
+
 async function boot() {
   registerCommands();
   buildInfo = await loadBuildInfo();
@@ -563,6 +656,8 @@ async function boot() {
     setLocale,
     i18n,
   };
+
+  openWelcomeIfNeeded();
 }
 
 boot().catch((err) => {
