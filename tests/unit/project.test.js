@@ -61,6 +61,7 @@ test('enterNote menulis NoteEvent pattern-local dengan durationTicks kanonik', (
   assert.equal(note.startTickLocal, 5 * DEFAULT_ROW_TICKS);
   assert.equal(note.durationTicks, DEFAULT_ROW_TICKS);
   assert.equal(note.pitch, 64);
+  assert.equal(note.instrumentId, next.song.tracks[2].defaultInstrumentId);
   assert.equal('absoluteTick' in note, false);
   assert.equal(project.song.patterns[0].notes.length, 0, 'input tidak dimutasi');
 });
@@ -87,7 +88,7 @@ test('note pada channel berbeda boleh berada pada row yang sama', () => {
   assert.equal(project.song.patterns[0].notes.length, 2);
 });
 
-test('row dan pitch di luar rentang gagal dengan kode stabil', () => {
+test('row, pitch, velocity, dan instrument invalid gagal dengan kode stabil', () => {
   const project = fixture();
   const pattern = activePattern(project);
   const trackId = project.song.tracks[0].id;
@@ -99,5 +100,19 @@ test('row dan pitch di luar rentang gagal dengan kode stabil', () => {
   assert.throws(
     () => enterNote(project, { patternId: pattern.id, trackId, row: 0, pitch: 128 }),
     (error) => error.code === 'E_PROJECT_PITCH_RANGE',
+  );
+  assert.throws(
+    () => enterNote(project, { patternId: pattern.id, trackId, row: 0, pitch: 60, velocity: 200 }),
+    (error) => error.code === 'E_PROJECT_VELOCITY_RANGE',
+  );
+  assert.throws(
+    () => enterNote(project, {
+      patternId: pattern.id,
+      trackId,
+      row: 0,
+      pitch: 60,
+      instrumentId: 'instrument-hilang',
+    }),
+    (error) => error.code === 'E_PROJECT_INSTRUMENT_MISSING',
   );
 });
