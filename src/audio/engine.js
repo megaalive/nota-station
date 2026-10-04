@@ -1,21 +1,27 @@
 // Audio slice R1-S1. Clock tetap AudioContext.currentTime (§7.2); belum ada
 // look-ahead scheduler di slice ini, jadi satu pattern kecil dijadwalkan dari satu anchor.
 
-import { PPQ } from '../core/project.js';
 import {
   FACTORY_BASIC_ROOT_PITCH,
   FACTORY_BASIC_WAV_BASE64,
 } from './factory-sample.js';
+import {
+  SCHEDULE_AHEAD_SECONDS,
+  SCHEDULER_WAKE_MS,
+  createPatternScheduleCursor,
+} from './scheduler.js';
 
 const ROOT_PITCH = FACTORY_BASIC_ROOT_PITCH;
 const PREVIEW_SECONDS = 0.18;
 
-export function createAudioEngine() {
+export function createAudioEngine({ onStateChange = null } = {}) {
   let context = null;
   let sampleBytesPromise = null;
   let buffer = null;
   let state = 'locked';
-  const activeSources = new Set();
+  let schedulerTimer = null;
+  let playback = null;
+  const activeSources = new Map();
 
   function preload() {
     if (!sampleBytesPromise) {
@@ -72,7 +78,7 @@ export function createAudioEngine() {
     source.connect(gain);
     gain.connect(context.destination);
     source.onended = () => activeSources.delete(source);
-    activeSources.add(source);
+    activeSources.set(source, { when });
     source.start(when);
     source.stop(when + Math.max(0.04, durationSeconds));
     return source;
@@ -85,32 +91,68 @@ export function createAudioEngine() {
     return when;
   }
 
-  async function playPattern(project, pattern) {
+  async function playPattern(project, pattern, { loop = false } = {}) {
     await ensureReady();
-    stopSources();
+    stop();
+
     const tempo = project.song.initial.tempo;
-    const secondsPerTick = 60 / tempo / PPQ;
     const anchor = context.currentTime + 0.05;
+    const cursor = createPatternScheduleCursor(pattern, tempo, { loop });
 
-    for (const note of pattern.notes) {
-      scheduleVoice({
-        pitch: note.pitch,
-        velocity: note.velocity,
-        when: anchor + note.startTickLocal * secondsPerTick,
-        durationSeconds: note.durationTicks * secondsPerTick,
-      });
-    }
+    playback = {
+      anchor,
+      cursor,
+      loop: Boolean(loop),
+      durationSeconds: cursor.durationSeconds,
+      notesScheduled: 0,
+      endAt: anchor + cursor.durationSeconds,
+    };
 
-    state = 'playing';
+    scheduleWindow();
+    schedulerTimer = setInterval(scheduleWindow, SCHEDULER_WAKE_MS);
+    setState('playing');
+
     return {
       anchor,
-      durationSeconds: pattern.lengthTicks * secondsPerTick,
-      notesScheduled: pattern.notes.length,
+      durationSeconds: cursor.durationSeconds,
+      notesScheduled: playback.notesScheduled,
+      loop: playback.loop,
     };
   }
 
+  function scheduleWindow() {
+    if (!context || !playback || state !== 'playing') return;
+
+    const now = context.currentTime;
+    const horizon = now + SCHEDULE_AHEAD_SECONDS;
+    const due = playback.cursor.drainUntil(playback.anchor, horizon);
+
+    for (const event of due) {
+      scheduleVoice({
+        pitch: event.pitch,
+        velocity: event.velocity,
+        when: Math.max(event.when, now + 0.001),
+        durationSeconds: event.durationSeconds,
+      });
+      playback.notesScheduled += 1;
+    }
+
+    if (!playback.loop && playback.cursor.isExhausted() && now >= playback.endAt) {
+      clearScheduler();
+      playback = null;
+      setState('ready');
+    }
+  }
+
+  function setLoop(enabled) {
+    if (!playback) return false;
+    playback.loop = Boolean(enabled);
+    playback.cursor.setLoop(playback.loop);
+    return true;
+  }
+
   function stopSources() {
-    for (const source of [...activeSources]) {
+    for (const source of [...activeSources.keys()]) {
       try {
         source.stop();
       } catch {
@@ -120,9 +162,24 @@ export function createAudioEngine() {
     activeSources.clear();
   }
 
+  function clearScheduler() {
+    if (schedulerTimer !== null) {
+      clearInterval(schedulerTimer);
+      schedulerTimer = null;
+    }
+  }
+
+  function setState(next) {
+    if (state === next) return;
+    state = next;
+    onStateChange?.(state);
+  }
+
   function stop() {
+    clearScheduler();
     stopSources();
-    if (context) state = 'ready';
+    playback = null;
+    if (context) setState('ready');
   }
 
   function getState() {
@@ -131,10 +188,13 @@ export function createAudioEngine() {
       contextState: context?.state ?? 'none',
       sampleReady: Boolean(buffer),
       activeVoices: activeSources.size,
+      loop: playback?.loop ?? false,
+      schedulerActive: schedulerTimer !== null,
+      anchor: playback?.anchor ?? null,
     };
   }
 
-  return { preload, preview, playPattern, stop, getState };
+  return { preload, preview, playPattern, stop, setLoop, getState };
 }
 
 
