@@ -5,6 +5,18 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S13 — Empty state sel pertama Pattern (PASS)
+
+- Pattern kosong kini memberi cue langsung pada sel NOTE pertama: `Z=C`, dengan
+  keterangan aksesibel "Mulai di sini: tekan Z untuk C; Ctrl+E untuk EDIT."
+- Cue hanya muncul ketika Pattern benar-benar belum punya note; setelah note ditulis ia
+  berubah ke pitch normal, dan kembali bila note terakhir dihapus.
+- Regression lama diperbarui karena kontrak blank-cell memang berubah dari `···` ke cue
+  onboarding yang eksplisit.
+- Gate final run **37243711069** di atas main yang sudah memuat S14: `npm ci` 0 vulnerability,
+  unit **50/50 PASS**, `npm run check` PASS, build **151.1 KiB PASS**,
+  Playwright Chromium+Firefox **138/138 PASS** (46,2 dtk).
+
 ### S14 — Tooltip shortcut R1 (PASS)
 
 - Tooltip untuk kontrol yang memang punya shortcut kini menampilkan shortcut nyata:

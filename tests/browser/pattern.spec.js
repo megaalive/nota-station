@@ -71,7 +71,7 @@ test.describe('Pattern R1 editing', () => {
     await page.keyboard.press('z');
 
     expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
-    await expect(noteCell(page)).toHaveText('···');
+    await expect(noteCell(page)).toHaveText('Z=C');
     await expect(instrumentCell(page)).toHaveText('··');
     await expect(volumeCell(page)).toHaveText('··');
   });
@@ -230,7 +230,7 @@ test.describe('Pattern R1 editing', () => {
 
     await page.keyboard.press('Delete');
     expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
-    await expect(noteCell(page)).toHaveText('···');
+    await expect(noteCell(page)).toHaveText('Z=C');
     expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(2);
 
     await page.keyboard.press('Control+z');
@@ -240,7 +240,7 @@ test.describe('Pattern R1 editing', () => {
 
     await page.keyboard.press('Control+z');
     expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
-    await expect(noteCell(page)).toHaveText('···');
+    await expect(noteCell(page)).toHaveText('Z=C');
 
     await page.keyboard.press('Control+y');
     expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(1);
