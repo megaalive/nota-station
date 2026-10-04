@@ -698,8 +698,9 @@
 }
 
 .pattern-grid.is-audition .pattern-grid__cell.is-cursor {
-  box-shadow: inset 0 0 0 2px var(--audition-1);
-  border-style: dashed;
+  box-shadow: none;
+  outline: 2px dashed var(--audition-1);
+  outline-offset: -2px;
 }
 
 .statusbar__mode.is-edit {
