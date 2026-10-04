@@ -10,20 +10,51 @@ import { el, trapFocus, focusableWithin, onDismiss } from './dom.js';
 
 /* ---------------------------------------------------------------- Button */
 
-export function Button({ label, icon = null, variant = 'default', shortcut = null, onClick, disabled = false }) {
+export function Button({
+  label,
+  icon = null,
+  variant = 'default',
+  shortcut = null,
+  onClick,
+  disabled = false,
+  iconOnly = false,
+}) {
   const node = el('button', {
     type: 'button',
-    class: `btn btn--${variant}`,
+    class: `btn btn--${variant}${iconOnly ? ' btn--icon-only' : ''}`,
     'data-action': 'button',
+    'aria-label': iconOnly ? label : null,
     disabled: disabled || undefined,
     on: { click: onClick },
   }, [
     icon ? el('span', { class: 'btn__icon', 'aria-hidden': 'true', text: icon }) : null,
-    el('span', { class: 'btn__label', text: label }),
-    // Shortcut ditampilkan sebagai teks, bukan cuma ikon — dan tetap terbaca screen reader.
-    shortcut ? el('kbd', { class: 'btn__shortcut', 'aria-hidden': 'true', text: shortcut }) : null,
+    iconOnly ? null : el('span', { class: 'btn__label', text: label }),
+    // Shortcut visual disembunyikan pada tombol ikon; nama aksesibelnya tetap dari label.
+    shortcut && !iconOnly
+      ? el('kbd', { class: 'btn__shortcut', 'aria-hidden': 'true', text: shortcut })
+      : null,
   ]);
   return node;
+}
+
+/* ---------------------------------------------------------------- Tooltip */
+
+let tooltipSeq = 0;
+
+/**
+ * Tooltip ringan buat kontrol ikon. Label aksesibel tetap milik kontrolnya;
+ * tooltip cuma membantu pengguna sighted saat hover/focus.
+ */
+export function Tooltip({ text, child, shortcut = null }) {
+  const id = `tooltip-${++tooltipSeq}`;
+  const tipText = shortcut ? `${text} (${shortcut})` : text;
+  const previous = child.getAttribute('aria-describedby');
+  child.setAttribute('aria-describedby', previous ? `${previous} ${id}` : id);
+
+  return el('span', { class: 'tooltip-host' }, [
+    child,
+    el('span', { class: 'tooltip', id, role: 'tooltip', text: tipText }),
+  ]);
 }
 
 /* ------------------------------------------------------------------- Menu */
@@ -285,7 +316,7 @@ export function Tabs({ tabs, activeId, onSelect, label }) {
  * gestur punya padanan keyboard. Panah kiri/kanan mengubah lebar 16 px per langkah,
  * Home/End ke batas.
  */
-export function Splitter({ container, initialSize = 240, min = 160, max = 520, storageKey = null, store = null, side = 'left' }) {
+export function Splitter({ container, initialSize = 240, min = 160, max = 520, storageKey = null, store = null, side = 'left', label }) {
   const saved = readSaved(storageKey, store);
   const size = Math.min(max, Math.max(min, saved ?? initialSize));
 
@@ -294,7 +325,7 @@ export function Splitter({ container, initialSize = 240, min = 160, max = 520, s
     role: 'separator',
     tabindex: '0',
     'aria-orientation': 'vertical',
-    'aria-label': 'Resize panel',
+    'aria-label': label,
     'aria-valuenow': String(Math.round(size)),
     'aria-valuemin': String(min),
     'aria-valuemax': String(max),

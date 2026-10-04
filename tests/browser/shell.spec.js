@@ -35,6 +35,24 @@ test.describe('shell layout §8.3', () => {
     await expect(page.locator('[data-action="build-id"]')).toHaveText(sha.slice(0, 7));
   });
 
+  test('toolbar memakai ikon ringkas tanpa kehilangan nama aksesibel', async ({ page }) => {
+    const topbar = page.locator('[data-action="topbar"]');
+    const play = topbar.getByRole('button', { name: 'Putar' });
+    const stop = topbar.getByRole('button', { name: 'Berhenti' });
+    const palette = topbar.getByRole('button', { name: 'Palet perintah' });
+
+    await expect(play).toHaveClass(/btn--icon-only/);
+    await expect(stop).toHaveClass(/btn--icon-only/);
+    await expect(palette).toHaveClass(/btn--icon-only/);
+    await expect(play).toHaveText('▶');
+    await expect(stop).toHaveText('■');
+    await expect(palette).toHaveText('⌕');
+
+    await palette.focus();
+    const describedBy = await palette.getAttribute('aria-describedby');
+    await expect(page.locator(`#${describedBy}`)).toContainText('Ctrl+K');
+  });
+
   test('tab berganti hanya lewat aksi eksplisit (klik atau Alt+digit)', async ({ page }) => {
     await page.locator('[data-action="workspace-tab"][data-entity="sound"]').click();
     await expect(page.locator('[data-action="workspace-view"]')).toHaveAttribute('data-entity', 'sound');
@@ -83,6 +101,51 @@ test.describe('shell layout §8.3', () => {
     await expect(splitter).toHaveAttribute('aria-valuenow', await splitter.getAttribute('aria-valuemin'));
     await page.keyboard.press('End');
     expect(Number(await splitter.getAttribute('aria-valuenow'))).toBeGreaterThan(start);
+  });
+
+  test('wrapper splitter benar-benar menyusun panel dan handle secara horizontal', async ({ page }) => {
+    const left = page.locator('.splitter-layout--left');
+    const right = page.locator('.splitter-layout--right');
+
+    await expect(left).toHaveCSS('display', 'flex');
+    await expect(right).toHaveCSS('display', 'flex');
+    await expect(right).toHaveCSS('flex-direction', 'row-reverse');
+  });
+
+  test('panel kiri dan kanan bisa dilipat, dipakai lewat keyboard, dan statusnya tersimpan', async ({ page }) => {
+    const leftPanel = page.locator('[data-action="panel-left"]');
+    const leftToggle = page.locator('[data-action="panel-left-toggle"]');
+    const rightPanel = page.locator('[data-action="panel-right"]');
+    const rightToggle = page.locator('[data-action="panel-right-toggle"]');
+
+    await expect(leftToggle).toHaveAttribute('aria-expanded', 'true');
+    await leftToggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(leftPanel).toHaveClass(/is-collapsed/);
+    await expect(leftToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(await page.evaluate(() => localStorage.getItem('notastation.panel.left.collapsed'))).toBe('1');
+
+    await rightToggle.click();
+    await expect(rightPanel).toHaveClass(/is-collapsed/);
+
+    await page.reload();
+    await gotoApp(page);
+    await expect(page.locator('[data-action="panel-left"]')).toHaveClass(/is-collapsed/);
+    await expect(page.locator('[data-action="panel-right"]')).toHaveClass(/is-collapsed/);
+  });
+
+  test('tema terang, gelap, dan kontras tinggi berganti lewat command layer dan tersimpan', async ({ page }) => {
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    expect(await page.evaluate(() => window.tracker.getState().theme)).toBe('light');
+
+    expect(await page.evaluate(() => window.tracker.commands.execute('ui.cycleTheme'))).toBe('dark');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+    await page.reload();
+    await gotoApp(page);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    expect(await page.evaluate(() => window.tracker.commands.execute('ui.cycleTheme'))).toBe('high-contrast');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'high-contrast');
   });
 });
 

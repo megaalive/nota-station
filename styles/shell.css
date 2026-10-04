@@ -32,9 +32,14 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .topbar__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
 }
@@ -98,6 +103,58 @@
   border: 1px solid var(--border-1);
   border-radius: 3px;
   padding: 0 4px;
+}
+
+.btn--icon-only {
+  justify-content: center;
+  width: 34px;
+  min-width: 34px;
+  padding-inline: 0;
+}
+
+.btn--icon-only .btn__icon {
+  line-height: 1;
+}
+
+/* Tooltip muncul lewat hover maupun keyboard focus; tidak perlu timer JS. */
+.tooltip-host {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + var(--space-1));
+  left: 50%;
+  width: max-content;
+  max-width: min(280px, 80vw);
+  padding: var(--space-1) var(--space-2);
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  font-size: 0.8rem;
+  color: var(--surface-1);
+  background: var(--text-1);
+  border-radius: var(--radius-1);
+}
+
+.tooltip-host:hover .tooltip,
+.tooltip-host:focus-within .tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.topbar__transport > .tooltip-host:first-child .tooltip {
+  left: 0;
+  transform: none;
+}
+
+.topbar__transport > .tooltip-host:last-child .tooltip {
+  right: 0;
+  left: auto;
+  transform: none;
 }
 
 /* ---------------------------------------------------------------- tabs */
@@ -165,6 +222,47 @@
   color: var(--text-2);
 }
 
+.panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.panel__header .panel__title {
+  margin: 0;
+}
+
+.panel__toggle {
+  flex: 0 0 auto;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  font: inherit;
+  color: var(--text-1);
+  background: transparent;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-1);
+  cursor: pointer;
+}
+
+.panel.is-collapsed {
+  width: 42px !important;
+  flex: 0 0 42px !important;
+  padding-inline: 6px;
+  overflow: hidden;
+}
+
+.panel.is-collapsed .panel__title,
+.panel.is-collapsed .panel__content {
+  display: none;
+}
+
+.panel.is-collapsed .panel__header {
+  justify-content: center;
+}
+
 .panel__list {
   margin: 0;
   padding: 0;
@@ -189,6 +287,18 @@
 }
 
 /* ----------------------------------------------------------- splitter */
+
+.splitter-layout {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+.splitter-layout--right {
+  flex-direction: row-reverse;
+}
 
 .splitter {
   flex: 0 0 6px;

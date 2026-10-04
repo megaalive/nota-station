@@ -56,16 +56,22 @@ test.describe('boot shell di subpath', () => {
     expect(build.sha).toMatch(/^[0-9a-f]{7,40}$/);
   });
 
-  test('locale bisa diganti lewat hook dan tersimpan di localStorage', async ({ page }) => {
+  test('locale mengganti teks shell nyata dan tersimpan di localStorage', async ({ page }) => {
     await gotoApp(page);
 
+    await expect(page.locator('[data-action="panel-left"]')).toHaveAttribute('aria-label', 'Peta lagu');
     await page.evaluate(() => window.tracker.setLocale('en'));
     expect(await page.evaluate(() => window.tracker.getState().locale)).toBe('en');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.locator('[data-action="panel-left"]')).toHaveAttribute('aria-label', 'Song map');
+    await expect(page.locator('[data-action="panel-left-toggle"]')).toHaveAttribute('aria-label', 'Collapse Song map');
+    await expect(page.locator('[data-action="splitter"]').first()).toHaveAttribute('aria-label', 'Resize Song map');
 
     await page.reload();
     await gotoApp(page);
     expect(await page.evaluate(() => window.tracker.getState().locale)).toBe('en');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.locator('[data-action="panel-left"]')).toHaveAttribute('aria-label', 'Song map');
   });
 
   test('lang di <html> ngikutin i18n, default Indonesia', async ({ page }) => {

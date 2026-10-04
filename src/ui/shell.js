@@ -5,7 +5,7 @@
 // view berikutnya (Pattern, Piano Roll, dst.) tinggal mengisi slot yang sudah ada.
 
 import { el } from './dom.js';
-import { Tabs, Splitter, Button } from './kit.js';
+import { Tabs, Splitter, Button, Tooltip } from './kit.js';
 
 const WORKSPACE_TABS = [
   { id: 'song', labelKey: 'tab.song' },
@@ -31,14 +31,41 @@ export function createShell({ root, t, registry, palette, store, build }) {
     text: build?.sha ? build.sha.slice(0, 7) : t('shell.buildUnknown'),
   });
 
+  const playButton = Button({
+    label: t('transport.play'),
+    icon: '▶',
+    iconOnly: true,
+    onClick: () => registry.execute('playback.play'),
+  });
+  const stopButton = Button({
+    label: t('transport.stop'),
+    icon: '■',
+    iconOnly: true,
+    onClick: () => registry.execute('playback.stop'),
+  });
+  const paletteButton = Button({
+    label: t('cmd.palette'),
+    icon: '⌕',
+    iconOnly: true,
+    variant: 'ghost',
+    onClick: () => palette.open(),
+  });
+
   const transport = el('div', { class: 'topbar__transport', role: 'group', 'aria-label': t('topbar.transport') }, [
-    Button({ label: t('transport.play'), icon: '▶', onClick: () => registry.execute('playback.play') }),
-    Button({ label: t('transport.stop'), icon: '■', onClick: () => registry.execute('playback.stop') }),
-    el('span', { class: 'topbar__meta', dataset: { action: 'loop-mode' }, text: t('transport.loopPattern') }),
+    Tooltip({ text: t('transport.play'), child: playButton }),
+    Tooltip({ text: t('transport.stop'), child: stopButton }),
+    el('span', {
+      class: 'topbar__meta topbar__loop',
+      'aria-label': t('transport.loopPattern'),
+      dataset: { action: 'loop-mode' },
+    }, [
+      el('span', { 'aria-hidden': 'true', text: '↻' }),
+      el('span', { text: t('tab.pattern') }),
+    ]),
     el('span', { class: 'topbar__meta', dataset: { action: 'tempo-display' }, text: t('transport.tempoPlaceholder') }),
     el('span', { class: 'topbar__saved', role: 'status', dataset: { action: 'save-status' }, text: t('status.notSaved') }),
     buildId,
-    Button({ label: t('cmd.palette'), shortcut: 'Ctrl+K', variant: 'ghost', onClick: () => palette.open() }),
+    Tooltip({ text: t('cmd.palette'), shortcut: 'Ctrl+K', child: paletteButton }),
   ]);
 
   const topbar = el('header', { class: 'topbar', dataset: { action: 'topbar' } }, [transport]);
@@ -73,8 +100,8 @@ export function createShell({ root, t, registry, palette, store, build }) {
 
   /* ------------------------------------------------------------- panels */
 
-  const leftPanel = panel('left', t('shell.leftPanel'), t('left.placeholder'));
-  const rightPanel = panel('right', t('shell.rightPanel'), t('right.placeholder'));
+  const leftPanel = panel('left', t('shell.leftPanel'), t('left.placeholder'), { t, store });
+  const rightPanel = panel('right', t('shell.rightPanel'), t('right.placeholder'), { t, store });
 
   // Ukuran panel disimpan di localStorage: ini preference UI, bukan data lagu (§10.1).
   const leftSplit = Splitter({
@@ -84,6 +111,7 @@ export function createShell({ root, t, registry, palette, store, build }) {
     max: 420,
     storageKey: 'notastation.panel.left',
     store,
+    label: t('panel.resize', { panel: t('shell.leftPanel') }),
   });
   const rightSplit = Splitter({
     container: rightPanel,
@@ -92,6 +120,7 @@ export function createShell({ root, t, registry, palette, store, build }) {
     max: 480,
     storageKey: 'notastation.panel.right',
     store,
+    label: t('panel.resize', { panel: t('shell.rightPanel') }),
   });
 
   const workspace = el('main', {
@@ -146,15 +175,44 @@ export function createShell({ root, t, registry, palette, store, build }) {
   return { render, selectTab, getActiveTab: () => activeTab };
 }
 
-function panel(side, title, placeholder) {
-  return el('aside', {
+function panel(side, title, placeholder, { t, store }) {
+  const contentId = `panel-${side}-content`;
+  const storageKey = `notastation.panel.${side}.collapsed`;
+  const content = el('div', { class: 'panel__content', id: contentId }, [
+    el('ul', { class: 'panel__list' }, [el('li', { class: 'panel__item', text: placeholder })]),
+  ]);
+  const titleNode = el('h2', { class: 'panel__title', text: title });
+  const toggle = el('button', {
+    type: 'button',
+    class: 'panel__toggle',
+    'aria-controls': contentId,
+    dataset: { action: `panel-${side}-toggle` },
+  });
+
+  const root = el('aside', {
     class: `panel panel--${side}`,
     dataset: { action: `panel-${side}` },
     'aria-label': title,
   }, [
-    el('h2', { class: 'panel__title', text: title }),
-    el('ul', { class: 'panel__list' }, [el('li', { class: 'panel__item', text: placeholder })]),
+    el('div', { class: 'panel__header' }, [titleNode, toggle]),
+    content,
   ]);
+
+  function setCollapsed(collapsed, persist = true) {
+    root.classList.toggle('is-collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.setAttribute('aria-label', t(collapsed ? 'panel.expand' : 'panel.collapse', { panel: title }));
+    // Panahnya menunjukkan arah panel akan bergerak kalau tombol ditekan lagi.
+    toggle.textContent = side === 'left'
+      ? (collapsed ? '›' : '‹')
+      : (collapsed ? '‹' : '›');
+    if (persist) store?.setItem(storageKey, collapsed ? '1' : '0');
+  }
+
+  toggle.addEventListener('click', () => setCollapsed(!root.classList.contains('is-collapsed')));
+  setCollapsed(store?.getItem(storageKey) === '1', false);
+
+  return root;
 }
 
 /** Empty state bermakna di setiap view kosong: satu kalimat + satu petunjuk (§8.15). */

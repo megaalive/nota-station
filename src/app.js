@@ -9,8 +9,13 @@ import { createShell } from './ui/shell.js';
 const i18n = createI18n(readInitialLocale());
 const registry = createCommandRegistry();
 const store = window.localStorage;
+const THEMES = ['light', 'dark', 'high-contrast'];
 
+let theme = readInitialTheme();
+let buildInfo = null;
 let shell = null;
+
+applyTheme(theme);
 
 /**
  * Metadata build dibaca relatif, bukan dari path absolut — biar tetap jalan di
@@ -40,8 +45,35 @@ function setLocale(next) {
   if (!i18n.setLocale(next)) return false;
   store?.setItem('notastation.locale', next);
   syncHtmlLang();
-  shell?.render();
+
+  // Shell R0 dibuat dari string terjemahan saat konstruksi. Jadi ganti bahasa
+  // harus membuat ulang node-nya, bukan sekadar memasang ulang node lama.
+  if (shell) mountShell(shell.getActiveTab());
   return true;
+}
+
+function readInitialTheme() {
+  const stored = store?.getItem('notastation.theme');
+  return THEMES.includes(stored) ? stored : 'light';
+}
+
+function applyTheme(next) {
+  document.documentElement.dataset.theme = next;
+}
+
+function setTheme(next) {
+  if (!THEMES.includes(next)) return false;
+  theme = next;
+  store?.setItem('notastation.theme', next);
+  applyTheme(next);
+  return true;
+}
+
+function cycleTheme() {
+  const index = THEMES.indexOf(theme);
+  const next = THEMES[(index + 1) % THEMES.length];
+  setTheme(next);
+  return next;
 }
 
 /** Satu-satunya tempat yang menulis `lang` di <html> — jangan disalin ke tempat lain. */
@@ -94,6 +126,12 @@ function registerCommands() {
       },
     },
     {
+      id: 'ui.cycleTheme',
+      group: 'Tampilan',
+      labelKey: 'palette.toggleTheme',
+      run: () => cycleTheme(),
+    },
+    {
       // Sengaja nonaktif di R0: audio baru ada di R1. Tampilkan denngan alasan,
       // bukan disembunyikan — user jadi tahu kenapa tidak bisa dipakai (§8.14).
       id: 'io.exportWav',
@@ -109,6 +147,19 @@ function registerCommands() {
 function setSaveStatus(key) {
   const chip = document.querySelector('[data-action="save-status"]');
   if (chip) chip.textContent = i18n.t(key);
+}
+
+function mountShell(activeTab = 'pattern') {
+  shell = createShell({
+    root: document.getElementById('app'),
+    t: (key, vars) => i18n.t(key, vars),
+    registry,
+    palette,
+    store,
+    build: buildInfo,
+  });
+  shell.render();
+  if (activeTab !== 'pattern') shell.selectTab(activeTab);
 }
 
 function bindShortcuts() {
@@ -131,24 +182,22 @@ function bindShortcuts() {
 
 async function boot() {
   registerCommands();
-  const build = await loadBuildInfo();
+  buildInfo = await loadBuildInfo();
 
-  shell = createShell({
-    root: document.getElementById('app'),
-    t: (key, vars) => i18n.t(key, vars),
-    registry,
-    palette,
-    store,
-    build,
-  });
-  shell.render();
+  mountShell();
   syncHtmlLang();
   bindShortcuts();
 
   // Hook agent: satu-satunya jalan keluar state/aksi (§9). Nggak ada AudioContext
   // atau raw storage yang di-expose lewat sini.
   window.tracker = {
-    getState: () => ({ ready: true, locale: i18n.getLocale(), build, activeTab: shell.getActiveTab() }),
+    getState: () => ({
+      ready: true,
+      locale: i18n.getLocale(),
+      theme,
+      build: buildInfo,
+      activeTab: shell.getActiveTab(),
+    }),
     commands: registry,
     setLocale,
     i18n,
