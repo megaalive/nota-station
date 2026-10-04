@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,10 +10,14 @@
 <title>NotaStation</title>
 <link rel="stylesheet" href="./styles/tokens.css" />
 <link rel="stylesheet" href="./styles/app.css" />
+<link rel="stylesheet" href="./styles/shell.css" />
 </head>
 <body>
-<div id="app" role="application" aria-label="NotaStation"></div>
+<!-- Catatan: role="application" sengaja TIDAK dipakai di wrapper ini. Role itu hanya
+     untuk elemen grid (§8.19); memakainya di level <body> membuat screen reader
+     berhenti membacakan struktur halaman. -->
+<div id="app"></div>
 <script type="module" src="./src/app.js"></script>
-<noscript>NotaStation needs JavaScript to run.</noscript>
+<noscript>NotaStation butuh JavaScript untuk berjalan.</noscript>
 </body>
 </html>

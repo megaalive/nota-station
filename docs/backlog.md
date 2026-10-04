@@ -21,9 +21,19 @@ Dikumpulkan di sini, **tidak dikerjakan** sampai dijadwalkan di PLAN.md.
 | Item | Keputusan |
 |---|---|
 | Lisensi source | MIT |
-| Bahasa UI default | English, Indonesia tersedia |
-| Preset keymap | OpenMPT-like (verifikasi against OpenMPT saat R3) |
+| Bahasa UI default | **Indonesia**, English tersedia (diubah dari English ke Indonesian saat audit penutup R0) |
+| Preset keymap | OpenMPT-like (verifikasi terhadap OpenMPT saat R3) |
 | Channel UI baseline | 8 channel, batas model 32 track |
 | PPQ | 480 |
 | Ekstensi | `.webtrack` |
 | Aturan emas, voice lane, hapus `repeatCount`, LPB + kolom DLY, mode EDIT default, istilah "Channel", urutan R5a→R5d, template awal, batas parser §10.5 | disetujui semua sesuai usulan default |
+
+## Butir §13.4 yang belum bisa diuji smoke (menunggu milestone)
+
+- Audio dapat diinisialisasi setelah gestur tepercaya → R1
+- Proyek baru dapat dibuat → R1
+- Minimal satu pattern dapat dimainkan → R1
+- Manifest factory sample dapat di-fetch → R2
+
+Keempatnya sengaja tidak diimplementasikan lebih awal demi membuat smoke test hijau —
+itu persis yang dilarang brief Anda.

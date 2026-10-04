@@ -20,7 +20,7 @@ const MIME = {
   '.png': 'image/png',
 };
 
-export function startServer({ basePath = '/', dir = join(ROOT, 'dist'), port = 0 } = {}) {
+export function startServer({ basePath = '/nota-station/', dir = join(ROOT, 'dist'), port = 0 } = {}) {
   // Normalisasi supaya basePath selalu "/repo/" dan cocok dengan URL Pages.
   const prefix = basePath.endsWith('/') ? basePath : `${basePath}/`;
 
@@ -69,7 +69,7 @@ export function startServer({ basePath = '/', dir = join(ROOT, 'dist'), port = 0
 // Dipakai CI smoke: jalankan sebagai proses panjang.
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   const port = Number(process.env.PORT ?? 8080);
-  const basePath = process.env.BASE_PATH ?? '/';
+  const basePath = process.env.BASE_PATH ?? '/nota-station/';
   const { baseUrl } = await startServer({ port, basePath });
   console.log(`serving dist/ di ${baseUrl}`);
 }

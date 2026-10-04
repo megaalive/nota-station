@@ -20,7 +20,6 @@ body {
 
 #app {
   min-height: 100vh;
-  padding: var(--space-4);
 }
 
 /* Fokus harus kelihatan jelas dan bukan cuma beda warna — garis tebal + offset. */

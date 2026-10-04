@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
 
+import { gotoApp, waitForApp } from './helpers.js';
+
 /**
  * Skenario boot R0 (§15 R0 exit): semua aset resolve di subpath /<repo>/,
  * tanpa galat console, build id terbaca, dan hook agent tersedia.
  */
 test.describe('boot shell di subpath', () => {
-  test('index.html 200 dan memuat app tanpa galat konsol', async ({ page }) => {
+  test('index.html 200 dan app boot tanpa galat konsol', async ({ page }) => {
     const consoleErrors = [];
     const pageErrors = [];
     page.on('console', (msg) => {
@@ -16,35 +18,38 @@ test.describe('boot shell di subpath', () => {
     const response = await page.goto('./');
     expect(response.status()).toBe(200);
 
-    await expect(page.getByRole('application')).toBeVisible();
-    await expect(page.locator('h1')).toHaveText('NotaStation');
-    await expect(page.locator('[data-action="shell-placeholder"]')).toBeVisible();
+    await gotoApp(page);
+    await expect(page.getByRole('banner')).toBeVisible();
 
     expect(pageErrors).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });
 
   test('window.tracker tersedia dengan command layer dan listCommands', async ({ page }) => {
-    await page.goto('./');
-    await page.waitForFunction(() => Boolean(window.tracker));
+    await gotoApp(page);
 
     const info = await page.evaluate(() => ({
       ready: window.tracker.getState().ready,
       hasRegistry: typeof window.tracker.commands.register === 'function',
-      commandCount: window.tracker.commands.listCommands().length,
+      commands: window.tracker.commands.listCommands(),
       // Agent tidak boleh sampai bisa menyentuh AudioContext atau storage mentah (§9).
       leaked: ['audioContext', 'storage', 'indexedDB'].filter((k) => k in window.tracker),
     }));
 
     expect(info.ready).toBe(true);
     expect(info.hasRegistry).toBe(true);
-    expect(info.commandCount).toBeGreaterThanOrEqual(0);
+    // Registry harus benar-benar berisi perintah, bukan PLACEHOLDER kosong.
+    expect(info.commands.length).toBeGreaterThan(0);
+    for (const command of info.commands) {
+      expect(command).toHaveProperty('id');
+      expect(command).toHaveProperty('labelKey');
+      expect(command).toHaveProperty('enabled');
+    }
     expect(info.leaked).toEqual([]);
   });
 
   test('build.json terbaca relatif sehingga SHA ikut', async ({ page }) => {
-    await page.goto('./');
-    await page.waitForFunction(() => Boolean(window.tracker));
+    await gotoApp(page);
 
     const build = await page.evaluate(() => window.tracker.getState().build);
     expect(build).not.toBeNull();
@@ -52,23 +57,45 @@ test.describe('boot shell di subpath', () => {
   });
 
   test('locale bisa diganti lewat hook dan tersimpan di localStorage', async ({ page }) => {
-    await page.goto('./');
-    await page.waitForFunction(() => Boolean(window.tracker));
+    await gotoApp(page);
 
-    await page.evaluate(() => window.tracker.setLocale('id'));
-    expect(await page.evaluate(() => window.tracker.getState().locale)).toBe('id');
+    await page.evaluate(() => window.tracker.setLocale('en'));
+    expect(await page.evaluate(() => window.tracker.getState().locale)).toBe('en');
 
     await page.reload();
-    await page.waitForFunction(() => Boolean(window.tracker));
-    expect(await page.evaluate(() => window.tracker.getState().locale)).toBe('id');
-    await expect(page.locator('html')).toHaveAttribute('lang', 'id');
+    await gotoApp(page);
+    expect(await page.evaluate(() => window.tracker.getState().locale)).toBe('en');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  });
+
+  test('lang di <html> ngikutin i18n, default Indonesia', async ({ page }) => {
+    await gotoApp(page);
+
+    const state = await page.evaluate(() => ({
+      lang: document.documentElement.lang,
+      locale: window.tracker.getState().locale,
+    }));
+    expect(state.locale).toBe('id');
+    expect(state.lang).toBe('id');
+  });
+
+  test('role=application tidak dipakai di wrapper halaman', async ({ page }) => {
+    await gotoApp(page);
+    // Role itu khusus elemen grid (§8.19); di R0 belum ada grid, jadi harus nihil.
+    expect(await page.locator('[role="application"]').count()).toBe(0);
   });
 
   test('CSP tidak memblokir aset sendiri', async ({ page }) => {
     const failed = [];
     page.on('requestfailed', (req) => failed.push(req.url()));
-    await page.goto('./');
-    await page.waitForFunction(() => Boolean(window.tracker));
+    await gotoApp(page);
     expect(failed).toEqual([]);
+  });
+
+  test('refresh tidak 404 di subpath', async ({ page }) => {
+    await gotoApp(page);
+    const response = await page.reload();
+    expect(response.status()).toBe(200);
+    await waitForApp(page);
   });
 });
