@@ -4,8 +4,9 @@ Web Tracker Songwriting Workstation — static site untuk GitHub Pages.
 Seluruh aplikasi berdiri di atas satu model musik kanonik, lalu diproyeksikan ke beberapa
 tampilan sekaligus (Pattern, Piano Roll, Lyrics, Guitar, Score).
 
-Status: **R0 — Fondasi statis + UI shell** sudah terimplementasi dan Pages aktif.
-Audit penutupan R0 masih berjalan; deployment saat ini manual ke branch `gh-pages`.
+Status: **R0 — Fondasi statis + UI shell: CLOSED**. Gate unit/check/build dan
+Playwright Chromium+Firefox sudah lulus; deployment tetap manual ke branch `gh-pages`.
+Milestone berikutnya: **R1 — Tracker yang bisa dimainkan**.
 
 ## Menjalankan
 
