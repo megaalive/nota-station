@@ -191,6 +191,8 @@ export function createAudioEngine({ onStateChange = null } = {}) {
       loop: playback?.loop ?? false,
       schedulerActive: schedulerTimer !== null,
       anchor: playback?.anchor ?? null,
+      durationSeconds: playback?.durationSeconds ?? null,
+      notesScheduled: playback?.notesScheduled ?? 0,
     };
   }
 
