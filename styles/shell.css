@@ -146,6 +146,17 @@
   visibility: visible;
 }
 
+.topbar__transport > .tooltip-host:first-child .tooltip {
+  left: 0;
+  transform: none;
+}
+
+.topbar__transport > .tooltip-host:last-child .tooltip {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
 /* ---------------------------------------------------------------- tabs */
 
 .tabs__list {
