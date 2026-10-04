@@ -27,6 +27,8 @@ const messages = {
     'shell.dock': 'Dock',
     'shell.statusBar': 'Status',
     'shell.buildUnknown': 'build ?',
+    'panel.collapse': 'Lipat {panel}',
+    'panel.expand': 'Buka {panel}',
 
     'topbar.transport': 'Transport',
     'transport.play': 'Putar',
@@ -80,6 +82,8 @@ const messages = {
     'shell.dock': 'Dock',
     'shell.statusBar': 'Status',
     'shell.buildUnknown': 'build ?',
+    'panel.collapse': 'Collapse {panel}',
+    'panel.expand': 'Expand {panel}',
 
     'topbar.transport': 'Transport',
     'transport.play': 'Play',
