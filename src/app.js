@@ -3,7 +3,10 @@
 
 import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
 import { createCommandRegistry } from './core/commands.js';
+import { activePattern, createBlankProject, enterNote } from './core/project.js';
+import { createAudioEngine } from './audio/engine.js';
 import { createPalette } from './ui/palette.js';
+import { createPatternView } from './ui/pattern.js';
 import { createShell } from './ui/shell.js';
 
 const i18n = createI18n(readInitialLocale());
@@ -13,6 +16,8 @@ const THEMES = ['light', 'dark', 'high-contrast'];
 
 let theme = readInitialTheme();
 let buildInfo = null;
+let project = createBlankProject();
+const audio = createAudioEngine();
 let shell = null;
 
 applyTheme(theme);
@@ -95,7 +100,7 @@ function registerCommands() {
       labelKey: 'transport.play',
       shortcut: 'Space',
       run: () => {
-        setSaveStatus('status.notSaved');
+        void playActivePattern();
         return 'play';
       },
     },
@@ -103,7 +108,21 @@ function registerCommands() {
       id: 'playback.stop',
       group: 'Playback',
       labelKey: 'transport.stop',
-      run: () => 'stop',
+      run: () => {
+        audio.stop();
+        shell?.setAudioStatus(audio.getState().state);
+        return 'stop';
+      },
+    },
+    {
+      id: 'pattern.enterNote',
+      group: 'Pattern',
+      labelKey: 'pattern.enterNote',
+      run: (args) => {
+        project = enterNote(project, args);
+        setSaveStatus('status.notSaved');
+        return { noteCount: activePattern(project).notes.length };
+      },
     },
     {
       id: 'ui.showPattern',
@@ -149,6 +168,37 @@ function setSaveStatus(key) {
   if (chip) chip.textContent = i18n.t(key);
 }
 
+async function playActivePattern() {
+  try {
+    const result = await audio.playPattern(project, activePattern(project));
+    shell?.setAudioStatus('playing');
+    return result;
+  } catch {
+    shell?.setAudioStatus('error');
+    return null;
+  }
+}
+
+function auditionPitch(pitch) {
+  void audio.preview(pitch)
+    .then(() => shell?.setAudioStatus('ready'))
+    .catch(() => shell?.setAudioStatus('error'));
+}
+
+function renderWorkspace(tab, root) {
+  if (tab !== 'pattern') return false;
+
+  createPatternView({
+    root,
+    t: (key, vars) => i18n.t(key, vars),
+    getProject: () => project,
+    registry,
+    onAudition: auditionPitch,
+    onStatus: (status) => shell?.setPatternStatus(status),
+  });
+  return true;
+}
+
 function mountShell(activeTab = 'pattern') {
   shell = createShell({
     root: document.getElementById('app'),
@@ -157,6 +207,7 @@ function mountShell(activeTab = 'pattern') {
     palette,
     store,
     build: buildInfo,
+    renderView: renderWorkspace,
   });
   shell.render();
   if (activeTab !== 'pattern') shell.selectTab(activeTab);
@@ -176,6 +227,12 @@ function bindShortcuts() {
       const index = Number(event.code.slice(5)) - 1;
       const ids = ['song', 'pattern', 'pianoRoll', 'lyrics', 'guitar', 'score', 'sound'];
       shell?.selectTab(ids[index]);
+      return;
+    }
+    if (event.code === 'Space' && !event.ctrlKey && !event.altKey && !event.metaKey) {
+      if (event.target.closest?.('input, textarea, [contenteditable="true"], [data-action="pattern-grid"]')) return;
+      event.preventDefault();
+      registry.execute(audio.getState().state === 'playing' ? 'playback.stop' : 'playback.play');
     }
   });
 }
@@ -187,6 +244,7 @@ async function boot() {
   mountShell();
   syncHtmlLang();
   bindShortcuts();
+  void audio.preload();
 
   // Hook agent: satu-satunya jalan keluar state/aksi (§9). Nggak ada AudioContext
   // atau raw storage yang di-expose lewat sini.
@@ -197,7 +255,14 @@ async function boot() {
       theme,
       build: buildInfo,
       activeTab: shell.getActiveTab(),
+      audio: audio.getState(),
+      project: {
+        id: project.id,
+        patternId: activePattern(project).id,
+        noteCount: activePattern(project).notes.length,
+      },
     }),
+    getProject: () => structuredClone(project),
     commands: registry,
     setLocale,
     i18n,
