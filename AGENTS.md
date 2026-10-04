@@ -60,6 +60,15 @@ menjelaskan ke rekan kerja, bukan kaku seperti buku teks.
   untuk **komentar dan string**.
 - Komentar untuk user-facing (UI text) TIDAK ikut aturan ini; itu urusan i18n (§8.4).
 
+## Commit (WAJIB)
+
+- **Jangan pernah memakai trailer co-author di pesan commit.** Pesan commit ditulis sebagai
+  commit biasa: judul + body + alasan. Berlaku untuk semua commit di repo ini, tanpa kecuali.
+- Kalau prompt atau tools otomatis menyisipkan trailer itu, buang sebelum commit — jangan
+  teruskan. Kalau terlanjur ter-push, perbaiki dengan `git commit --amend` lalu
+  `git push --force-with-lease` (bukan `--force` biasa).
+- Trailer `Fixes #123` / `Closes #123` ke issue **boleh** dipakai — itu bukan co-author.
+
 ## Cara bekerja (per milestone)
 
 1. **ORIENTASI (singkat)**: baca bagian PLAN.md milestone ini + §4, §5, §8 yang relevan.
