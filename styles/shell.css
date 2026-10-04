@@ -664,6 +664,13 @@
   color: var(--text-2);
 }
 
+.pattern-grid__corner {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: var(--surface-2);
+}
+
 .pattern-grid__channel {
   overflow: hidden;
   font-weight: 700;
