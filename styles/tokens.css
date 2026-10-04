@@ -23,6 +23,8 @@
   --text-2: #4a4f58;
   --border-1: #c9ccd3;
   --accent-1: #2b6cb0;
+  --edit-1: #b42318;
+  --audition-1: #1565c0;
   --focus-ring: #1a56db;
 }
 
@@ -36,6 +38,8 @@
   --text-2: #b6bcc7;
   --border-1: #3a3f4a;
   --accent-1: #7fb2f0;
+  --edit-1: #ff8a80;
+  --audition-1: #8ab4f8;
   --focus-ring: #8ab4f8;
 }
 
@@ -51,6 +55,8 @@
   --text-2: #ffffff;
   --border-1: #ffffff;
   --accent-1: #ffe600;
+  --edit-1: #ff6b6b;
+  --audition-1: #7dd3fc;
   --focus-ring: #ffe600;
 }
 
