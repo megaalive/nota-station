@@ -272,7 +272,9 @@ export function createPatternView({
   }
 
   function deleteCurrentEvent() {
-    if (mode !== 'edit') return;
+    // INST/VOL masih read-only pada slice ini. Delete di sana tidak boleh
+    // diam-diam menghapus seluruh NoteEvent.
+    if (mode !== 'edit' || cursorField !== 'note') return;
 
     const { pattern, tracks } = projectInfo();
     registry.execute('pattern.deleteNote', {
