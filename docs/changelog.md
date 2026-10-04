@@ -5,6 +5,31 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+
+### S5 — Pause/seek/metronom + tempo live re-anchor (PASS)
+
+- Transport Pattern kini lengkap untuk pekerjaan dasar: **Play, Pause/Resume, Stop, Seek**,
+  loop Pattern, tempo, dan metronom. Posisi transport diturunkan dari
+  `AudioContext.currentTime`; timer hanya membangunkan look-ahead scheduler.
+- Pause menangkap tick saat ini dan resume melanjutkan dari tick tersebut. Seek dapat dilakukan
+  saat diam maupun playback; Stop mengembalikan posisi ke awal Pattern.
+- Metronom mengikuti meter Pattern, memberi accent pada awal bar, dan dijadwalkan lewat audio
+  clock yang sama dengan note. Toggle loop/metronom adalah state sesi dan tidak mengotori
+  history project.
+- Perubahan tempo saat playback tidak lagi menghentikan transport: scheduler di-*re-anchor*
+  pada tick kini dengan tempo baru. `scheduleRevision` dipakai sebagai observability
+  deterministik agar regresi lintas-browser tidak bergantung pada perilaku clock headless.
+- Scheduler mendukung `startTick`, seek, metronom, dan uji **100 loop tanpa drift progresif**.
+  Kontrak S4 `durationSeconds` tetap dipertahankan untuk kompatibilitas.
+- Topbar tetap compact: aksi universal memakai ikon `▶ ⏸ ■ ↻ ♩`, sedangkan tempo, meter,
+  dan seek memakai kontrol yang lebih jelas; semuanya tetap punya accessible name/tooltip.
+- Gate final setelah koreksi regresi: `npm ci` **0 vulnerability**, unit **39/39 PASS**,
+  `npm run check` PASS, build **123.6 KiB PASS**, Playwright Chromium+Firefox
+  **108/108 PASS** (42,8 dtk).
+- **Belum menutup R1**: live-edit add/delete dengan cancel/freeze window scheduler,
+  JSON debug import/export, spike efek pitch, template/welcome, serta UAT/performance exit.
+
+
 ### S4 — Scheduler look-ahead + tempo + loop Pattern (PASS)
 
 - Playback Pattern dipindahkan dari "jadwalkan semua sekali" ke scheduler look-ahead
