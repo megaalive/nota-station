@@ -23,8 +23,10 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
   tidak lagi diblokir oleh penyelesaian promise itu; node audio boleh dijadwalkan
   selama context menunggu transisi ke `running`.
 - Gate final slice: `npm ci` **0 vulnerability**, unit **22/22 PASS**,
-  `npm run check` PASS, build **84.9 KiB PASS**, Playwright Chromium+Firefox
-  **68/68 PASS** (21,0 dtk).
+  `npm run check` PASS, build **85.4 KiB PASS**, Playwright Chromium+Firefox
+  **68/68 PASS** (27,0 dtk).
+- Live smoke diperluas setelah publish: boot/subpath/CSP/build metadata + project baru,
+  input NoteEvent, serta Play/Stop factory sound dari gestur pengguna — **9/9 PASS**.
 - Workflow verifikasi hanya sementara dan dihapus kembali sebelum merge.
 - **Belum menutup R1**: NOTE/INST/VOL lengkap, loop/metronome, seek/pause, undo/redo,
   JSON debug import/export, live-edit scheduler penuh, pitch-effect spike, template,
