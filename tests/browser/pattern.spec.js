@@ -301,6 +301,11 @@ test.describe('Pattern R1 editing', () => {
     await page.getByRole('button', { name: 'Putar' }).click();
     await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain', { timeout: 5000 });
 
+    // Dekat akhir Pattern: row 0 cycle berikutnya jatuh ~112,5 ms dari sekarang
+    // (anchor 50 ms + sisa 60 tick pada 120 BPM), langsung di dalam horizon 120 ms.
+    // Ini menguji cancel nyata tanpa bergantung pada currentTime headless yang maju.
+    await page.evaluate(() => window.tracker.commands.execute('playback.seek', { tick: 7620 }));
+
     const before = await page.evaluate(() => window.tracker.getState().audio);
     const context = await page.evaluate(() => {
       const project = window.tracker.getProject();
@@ -314,7 +319,7 @@ test.describe('Pattern R1 editing', () => {
       window.tracker.commands.execute('pattern.enterNote', {
         patternId,
         trackId,
-        row: 4,
+        row: 0,
         pitch: 60,
       });
     }, context);
@@ -335,7 +340,7 @@ test.describe('Pattern R1 editing', () => {
       window.tracker.commands.execute('pattern.deleteNote', {
         patternId,
         trackId,
-        row: 4,
+        row: 0,
       });
     }, context);
 
