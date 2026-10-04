@@ -35,6 +35,9 @@ const messages = {
     'transport.play': 'Putar',
     'transport.stop': 'Berhenti',
     'transport.loopPattern': 'Loop Pattern',
+    'transport.tempo': 'Tempo',
+    'transport.tempoUnit': 'BPM',
+    'transport.tempoInvalid': 'Tempo harus 20–300 BPM.',
     'transport.tempoPlaceholder': '♩120 4/4 Am',
 
     'status.edit': 'EDIT',
@@ -119,6 +122,9 @@ const messages = {
     'transport.play': 'Play',
     'transport.stop': 'Stop',
     'transport.loopPattern': 'Loop Pattern',
+    'transport.tempo': 'Tempo',
+    'transport.tempoUnit': 'BPM',
+    'transport.tempoInvalid': 'Tempo must be 20–300 BPM.',
     'transport.tempoPlaceholder': '♩120 4/4 Am',
 
     'status.edit': 'EDIT',
