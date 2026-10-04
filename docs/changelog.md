@@ -5,6 +5,27 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S9 — Template R1 + first-run welcome (PASS)
+
+- R1 mengirim dua template sesuai roadmap: **Kosong** dan **Pop 4/4**. Pop 4/4 memakai
+  factory sound R1 yang sama tetapi sudah berisi guide kick/snare/bass/melodi agar pengguna
+  dapat langsung menekan Play dan mengedit pola.
+- First-run welcome tampil sekali dan menyediakan bahasa Indonesia/English, preset keymap,
+  template, serta aksi **Lewati**. Default template adalah Pop 4/4 untuk memperpendek T1.
+- Pilihan keymap tidak kosmetik: Songwriter membuka Pattern dalam **AUDISI**; OpenMPT-like
+  membuka Pattern dalam **EDIT**. Shortcut OpenMPT-like lengkap tetap milestone R3.
+- Jalur UI dan agent memakai command yang sama, `project.loadTemplate`; mengganti template
+  mereset history dan membangun ulang Pattern view dengan preference project baru.
+- Locale dan keymap first-run disimpan sebagai preference sesi/browser. Reload tidak
+  memunculkan welcome lagi setelah pengguna menyelesaikan atau melewatinya.
+- Ditambahkan scaffold `docs/ux-findings.md` dan `docs/r1-uat.md`; hasil manusia belum
+  diisi dan tidak dianggap PASS sebelum sesi nyata dilakukan.
+- Gate final run **37242568013**: `npm ci` 0 vulnerability, unit **50/50 PASS**,
+  `npm run check` PASS, build **148.6 KiB PASS**, Playwright Chromium+Firefox
+  **128/128 PASS** (58,1 dtk).
+- **Belum menutup R1**: banner audio terkunci, proof 32 voice, publish live, UAT manusia,
+  dan uji underrun audio real-time 2 menit.
+
 ### S7 — JSON debug export/import (PASS)
 
 - Tambah format debug `.webtrack.json` untuk fixture/test dan round-trip proyek R1
