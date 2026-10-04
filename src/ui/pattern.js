@@ -209,6 +209,21 @@ export function createPatternView({
     } else if (bottom > scroller.scrollTop + scroller.clientHeight) {
       scroller.scrollTop = bottom - scroller.clientHeight;
     }
+
+    const fieldIndex = FIELDS.indexOf(cursorField);
+    const widths = [NOTE_WIDTH, INST_WIDTH, VOL_WIDTH];
+    const fieldOffset = widths.slice(0, fieldIndex).reduce((sum, width) => sum + width, 0);
+    const fieldWidth = widths[fieldIndex];
+    const left = ROW_NUMBER_WIDTH + cursorChannel * CHANNEL_WIDTH + fieldOffset;
+    const right = left + fieldWidth;
+    const visibleLeft = scroller.scrollLeft + ROW_NUMBER_WIDTH;
+    const visibleRight = scroller.scrollLeft + scroller.clientWidth;
+
+    if (left < visibleLeft) {
+      scroller.scrollLeft = Math.max(0, left - ROW_NUMBER_WIDTH);
+    } else if (right > visibleRight) {
+      scroller.scrollLeft = Math.max(0, right - scroller.clientWidth);
+    }
   }
 
   function moveVertical(delta) {
@@ -228,6 +243,7 @@ export function createPatternView({
     );
     cursorChannel = Math.floor(flat / FIELDS.length);
     cursorField = FIELDS[flat % FIELDS.length];
+    ensureCursorVisible();
     renderWindow();
     syncStatus();
   }
@@ -275,7 +291,11 @@ export function createPatternView({
     scroller.classList.toggle('is-audition', mode !== 'edit');
     octaveText.textContent = `${t('status.octave')} ${octave}`;
     stepText.textContent = `${t('status.step')} ${step}`;
-    hint.textContent = t(mode === 'edit' ? 'pattern.hintEdit' : 'pattern.hintAudition');
+    hint.textContent = cursorField === 'note'
+      ? t(mode === 'edit' ? 'pattern.hintEdit' : 'pattern.hintAudition')
+      : t('pattern.hintReadonlyField', {
+        field: t(cursorField === 'instrument' ? 'pattern.columnInstrument' : 'pattern.columnVolume'),
+      });
     onStatus?.({ mode, octave, step, row: cursorRow });
   }
 
