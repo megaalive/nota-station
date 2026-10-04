@@ -5,7 +5,7 @@
 // view berikutnya (Pattern, Piano Roll, dst.) tinggal mengisi slot yang sudah ada.
 
 import { el } from './dom.js';
-import { Tabs, Splitter, Button } from './kit.js';
+import { Tabs, Splitter, Button, Tooltip } from './kit.js';
 
 const WORKSPACE_TABS = [
   { id: 'song', labelKey: 'tab.song' },
@@ -31,14 +31,41 @@ export function createShell({ root, t, registry, palette, store, build }) {
     text: build?.sha ? build.sha.slice(0, 7) : t('shell.buildUnknown'),
   });
 
+  const playButton = Button({
+    label: t('transport.play'),
+    icon: '▶',
+    iconOnly: true,
+    onClick: () => registry.execute('playback.play'),
+  });
+  const stopButton = Button({
+    label: t('transport.stop'),
+    icon: '■',
+    iconOnly: true,
+    onClick: () => registry.execute('playback.stop'),
+  });
+  const paletteButton = Button({
+    label: t('cmd.palette'),
+    icon: '⌕',
+    iconOnly: true,
+    variant: 'ghost',
+    onClick: () => palette.open(),
+  });
+
   const transport = el('div', { class: 'topbar__transport', role: 'group', 'aria-label': t('topbar.transport') }, [
-    Button({ label: t('transport.play'), icon: '▶', onClick: () => registry.execute('playback.play') }),
-    Button({ label: t('transport.stop'), icon: '■', onClick: () => registry.execute('playback.stop') }),
-    el('span', { class: 'topbar__meta', dataset: { action: 'loop-mode' }, text: t('transport.loopPattern') }),
+    Tooltip({ text: t('transport.play'), child: playButton }),
+    Tooltip({ text: t('transport.stop'), child: stopButton }),
+    el('span', {
+      class: 'topbar__meta topbar__loop',
+      'aria-label': t('transport.loopPattern'),
+      dataset: { action: 'loop-mode' },
+    }, [
+      el('span', { 'aria-hidden': 'true', text: '↻' }),
+      el('span', { text: 'Pattern' }),
+    ]),
     el('span', { class: 'topbar__meta', dataset: { action: 'tempo-display' }, text: t('transport.tempoPlaceholder') }),
     el('span', { class: 'topbar__saved', role: 'status', dataset: { action: 'save-status' }, text: t('status.notSaved') }),
     buildId,
-    Button({ label: t('cmd.palette'), shortcut: 'Ctrl+K', variant: 'ghost', onClick: () => palette.open() }),
+    Tooltip({ text: t('cmd.palette'), shortcut: 'Ctrl+K', child: paletteButton }),
   ]);
 
   const topbar = el('header', { class: 'topbar', dataset: { action: 'topbar' } }, [transport]);
