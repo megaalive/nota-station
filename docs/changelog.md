@@ -5,6 +5,21 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R0 — Fondasi statis + UI shell
 
+### Audit deployment setelah R0 — artifact branch (2026-10-04)
+
+- Workflow Pages dan workflow browser GitHub Actions dihapus setelah full Playwright pada
+  GitHub-hosted runner berulang kali hang sangat lama; masalah runner belum dinyatakan selesai.
+- Deployment aktif sekarang: `main` = source, `gh-pages` = artifact. `npm run deploy`
+  membangun `dist/` terbaru lalu `tools/deploy-pages.mjs` force-push artefak ke
+  `gh-pages`.
+- Smoke live tetap tersedia lewat `npm run test:smoke` dengan `PAGE_URL` dan
+  `EXPECT_SHA`; ia tidak lagi dijalankan otomatis oleh workflow.
+- Entri S2–S4 di bawah dipertahankan sebagai sejarah implementasi awal. Bagian workflow di
+  sana **bukan lagi state aktif repository**.
+- Penutupan R0 diaudit ulang terhadap state aktual sebelum R1 dimulai; keberadaan tes tidak
+  dianggap bukti bahwa tes tersebut baru saja dijalankan.
+
+
 ### S1 — Infra build/test + app shell statis boot (selesai)
 
 - Infra: `package.json` (gate `test`/`check`/`build`/`test:browser`/`test:smoke`),
