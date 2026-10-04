@@ -159,6 +159,54 @@ test.describe('smoke build live', () => {
     expect(audio.schedulerActive).toBe(false);
   });
 
+  test('transport S5 pause seek metronom dan tempo live bekerja pada Pages', async ({ page }) => {
+    await gotoApp(page);
+
+    const grid = page.locator('[data-action="pattern-grid"]');
+    await grid.focus();
+    await page.keyboard.press('Control+e');
+    await page.keyboard.press('z');
+
+    const metronome = page.getByRole('button', { name: 'Metronom' });
+    await metronome.click();
+    await expect(metronome).toHaveAttribute('aria-pressed', 'true');
+
+    await page.getByRole('button', { name: 'Putar' }).click();
+    await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain', { timeout: 5000 });
+
+    const revisionBefore = await page.evaluate(() => window.tracker.getState().audio.scheduleRevision);
+    const tempo = page.locator('[data-action="tempo-input"]');
+    await tempo.fill('180');
+    await tempo.press('Tab');
+
+    let audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.state).toBe('playing');
+    expect(audio.tempo).toBe(180);
+    expect(audio.scheduleRevision).toBeGreaterThan(revisionBefore);
+    expect(audio.clicksScheduled).toBeGreaterThan(0);
+
+    await page.getByRole('button', { name: 'Jeda' }).click();
+    await expect(page.locator('[data-action="audio-status"]')).toContainText('jeda');
+    const pausedTick = await page.evaluate(() => window.tracker.getState().audio.positionTick);
+    expect(pausedTick).toBeGreaterThanOrEqual(0);
+
+    const seek = page.locator('[data-action="transport-seek"]');
+    await seek.evaluate((node) => {
+      node.value = '960';
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(await page.evaluate(() => window.tracker.getState().audio.positionTick)).toBe(960);
+
+    await page.getByRole('button', { name: 'Putar' }).click();
+    await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain');
+
+    await page.getByRole('button', { name: 'Berhenti' }).click();
+    await expect(page.locator('[data-action="audio-status"]')).toContainText('siap');
+    audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.positionTick).toBe(0);
+    expect(audio.activeClicks).toBe(0);
+  });
+
   test('gestur pengguna membuka factory sound dan Pattern dapat dimainkan', async ({ page }) => {
     await gotoApp(page);
 
