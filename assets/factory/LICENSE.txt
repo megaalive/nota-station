@@ -1,0 +1,5 @@
+NotaStation factory sample — Basic
+
+License: CC0 1.0 Universal (CC0-1.0)
+Source: generated specifically for NotaStation from a short decaying synthetic waveform.
+No third-party recording or sample is included.

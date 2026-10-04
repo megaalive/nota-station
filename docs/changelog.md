@@ -3,6 +3,33 @@
 Format singkat: satu entri per slice/PR yang menutup bagian dari milestone.
 Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
+## R1 — Tracker yang bisa dimainkan (ACTIVE)
+
+### S1 — Vertical slice Pattern → NoteEvent → Web Audio (PASS)
+
+- Model minimum dibuat sesuai PLAN V2: PPQ 480, 8 `Track`, Pattern 64 row
+  (LPB 4 / 120 tick per row), satu `OrderEntry`, dan `NoteEvent` pattern-local.
+  Schema `Track` dikunci ke `color`, `kind`, `defaultInstrumentId`, dan
+  `polyphony`; nama sementara `voiceMode` dibuang sebelum masuk `main`.
+- Pattern editor pertama memakai DOM windowing, header 8 channel, kursor keyboard,
+  mapping note berbasis `KeyboardEvent.code`, oktaf, step, serta mode awal
+  **AUDISI** untuk workflow Songwriter. `Ctrl+E` masuk EDIT; note ditulis hanya
+  melalui command `pattern.enterNote`.
+- Factory sound `Basic` dibuat oleh proyek sendiri dan dilisensikan CC0-1.0.
+  Audio engine memakai `AudioContext.currentTime`; Play menjadwalkan NoteEvent dari
+  satu anchor audio clock, Stop membersihkan voice aktif.
+- Firefox headless menemukan kasus `AudioContext.resume()` yang promise-nya dapat
+  tetap pending. Engine tetap meminta resume pada gestur tepercaya, tetapi scheduler
+  tidak lagi diblokir oleh penyelesaian promise itu; node audio boleh dijadwalkan
+  selama context menunggu transisi ke `running`.
+- Gate final slice: `npm ci` **0 vulnerability**, unit **22/22 PASS**,
+  `npm run check` PASS, build **84.9 KiB PASS**, Playwright Chromium+Firefox
+  **68/68 PASS** (21,0 dtk).
+- Workflow verifikasi hanya sementara dan dihapus kembali sebelum merge.
+- **Belum menutup R1**: NOTE/INST/VOL lengkap, loop/metronome, seek/pause, undo/redo,
+  JSON debug import/export, live-edit scheduler penuh, pitch-effect spike, template,
+  dan UAT exit R1 tetap pekerjaan slice berikutnya.
+
 ## Review arsitektur sebelum R1 — anchor event + mode Pattern
 
 - Aturan model dipersempit ke hal yang benar-benar wajib: **tidak ada absolute song tick**.

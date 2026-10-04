@@ -4,9 +4,10 @@ Web Tracker Songwriting Workstation — static site untuk GitHub Pages.
 Seluruh aplikasi berdiri di atas satu model musik kanonik, lalu diproyeksikan ke beberapa
 tampilan sekaligus (Pattern, Piano Roll, Lyrics, Guitar, Score).
 
-Status: **R0 — Fondasi statis + UI shell: CLOSED**. Gate unit/check/build dan
-Playwright Chromium+Firefox sudah lulus; deployment tetap manual ke branch `gh-pages`.
-Milestone berikutnya: **R1 — Tracker yang bisa dimainkan**.
+Status: **R1 — Tracker yang bisa dimainkan: ACTIVE**. R0 sudah CLOSED.
+Slice R1-S1 sudah memberi Pattern editor 8 channel × 64 row, mode AUDISI/EDIT,
+factory sample CC0, serta Play/Stop Web Audio. R1 belum selesai: transport penuh,
+loop/metronome, undo/redo, JSON import/export, dan operasi tracker lanjutan masih menyusul.
 
 ## Menjalankan
 
@@ -51,4 +52,7 @@ Spesifikasi ada di [`rencana-web-tracker-songwriting-workstation-v2.md`](./renca
 
 ## Lisensi
 
-[MIT](./LICENSE). Lisensi sample factory ditentukan terpisah di R2.
+Source code: [MIT](./LICENSE).
+
+Factory sample `Basic`: **CC0-1.0**, dibuat khusus untuk NotaStation dari gelombang
+sintetis pendek; lihat [assets/factory/LICENSE.txt](./assets/factory/LICENSE.txt).

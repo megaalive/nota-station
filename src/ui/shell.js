@@ -1,8 +1,8 @@
 // Shell layout §8.3: top bar, tab workspace, panel kiri, area kerja, panel kanan,
 // dock terlipat, dan status bar yang selalu tampil.
 //
-// Isi panel di R0 masih placeholder — yang dibangun di sini strukturnya, supaya
-// view berikutnya (Pattern, Piano Roll, dst.) tinggal mengisi slot yang sudah ada.
+// Shell ini berasal dari R0. Mulai R1, view seperti Pattern mengisi slot tengah
+// lewat renderView; view lain tetap mendapat empty state sampai milestone pemiliknya.
 
 import { el } from './dom.js';
 import { Tabs, Splitter, Button, Tooltip } from './kit.js';
@@ -17,7 +17,7 @@ const WORKSPACE_TABS = [
   { id: 'sound', labelKey: 'tab.sound' },
 ];
 
-export function createShell({ root, t, registry, palette, store, build }) {
+export function createShell({ root, t, registry, palette, store, build, renderView = null }) {
   let activeTab = 'pattern';
 
   /* ------------------------------------------------------------- top bar */
@@ -79,15 +79,22 @@ export function createShell({ root, t, registry, palette, store, build }) {
     dataset: { action: 'workspace-view', entity: activeTab },
   });
 
+  function renderActiveView() {
+    activeView.textContent = '';
+    const handled = renderView?.(activeTab, activeView) === true;
+    if (!handled) {
+      activeView.append(emptyState(t('view.placeholder', { tab: t(`tab.${activeTab}`) })));
+    }
+  }
+
   function selectTab(id) {
     // Aturan produk: tab tidak pernah berganti sendiri, hanya aksi eksplisit (§8.2).
     activeTab = id;
     tabs.render(id);
     activeView.id = `tabpanel-${id}`;
     activeView.dataset.entity = id;
-    activeView.textContent = '';
-    activeView.append(emptyState(t('view.placeholder', { tab: t(`tab.${id}`) })));
     workspace.setAttribute('aria-labelledby', `tab-${id}`);
+    renderActiveView();
   }
 
   const tabs = Tabs({
@@ -96,8 +103,6 @@ export function createShell({ root, t, registry, palette, store, build }) {
     label: t('shell.workspaceTabs'),
     onSelect: selectTab,
   });
-  activeView.append(emptyState(t('view.placeholder', { tab: t(`tab.${activeTab}`) })));
-
   /* ------------------------------------------------------------- panels */
 
   const leftPanel = panel('left', t('shell.leftPanel'), t('left.placeholder'), { t, store });
@@ -157,22 +162,74 @@ export function createShell({ root, t, registry, palette, store, build }) {
 
   /* --------------------------------------------------------- status bar */
 
-  const statusbar = el('footer', { class: 'statusbar', dataset: { action: 'statusbar' }, 'aria-label': t('shell.statusBar') }, [
-    // Teks EDIT ikut di badge: kursor merah saja bukan penanda yang cukup (§8.19).
-    el('span', { class: 'statusbar__mode', dataset: { action: 'edit-mode' }, text: `● ${t('status.edit')}` }),
-    el('span', { class: 'statusbar__item', dataset: { action: 'octave' }, text: `${t('status.octave')} 4` }),
-    el('span', { class: 'statusbar__item', dataset: { action: 'step' }, text: `${t('status.step')} 1` }),
-    el('span', { class: 'statusbar__item', dataset: { action: 'position' }, text: t('position.barBeat', { bar: 1 }) }),
-    el('span', { class: 'statusbar__item', dataset: { action: 'audio-status' }, text: `${t('status.audio')} ${t('status.idle')}` }),
-  ]);
+  const modeStatus = el('span', {
+    class: 'statusbar__mode is-audition',
+    dataset: { action: 'edit-mode' },
+    text: `○ ${t('status.audisi')}`,
+  });
+  const octaveStatus = el('span', {
+    class: 'statusbar__item',
+    dataset: { action: 'octave' },
+    text: `${t('status.octave')} 4`,
+  });
+  const stepStatus = el('span', {
+    class: 'statusbar__item',
+    dataset: { action: 'step' },
+    text: `${t('status.step')} 1`,
+  });
+  const positionStatus = el('span', {
+    class: 'statusbar__item',
+    dataset: { action: 'position' },
+    text: t('position.row', { row: 0 }),
+  });
+  const audioStatus = el('span', {
+    class: 'statusbar__item',
+    dataset: { action: 'audio-status' },
+    text: `${t('status.audio')} · ${t('status.audioLocked')}`,
+  });
+
+  const statusbar = el('footer', {
+    class: 'statusbar',
+    dataset: { action: 'statusbar' },
+    'aria-label': t('shell.statusBar'),
+  }, [modeStatus, octaveStatus, stepStatus, positionStatus, audioStatus]);
+
+  function setPatternStatus({ mode, octave, step, row }) {
+    const edit = mode === 'edit';
+    modeStatus.textContent = `${edit ? '●' : '○'} ${t(edit ? 'status.edit' : 'status.audisi')}`;
+    modeStatus.classList.toggle('is-edit', edit);
+    modeStatus.classList.toggle('is-audition', !edit);
+    octaveStatus.textContent = `${t('status.octave')} ${octave}`;
+    stepStatus.textContent = `${t('status.step')} ${step}`;
+    positionStatus.textContent = t('position.row', { row });
+  }
+
+  function setAudioStatus(state) {
+    const key = {
+      locked: 'status.audioLocked',
+      ready: 'status.audioReady',
+      playing: 'status.audioPlaying',
+      error: 'status.audioError',
+    }[state] ?? 'status.audioReady';
+    audioStatus.textContent = `${t('status.audio')} · ${t(key)}`;
+    audioStatus.dataset.state = state;
+  }
 
   function render() {
     root.textContent = '';
     root.append(topbar, workspace, dock, statusbar);
+    renderActiveView();
     return root;
   }
 
-  return { render, selectTab, getActiveTab: () => activeTab };
+  return {
+    render,
+    selectTab,
+    getActiveTab: () => activeTab,
+    setPatternStatus,
+    setAudioStatus,
+    refreshView: renderActiveView,
+  };
 }
 
 function panel(side, title, placeholder, { t, store }) {
