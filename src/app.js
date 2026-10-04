@@ -13,6 +13,11 @@ import {
   updateNoteAtCell,
 } from './core/project.js';
 import { createAudioEngine } from './audio/engine.js';
+import {
+  debugJsonFilename,
+  parseDebugProject,
+  serializeDebugProject,
+} from './io/debug-json.js';
 import { createPalette } from './ui/palette.js';
 import { createPatternView } from './ui/pattern.js';
 import { createShell } from './ui/shell.js';
@@ -266,6 +271,22 @@ function registerCommands() {
       run: () => cycleTheme(),
     },
     {
+      id: 'io.exportDebugJson',
+      group: 'File',
+      labelKey: 'io.exportDebugJson',
+      run: (args) => exportDebugJson({ download: args?.download !== false }),
+    },
+    {
+      id: 'io.importDebugJson',
+      group: 'File',
+      labelKey: 'io.importDebugJson',
+      run: (args) => {
+        if (typeof args?.text === 'string') return importDebugJsonText(args.text);
+        openDebugJsonPicker();
+        return { pickerOpened: true };
+      },
+    },
+    {
       // Ekspor WAV belum masuk R1. Tetap tampil dengan alasan,
       // bukan disembunyikan — user jadi tahu kenapa belum bisa dipakai (§8.14).
       id: 'io.exportWav',
@@ -281,6 +302,66 @@ function registerCommands() {
 function setSaveStatus(key) {
   const chip = document.querySelector('[data-action="save-status"]');
   if (chip) chip.textContent = i18n.t(key);
+}
+
+function exportDebugJson({ download = true } = {}) {
+  const text = serializeDebugProject(project);
+  const filename = debugJsonFilename(project);
+
+  if (download) {
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.hidden = true;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+    setSaveStatus('status.jsonExported');
+  }
+
+  return { filename, text, schemaVersion: project.schemaVersion };
+}
+
+function importDebugJsonText(text) {
+  // Parse + validasi selesai dulu. Kalau gagal, project/history/audio tidak disentuh.
+  const nextProject = parseDebugProject(text);
+  audio.stop();
+  history.reset(nextProject);
+  project = nextProject;
+  setSaveStatus('status.jsonImported');
+  syncTransportUi();
+  patternView?.refresh();
+  return {
+    projectId: project.id,
+    schemaVersion: project.schemaVersion,
+    noteCount: activePattern(project).notes.length,
+  };
+}
+
+function openDebugJsonPicker() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.webtrack.json,application/json';
+  input.hidden = true;
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0];
+    if (!file) {
+      input.remove();
+      return;
+    }
+    try {
+      importDebugJsonText(await file.text());
+    } catch {
+      setSaveStatus('status.jsonImportFailed');
+    } finally {
+      input.remove();
+    }
+  }, { once: true });
+  document.body.append(input);
+  input.click();
 }
 
 function syncTransportUi() {

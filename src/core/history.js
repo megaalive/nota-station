@@ -40,6 +40,13 @@ export function createHistory(initialState, { limit = 100 } = {}) {
     return current;
   }
 
+  function reset(nextState) {
+    current = nextState;
+    undoStack.length = 0;
+    redoStack.length = 0;
+    return current;
+  }
+
   function getState() {
     return {
       canUndo: undoStack.length > 0,
@@ -56,6 +63,7 @@ export function createHistory(initialState, { limit = 100 } = {}) {
     commit,
     undo,
     redo,
+    reset,
     getState,
   };
 }
