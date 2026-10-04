@@ -304,53 +304,51 @@ test.describe('Pattern R1 editing', () => {
     // Dekat akhir Pattern: row 0 cycle berikutnya jatuh ~112,5 ms dari sekarang
     // (anchor 50 ms + sisa 60 tick pada 120 BPM), langsung di dalam horizon 120 ms.
     // Ini menguji cancel nyata tanpa bergantung pada currentTime headless yang maju.
-    await page.evaluate(() => window.tracker.commands.execute('playback.seek', { tick: 7620 }));
-
-    const before = await page.evaluate(() => window.tracker.getState().audio);
-    const context = await page.evaluate(() => {
+    // Seek, add, snapshot, lalu delete dilakukan dalam satu task halaman. Ini
+    // mempertahankan event di luar freeze window tanpa bergantung pada jeda
+    // round-trip Playwright yang dapat membuat event keburu menjadi beku.
+    const result = await page.evaluate(() => {
+      window.tracker.commands.execute('playback.seek', { tick: 7620 });
+      const before = window.tracker.getState().audio;
       const project = window.tracker.getProject();
-      return {
-        patternId: project.song.patterns[0].id,
-        trackId: project.song.tracks[0].id,
-      };
-    });
+      const patternId = project.song.patterns[0].id;
+      const trackId = project.song.tracks[0].id;
 
-    await page.evaluate(({ patternId, trackId }) => {
       window.tracker.commands.execute('pattern.enterNote', {
         patternId,
         trackId,
         row: 0,
         pitch: 60,
       });
-    }, context);
+      const afterAdd = window.tracker.getState().audio;
 
-    let audio = await page.evaluate(() => window.tracker.getState().audio);
-    expect(audio.state).toBe('playing');
-    expect(audio.scheduleRevision).toBe(before.scheduleRevision);
-    expect(audio.liveEditRevision).toBe(before.liveEditRevision + 1);
-    expect(audio.liveEditFreezeSeconds).toBeCloseTo(0.03, 6);
-
-    await expect.poll(
-      () => page.evaluate(() => window.tracker.getState().audio.scheduledNoteSources),
-      { timeout: 1500, intervals: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20] },
-    ).toBe(1);
-
-    const revisionAfterAdd = audio.liveEditRevision;
-    await page.evaluate(({ patternId, trackId }) => {
       window.tracker.commands.execute('pattern.deleteNote', {
         patternId,
         trackId,
         row: 0,
       });
-    }, context);
+      const afterDelete = window.tracker.getState().audio;
 
-    audio = await page.evaluate(() => window.tracker.getState().audio);
-    expect(audio.state).toBe('playing');
-    expect(audio.scheduleRevision).toBe(before.scheduleRevision);
-    expect(audio.liveEditRevision).toBe(revisionAfterAdd + 1);
-    expect(audio.lastLiveEditCanceledNotes).toBeGreaterThanOrEqual(1);
-    expect(audio.scheduledNoteSources).toBe(0);
-    expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
+      return {
+        before,
+        afterAdd,
+        afterDelete,
+        noteCount: window.tracker.getState().project.noteCount,
+      };
+    });
+
+    expect(result.afterAdd.state).toBe('playing');
+    expect(result.afterAdd.scheduleRevision).toBe(result.before.scheduleRevision);
+    expect(result.afterAdd.liveEditRevision).toBe(result.before.liveEditRevision + 1);
+    expect(result.afterAdd.liveEditFreezeSeconds).toBeCloseTo(0.03, 6);
+    expect(result.afterAdd.scheduledNoteSources).toBe(1);
+
+    expect(result.afterDelete.state).toBe('playing');
+    expect(result.afterDelete.scheduleRevision).toBe(result.before.scheduleRevision);
+    expect(result.afterDelete.liveEditRevision).toBe(result.afterAdd.liveEditRevision + 1);
+    expect(result.afterDelete.lastLiveEditCanceledNotes).toBeGreaterThanOrEqual(1);
+    expect(result.afterDelete.scheduledNoteSources).toBe(0);
+    expect(result.noteCount).toBe(0);
 
     await page.getByRole('button', { name: 'Berhenti' }).click();
   });
