@@ -444,6 +444,9 @@ export function createPatternView({
   }
 
   function refresh() {
+    // Refresh dari history/command eksternal harus membuang input dua-nibble yang
+    // belum menjadi transaksi project.
+    clearInputState();
     renderHeader();
     renderWindow();
     syncStatus();
