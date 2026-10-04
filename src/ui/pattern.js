@@ -210,6 +210,9 @@ export function createPatternView({
               trackId: track.id,
             },
             text: displayCellText(project, note, field, row, channel),
+            title: emptyFirstCell(project, note, field, row, channel)
+              ? t('pattern.emptyCellTitle')
+              : null,
             on: {
               click: () => {
                 clearInputState();
@@ -400,7 +403,18 @@ export function createPatternView({
     return true;
   }
 
+  function emptyFirstCell(project, note, field, row, channel) {
+    return !note
+      && field === 'note'
+      && row === 0
+      && channel === 0
+      && activePattern(project).notes.length === 0;
+  }
+
   function displayCellText(project, note, field, row, channel) {
+    if (emptyFirstCell(project, note, field, row, channel)) {
+      return t('pattern.emptyCell');
+    }
     if (
       pendingHex
       && pendingHex.row === row
