@@ -4,8 +4,8 @@ Web Tracker Songwriting Workstation — static site untuk GitHub Pages.
 Seluruh aplikasi berdiri di atas satu model musik kanonik, lalu diproyeksikan ke beberapa
 tampilan sekaligus (Pattern, Piano Roll, Lyrics, Guitar, Score).
 
-Status: **R0 — Fondasi statis + UI shell** (selesai; Pages & smoke menyusul saat workflow
-pertama kali jalan di GitHub).
+Status: **R0 — Fondasi statis + UI shell** sudah terimplementasi dan Pages aktif.
+Audit penutupan R0 masih berjalan; deployment saat ini manual ke branch `gh-pages`.
 
 ## Menjalankan
 
@@ -30,6 +30,15 @@ Smoke test hanya jalan terhadap URL yang benar-benar hidup, jadi wajib diberi `P
 ```bash
 PAGE_URL="https://<user>.github.io/nota-station/" EXPECT_SHA="$(git rev-parse HEAD)" npm run test:smoke
 ```
+
+Deployment Pages tidak memakai GitHub Actions. Jalankan gate lokal yang relevan, lalu:
+
+```bash
+npm run deploy
+```
+
+Perintah itu selalu menjalankan build terlebih dahulu, kemudian force-push isi `dist/`
+ke branch artifact `gh-pages`. Source tetap di `main`; `gh-pages` bukan history source.
 
 ## Aturan kerja
 

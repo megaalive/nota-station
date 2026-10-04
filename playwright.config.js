@@ -1,9 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // Tes browser selalu melawan ARTEFAK build di subpath, bukan source tree (§13.3).
-// Default-nya nama repo asli supaya kondisi lokal = kondisi Pages. Di CI, BASE_PATH
-// di-override dari github.event.repository.name oleh workflow, jadi rename repo
-// tidak diam-diam menguji subpath yang salah.
+// Default-nya nama repo asli supaya kondisi lokal = kondisi Pages. BASE_PATH tetap
+// bisa di-override oleh pemanggil bila repo di-rename atau suite dijalankan di lingkungan lain.
 const BASE_PATH = process.env.BASE_PATH ?? '/nota-station/';
 const PORT = Number(process.env.PORT ?? 4173);
 
