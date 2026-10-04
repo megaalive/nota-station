@@ -17,6 +17,22 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R0 — Fondasi statis + UI shell
 
+### Closure audit — PASS (2026-10-04)
+
+- Gap shell yang ditemukan saat audit ditutup: aktivasi tema terang/gelap/kontras tinggi,
+  panel kiri/kanan dapat dilipat + persist, geometri wrapper Splitter, i18n yang benar-benar
+  merender ulang shell, serta primitive Tooltip yang sebelumnya hanya disebut di kontrak.
+- Toolbar atas dipadatkan: Play, Stop, dan Command Palette memakai ikon universal dengan
+  accessible name + tooltip; tab workspace tetap memakai teks karena ikonnya lebih ambigu.
+- Root cause hang GitHub runner: `@playwright/test 1.49.1` pada Node 24.21.0 hang sebelum
+  suite browser mulai. Setelah dipin ke `1.63.0`, runner yang sama menyelesaikan suite normal.
+- Gate final: `npm ci` PASS (0 vulnerability), unit **17/17 PASS**, `npm run check` PASS,
+  build **58.1 KiB PASS**, Playwright Chromium+Firefox **56/56 PASS** (2 worker, 15.4 dtk).
+- Workflow verifikasi hanya sementara dan dihapus kembali. Jalur deploy aktif tetap manual
+  `main → npm run deploy → gh-pages` sesuai §13.
+- R0 dinyatakan **CLOSED** setelah build closure ini dipublish dan smoke live cocok dengan SHA.
+
+
 ### Audit deployment setelah R0 — artifact branch (2026-10-04)
 
 - Workflow Pages dan workflow browser GitHub Actions dihapus setelah full Playwright pada
