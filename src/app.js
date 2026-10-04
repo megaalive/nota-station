@@ -421,7 +421,11 @@ function bindShortcuts() {
 }
 
 function isTextInputTarget(target) {
-  return Boolean(target?.closest?.('input, textarea, [contenteditable="true"]'));
+  const node = target?.closest?.('input, textarea, [contenteditable="true"]');
+  if (!node) return false;
+  if (node.matches?.('textarea, [contenteditable="true"]')) return true;
+  const type = String(node.type ?? 'text').toLowerCase();
+  return !['range', 'checkbox', 'radio', 'button', 'submit', 'reset'].includes(type);
 }
 
 async function boot() {

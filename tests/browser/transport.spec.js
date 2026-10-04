@@ -73,7 +73,7 @@ test.describe('Transport R1-S5', () => {
     await enterOneNote(page);
     await page.getByRole('button', { name: 'Putar' }).click();
     await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain', { timeout: 5000 });
-    const before = await page.evaluate(() => window.tracker.getState().audio.anchor);
+    const before = await page.evaluate(() => window.tracker.getState().audio.scheduleRevision);
 
     const tempo = page.locator('[data-action="tempo-input"]');
     await tempo.fill('180');
@@ -82,7 +82,7 @@ test.describe('Transport R1-S5', () => {
     const state = await page.evaluate(() => window.tracker.getState().audio);
     expect(state.state).toBe('playing');
     expect(state.tempo).toBe(180);
-    expect(state.anchor).not.toBe(before);
+    expect(state.scheduleRevision).toBeGreaterThan(before);
   });
 
   test('metronom menjadwalkan click pada audio clock', async ({ page }) => {

@@ -28,6 +28,7 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
   let loopEnabled = true;
   let metronomeEnabled = false;
   let lastTempo = 120;
+  let scheduleRevision = 0;
   const activeSources = new Map();
 
   function preload() {
@@ -139,7 +140,9 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
           startTick: normalizedTick,
         })
         : null,
+      durationSeconds: pattern.lengthTicks * secondsPerTick(tempo),
       endAt: anchor + Math.max(0, pattern.lengthTicks - normalizedTick) * secondsPerTick(tempo),
+      revision: ++scheduleRevision,
       notesScheduled: 0,
       clicksScheduled: 0,
     };
@@ -314,6 +317,8 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
       metronome: metronomeEnabled,
       schedulerActive: schedulerTimer !== null,
       anchor: playback?.anchor ?? null,
+      durationSeconds: playback?.durationSeconds ?? null,
+      scheduleRevision,
       tempo: playback?.tempo ?? lastTempo,
       positionTick: currentTick(),
       notesScheduled: playback?.notesScheduled ?? 0,
