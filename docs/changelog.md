@@ -5,6 +5,23 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S11 — Banner aktivasi audio (PASS)
+
+- Saat Web Audio masih terkunci, shell menampilkan banner eksplisit dengan aksi
+  **Aktifkan audio**; status ini tidak hanya diwakili warna atau pesan console.
+- Tombol banner memakai command `playback.activateAudio` dan primitive
+  `audio.activate()`; jalur yang sama tetap dipakai Play/audition sehingga tidak ada
+  AudioContext kedua atau state paralel.
+- Aktivasi dari gestur tepercaya menyiapkan factory sample dan mengubah status
+  `locked → ready`; Play dari gestur pengguna juga otomatis menghilangkan banner.
+- String banner/aksi parity Indonesia-English telah diaudit; regresi browser menguji
+  aktivasi eksplisit dan aktivasi lewat Play tanpa page error.
+- Gate final run **37243045844** di atas stack S9+S10: `npm ci` 0 vulnerability,
+  unit **50/50 PASS**, `npm run check` PASS, build **150.2 KiB PASS**,
+  Playwright Chromium+Firefox **134/134 PASS** (1,1 mnt).
+- **Belum menutup R1**: automated exit final + publish live + UAT manusia dan
+  uji audio real-time 2 menit masih tersisa.
+
 ### S10 — Kesiapan audio + proof 32 voice (PASS)
 
 - Audio engine menambah primitive `activate()` yang memakai jalur `ensureReady()` yang sama

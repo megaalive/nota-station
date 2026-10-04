@@ -184,6 +184,22 @@ export function createShell({
 
   const topbar = el('header', { class: 'topbar', dataset: { action: 'topbar' } }, [transportBar]);
 
+  const audioUnlockButton = Button({
+    label: t('audio.activate'),
+    variant: 'default',
+    onClick: () => registry.execute('playback.activateAudio'),
+  });
+  audioUnlockButton.dataset.action = 'audio-unlock-button';
+
+  const audioBanner = el('div', {
+    class: 'audio-unlock',
+    role: 'status',
+    dataset: { action: 'audio-unlock-banner' },
+  }, [
+    el('span', { class: 'audio-unlock__text', text: t('audio.lockedBanner') }),
+    audioUnlockButton,
+  ]);
+
   /* ---------------------------------------------------- workspace tabs */
 
   const activeView = el('div', {
@@ -328,6 +344,7 @@ export function createShell({
     }[state] ?? 'status.audioReady';
     audioStatus.textContent = `${t('status.audio')} · ${t(key)}`;
     audioStatus.dataset.state = state;
+    audioBanner.hidden = state !== 'locked';
   }
 
   function setTransportStatus(next) {
@@ -359,7 +376,7 @@ export function createShell({
 
   function render() {
     root.textContent = '';
-    root.append(topbar, workspace, dock, statusbar);
+    root.append(topbar, audioBanner, workspace, dock, statusbar);
     setTransportStatus(currentTransport);
     renderActiveView();
     return root;

@@ -862,3 +862,22 @@
   background: inherit;
   color: inherit;
 }
+
+
+/* ------------------------------------------------------ R1 audio unlock */
+.audio-unlock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid currentColor;
+}
+
+.audio-unlock[hidden] {
+  display: none;
+}
+
+.audio-unlock__text {
+  line-height: 1.35;
+}

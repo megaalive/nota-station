@@ -157,6 +157,12 @@ function registerCommands() {
       },
     },
     {
+      id: 'playback.activateAudio',
+      group: 'Playback',
+      labelKey: 'audio.activate',
+      run: () => activateAudio(),
+    },
+    {
       id: 'playback.pause',
       group: 'Playback',
       labelKey: 'transport.pause',
@@ -491,6 +497,17 @@ function restoreHistory(direction) {
   return history.getState();
 }
 
+
+async function activateAudio() {
+  try {
+    const result = await audio.activate();
+    syncTransportUi();
+    return result;
+  } catch {
+    shell?.setAudioStatus('error');
+    return null;
+  }
+}
 
 async function playActivePattern() {
   try {
