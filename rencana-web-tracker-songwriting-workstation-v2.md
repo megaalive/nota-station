@@ -18,7 +18,7 @@ V1 kuat di fondasi teknis (model kanonik berbasis tick, command layer, theory en
 | # | Perubahan utama | Alasan singkat | Bagian |
 |---|---|---|---|
 | 1 | **Bab UI/UX ditulis ulang total** (workspace, fokus bersama, split view, lyric lane, command palette, onboarding, status/feedback, ukuran keberhasilan UX) | Layout V1 mencampur 4 hal di panel bawah, tanpa model fokus, tanpa onboarding | §8 |
-| 2 | **Data musikal tidak lagi memakai absolute tick** (chord/tempo/key jadi pattern-lokal; timeline absolut hanya hasil proyeksi) | Mengubah urutan pattern merusak chord/tempo di V1 | §5 |
+| 2 | **Data musikal tidak lagi memakai absolute tick** (event di-anchor ke Pattern atau occurrence sesuai semantik; timeline absolut hanya hasil proyeksi) | Mengubah urutan pattern merusak chord/tempo di V1 | §5 |
 | 3 | **Keputusan polifoni**: track punya *voice lane* | Channel tracker monofonik vs Piano Roll/gitar polifonik belum diputuskan | §5.4 |
 | 4 | **Event off-grid punya proyeksi di Pattern** (resolusi tampilan + kolom DLY) | Note dari Piano Roll tidak boleh hilang/ter-kuantisasi diam-diam | §5.2, §8.6 |
 | 5 | **`repeatCount` dihapus** dari OrderEntry | Membuat "occurrence" lirik ambigu | §5.5 |
@@ -1138,7 +1138,7 @@ Proposal LLM terstruktur melalui validator; app penuh tetap berfungsi tanpa LLM.
 | **Scope R5 terlalu besar** (V1) | Rilis fitur utama tak kunjung terjadi | R5 dipecah a–d; Score hanya-baca; Piano Roll & Lyrics duluan |
 | **Polifoni vs channel monofonik** | Chord tak bisa ditulis konsisten | Voice lane (§5.4) |
 | **Event off-grid tersembunyi/terkuantisasi** | Data hilang diam-diam | Resolusi LPB + kolom DLY + kuantisasi eksplisit |
-| **Absolute tick pada chord/tempo** | Reorder merusak data | Semua event pattern-lokal; tes properti reorder |
+| **Absolute tick pada chord/tempo** | Reorder merusak data | Anchor Pattern/occurrence tanpa absolute tick; tes properti reorder |
 | **Pattern bersama mengejutkan pengguna** | Edit tak sengaja ke occurrence lain | Popover + "Jadikan unik" (§8.12) |
 | Sample membuat proyek terlalu besar | Lambat/penuh | Dedup hash, lazy decode, embed hanya di bundle, batas §10.5 |
 | AudioWorklet/WASM overengineering | Kompleksitas tanpa manfaat | Gerbang benchmark (R9) |
