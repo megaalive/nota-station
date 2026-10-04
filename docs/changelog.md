@@ -5,6 +5,22 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S10 — Kesiapan audio + proof 32 voice (PASS)
+
+- Audio engine menambah primitive `activate()` yang memakai jalur `ensureReady()` yang sama
+  dengan Play/audition, sehingga UI dapat membuka audio dari gestur tepercaya tanpa
+  mengekspos `AudioContext`.
+- Browser probe mengaktifkan engine dari klik pengguna, memuat factory sample sekali, lalu
+  menjadwalkan **32 preview voice aktif** dalam satu jendela waktu.
+- Proof dijalankan pada Chromium + Firefox; `activeVoices === 32`, sample siap, dan
+  context berada pada state browser-valid (`running` atau `suspended` saat policy browser
+  masih menyelesaikan resume).
+- Gate final run **37242834683** di atas main yang sudah memuat S9: `npm ci` 0 vulnerability,
+  unit **50/50 PASS**, `npm run check` PASS, build **148.7 KiB PASS**,
+  Playwright Chromium+Firefox **130/130 PASS** (1,1 mnt).
+- **Belum dianggap membuktikan 0 underrun 2 menit**: Web Audio tidak menyediakan counter
+  underrun portabel; syarat itu tetap UAT audio real-time/manual R1.
+
 ### S9 — Template R1 + first-run welcome (PASS)
 
 - R1 mengirim dua template sesuai roadmap: **Kosong** dan **Pop 4/4**. Pop 4/4 memakai
