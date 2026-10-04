@@ -852,8 +852,8 @@ Alur operasional:
 ```text
 gate lokal
 → npm run deploy
-→ npm run build
-→ dist/
+  ↳ npm run build
+  ↳ dist/
 → temporary repository
 → commit artefak
 → force-push gh-pages
