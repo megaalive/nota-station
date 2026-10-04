@@ -1,5 +1,5 @@
-// Audio slice R1-S1. Clock tetap AudioContext.currentTime (§7.2); belum ada
-// look-ahead scheduler di slice ini, jadi satu pattern kecil dijadwalkan dari satu anchor.
+// Audio R1 memakai AudioContext.currentTime sebagai jam musik (§7.2).
+// S4 menambahkan look-ahead scheduler; setInterval hanya wake-up, bukan sumber waktu musikal.
 
 import {
   FACTORY_BASIC_ROOT_PITCH,
