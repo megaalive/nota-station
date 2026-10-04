@@ -62,6 +62,10 @@ jobs:
           # Nama repo diturunkan dari event, bukan ditulis manual — kalau repo di-rename,
           # CI tidak diam-diam menguji subpath yang salah.
           BASE_PATH: /${{ github.event.repository.name }}/
+          # DIAGNOSTIC: jalankan Chromium saja + reporter list supaya kelihatan
+          # tes mana yang lambat. sementara ini belum stabil dengan dua browser.
+          PW_PROJECTS: chromium
+          PW_REPORTER: list
 
   deploy:
     needs: [build, browser]
