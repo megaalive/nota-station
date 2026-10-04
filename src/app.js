@@ -12,6 +12,7 @@ const store = window.localStorage;
 const THEMES = ['light', 'dark', 'high-contrast'];
 
 let theme = readInitialTheme();
+let buildInfo = null;
 let shell = null;
 
 applyTheme(theme);
@@ -44,7 +45,10 @@ function setLocale(next) {
   if (!i18n.setLocale(next)) return false;
   store?.setItem('notastation.locale', next);
   syncHtmlLang();
-  shell?.render();
+
+  // Shell R0 dibuat dari string terjemahan saat konstruksi. Jadi ganti bahasa
+  // harus membuat ulang node-nya, bukan sekadar memasang ulang node lama.
+  if (shell) mountShell(shell.getActiveTab());
   return true;
 }
 
@@ -145,6 +149,19 @@ function setSaveStatus(key) {
   if (chip) chip.textContent = i18n.t(key);
 }
 
+function mountShell(activeTab = 'pattern') {
+  shell = createShell({
+    root: document.getElementById('app'),
+    t: (key, vars) => i18n.t(key, vars),
+    registry,
+    palette,
+    store,
+    build: buildInfo,
+  });
+  shell.render();
+  if (activeTab !== 'pattern') shell.selectTab(activeTab);
+}
+
 function bindShortcuts() {
   document.addEventListener('keydown', (event) => {
     // Shortcut pakai KeyboardEvent.code, bukan karakter, supaya tetap benar di
@@ -165,17 +182,9 @@ function bindShortcuts() {
 
 async function boot() {
   registerCommands();
-  const build = await loadBuildInfo();
+  buildInfo = await loadBuildInfo();
 
-  shell = createShell({
-    root: document.getElementById('app'),
-    t: (key, vars) => i18n.t(key, vars),
-    registry,
-    palette,
-    store,
-    build,
-  });
-  shell.render();
+  mountShell();
   syncHtmlLang();
   bindShortcuts();
 
@@ -186,7 +195,7 @@ async function boot() {
       ready: true,
       locale: i18n.getLocale(),
       theme,
-      build,
+      build: buildInfo,
       activeTab: shell.getActiveTab(),
     }),
     commands: registry,
