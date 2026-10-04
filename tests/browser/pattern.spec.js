@@ -293,6 +293,95 @@ test.describe('Pattern R1 editing', () => {
     expect(await page.locator('.pattern-grid__row').count()).toBeLessThan(64);
   });
 
+  test('live edit add/delete saat loop berjalan membangun ulang masa depan tanpa re-anchor', async ({ page }) => {
+    const grid = page.locator('[data-action="pattern-grid"]');
+    await grid.focus();
+    await page.keyboard.press('Control+e');
+
+    await page.getByRole('button', { name: 'Putar' }).click();
+    await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain', { timeout: 5000 });
+
+    // Dekat akhir Pattern: row 0 cycle berikutnya jatuh ~112,5 ms dari sekarang
+    // (anchor 50 ms + sisa 60 tick pada 120 BPM), langsung di dalam horizon 120 ms.
+    // Ini menguji cancel nyata tanpa bergantung pada currentTime headless yang maju.
+    // Seek, add, snapshot, lalu delete dilakukan dalam satu task halaman. Ini
+    // mempertahankan event di luar freeze window tanpa bergantung pada jeda
+    // round-trip Playwright yang dapat membuat event keburu menjadi beku.
+    const result = await page.evaluate(() => {
+      window.tracker.commands.execute('playback.seek', { tick: 7620 });
+      const before = window.tracker.getState().audio;
+      const project = window.tracker.getProject();
+      const patternId = project.song.patterns[0].id;
+      const trackId = project.song.tracks[0].id;
+
+      window.tracker.commands.execute('pattern.enterNote', {
+        patternId,
+        trackId,
+        row: 0,
+        pitch: 60,
+      });
+      const afterAdd = window.tracker.getState().audio;
+
+      window.tracker.commands.execute('pattern.deleteNote', {
+        patternId,
+        trackId,
+        row: 0,
+      });
+      const afterDelete = window.tracker.getState().audio;
+
+      return {
+        before,
+        afterAdd,
+        afterDelete,
+        noteCount: window.tracker.getState().project.noteCount,
+      };
+    });
+
+    expect(result.afterAdd.state).toBe('playing');
+    expect(result.afterAdd.scheduleRevision).toBe(result.before.scheduleRevision);
+    expect(result.afterAdd.liveEditRevision).toBe(result.before.liveEditRevision + 1);
+    expect(result.afterAdd.liveEditFreezeSeconds).toBeCloseTo(0.03, 6);
+    expect(result.afterAdd.scheduledNoteSources).toBe(1);
+
+    expect(result.afterDelete.state).toBe('playing');
+    expect(result.afterDelete.scheduleRevision).toBe(result.before.scheduleRevision);
+    expect(result.afterDelete.liveEditRevision).toBe(result.afterAdd.liveEditRevision + 1);
+    expect(result.afterDelete.lastLiveEditCanceledNotes).toBeGreaterThanOrEqual(1);
+    expect(result.afterDelete.scheduledNoteSources).toBe(0);
+    expect(result.noteCount).toBe(0);
+
+    await page.getByRole('button', { name: 'Berhenti' }).click();
+  });
+
+  test('Undo note saat playback memakai freeze-window live edit, bukan restart transport', async ({ page }) => {
+    const project = await page.evaluate(() => window.tracker.getProject());
+    const patternId = project.song.patterns[0].id;
+    const trackId = project.song.tracks[0].id;
+
+    await page.evaluate(({ patternId, trackId }) => {
+      window.tracker.commands.execute('pattern.enterNote', {
+        patternId,
+        trackId,
+        row: 8,
+        pitch: 64,
+      });
+    }, { patternId, trackId });
+
+    await page.getByRole('button', { name: 'Putar' }).click();
+    await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain', { timeout: 5000 });
+    const before = await page.evaluate(() => window.tracker.getState().audio);
+
+    await page.keyboard.press('Control+z');
+
+    const after = await page.evaluate(() => window.tracker.getState().audio);
+    expect(after.state).toBe('playing');
+    expect(after.scheduleRevision).toBe(before.scheduleRevision);
+    expect(after.liveEditRevision).toBe(before.liveEditRevision + 1);
+    expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
+
+    await page.getByRole('button', { name: 'Berhenti' }).click();
+  });
+
   test('Play memakai look-ahead scheduler, tempo project, dan loop Pattern', async ({ page }) => {
     const grid = page.locator('[data-action="pattern-grid"]');
     await grid.focus();

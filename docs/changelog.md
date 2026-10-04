@@ -5,6 +5,33 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S6 — Live-edit scheduler + freeze window 30 ms (PASS)
+
+- Edit note saat playback kini tidak me-restart transport. `pattern.enterNote`,
+  `pattern.deleteNote`, `pattern.updateNote`, serta Undo/Redo note membangun ulang
+  hanya jadwal note masa depan melalui `reschedulePattern()`.
+- Freeze window dikunci ke **30 ms**: event dengan waktu mulai `< now + 30 ms` dianggap
+  beku dan tidak disentuh; event pada atau setelah batas tersebut boleh dibatalkan dan
+  dijadwalkan ulang.
+- Source audio dibedakan menjadi `note`, `preview`, dan `metronome`. Live edit hanya
+  membatalkan scheduled note yang mutable; preview audition dan click metronom tidak ikut
+  tersapu.
+- Phase transport tetap memakai anchor playback lama. Scheduler note boleh memiliki
+  `noteAnchor` sendiri setelah live edit, sehingga perubahan Pattern tidak menaikkan
+  `scheduleRevision` dan tidak menggeser posisi transport.
+- Observability S6 menambah `liveEditRevision`, `liveEditCanceledNotes`,
+  `lastLiveEditCanceledNotes`, `lastLiveEditFreezeTick`,
+  `liveEditFreezeSeconds`, dan `scheduledNoteSources`.
+- Regression membuktikan batas freeze tepat 30 ms, add/delete saat loop berjalan,
+  cancellation note masa depan tanpa duplicate, serta Undo note saat playback tanpa
+  re-anchor transport. Harness browser dibuat deterministik tanpa menunggu wall-clock
+  atau kemajuan `AudioContext.currentTime` headless.
+- Gate final run **37233148891** pada runtime HEAD `42dcb9d4…`: `npm ci` PASS,
+  unit **40/40 PASS**, `npm run check` PASS, build PASS, dan Playwright
+  Chromium+Firefox **112/112 PASS** (40,2 dtk).
+- **Belum menutup R1**: JSON debug export/import, spike teknis pitch effect / AudioParam,
+  template/welcome project, serta final UAT/performance dan pemeriksaan Exit criteria R1.
+
 
 ### S5 — Pause/seek/metronom + tempo live re-anchor (PASS)
 

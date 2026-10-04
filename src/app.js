@@ -187,7 +187,7 @@ function registerCommands() {
       requiresArgs: true,
       run: (args) => {
         requireCommandArgs('pattern.enterNote', args);
-        commitProject(enterNote(project, args), 'pattern.enterNote');
+        commitPatternProject(enterNote(project, args), 'pattern.enterNote');
         return { noteCount: activePattern(project).notes.length };
       },
     },
@@ -199,7 +199,7 @@ function registerCommands() {
       run: (args) => {
         requireCommandArgs('pattern.deleteNote', args);
         const before = project;
-        commitProject(deleteNote(project, args), 'pattern.deleteNote');
+        commitPatternProject(deleteNote(project, args), 'pattern.deleteNote');
         return {
           changed: project !== before,
           noteCount: activePattern(project).notes.length,
@@ -214,7 +214,7 @@ function registerCommands() {
       run: (args) => {
         requireCommandArgs('pattern.updateNote', args);
         const before = project;
-        commitProject(updateNoteAtCell(project, args), 'pattern.updateNote');
+        commitPatternProject(updateNoteAtCell(project, args), 'pattern.updateNote');
         return {
           changed: project !== before,
           noteCount: activePattern(project).notes.length,
@@ -316,13 +316,29 @@ function commitProject(nextProject, label) {
   return project;
 }
 
+function commitPatternProject(nextProject, label) {
+  const before = project;
+  commitProject(nextProject, label);
+  if (project !== before) {
+    audio.reschedulePattern(project, activePattern(project));
+  }
+  return project;
+}
+
 function restoreHistory(direction) {
   const nextProject = direction === 'undo' ? history.undo() : history.redo();
   if (!nextProject) return history.getState();
 
+  const previous = project;
   project = nextProject;
   setSaveStatus('status.notSaved');
-  audio.setTempo(project, activePattern(project));
+
+  if (previous.song.initial.tempo !== project.song.initial.tempo) {
+    audio.setTempo(project, activePattern(project));
+  } else {
+    audio.reschedulePattern(project, activePattern(project));
+  }
+
   syncTransportUi();
   patternView?.refresh();
   return history.getState();

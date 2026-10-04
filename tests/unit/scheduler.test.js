@@ -2,8 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  LIVE_EDIT_FREEZE_SECONDS,
   createMetronomeScheduleCursor,
   createPatternScheduleCursor,
+  isLiveEditMutable,
+  liveEditFreezeTime,
   metronomeEventTemplates,
   patternDurationSeconds,
   patternEventTemplates,
@@ -139,4 +142,14 @@ test('100 loop tetap dihitung dari anchor tanpa drift progresif', () => {
   const due = cursor.drainUntil(anchor, anchor + 800.01);
   assert.equal(due.at(-1).cycle, 100);
   assert.equal(due.at(-1).when, anchor + 800);
+});
+
+
+test('live-edit freeze window tepat 30 ms: di bawahnya beku, batasnya mutable', () => {
+  const now = 10;
+  assert.equal(LIVE_EDIT_FREEZE_SECONDS, 0.03);
+  assert.equal(liveEditFreezeTime(now), 10.03);
+  assert.equal(isLiveEditMutable(10.029999, now), false);
+  assert.equal(isLiveEditMutable(10.03, now), true);
+  assert.equal(isLiveEditMutable(10.12, now), true);
 });
