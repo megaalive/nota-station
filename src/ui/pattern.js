@@ -3,7 +3,7 @@
 
 import { activePattern, noteAtCell } from '../core/project.js';
 import { el } from './dom.js';
-import { Button } from './kit.js';
+import { Button, Tooltip } from './kit.js';
 
 const ROW_HEIGHT = 28;
 const HEADER_HEIGHT = 52;
@@ -22,6 +22,12 @@ const NOTE_CODES = new Map([
   ['Digit5', 18], ['KeyT', 19], ['Digit6', 20], ['KeyY', 21], ['Digit7', 22], ['KeyU', 23],
 ]);
 
+const HEX_CODES = new Map([
+  ['Digit0', '0'], ['Digit1', '1'], ['Digit2', '2'], ['Digit3', '3'], ['Digit4', '4'],
+  ['Digit5', '5'], ['Digit6', '6'], ['Digit7', '7'], ['Digit8', '8'], ['Digit9', '9'],
+  ['KeyA', 'A'], ['KeyB', 'B'], ['KeyC', 'C'], ['KeyD', 'D'], ['KeyE', 'E'], ['KeyF', 'F'],
+]);
+
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
 
 export function createPatternView({
@@ -38,6 +44,8 @@ export function createPatternView({
   let mode = 'audition';
   let octave = 4;
   let step = 1;
+  let pendingHex = null;
+  let feedback = null;
 
   const modeButton = Button({
     label: t('status.audisi'),
@@ -50,10 +58,21 @@ export function createPatternView({
   const stepText = el('span', { class: 'pattern-toolbar__meta', dataset: { action: 'pattern-step' } });
   const hint = el('span', { class: 'pattern-toolbar__hint', dataset: { action: 'pattern-hint' } });
 
+  const octaveGroup = el('span', { class: 'pattern-toolbar__stepper' }, [
+    toolButton('pattern-octave-down', t('pattern.octaveDown'), '−', () => adjustOctave(-1)),
+    octaveText,
+    toolButton('pattern-octave-up', t('pattern.octaveUp'), '+', () => adjustOctave(1)),
+  ]);
+  const stepGroup = el('span', { class: 'pattern-toolbar__stepper' }, [
+    toolButton('pattern-step-down', t('pattern.stepDown'), '−', () => adjustStep(-1)),
+    stepText,
+    toolButton('pattern-step-up', t('pattern.stepUp'), '+', () => adjustStep(1)),
+  ]);
+
   const toolbar = el('div', { class: 'pattern-toolbar' }, [
     modeButton,
-    octaveText,
-    stepText,
+    octaveGroup,
+    stepGroup,
     hint,
   ]);
 
@@ -183,9 +202,10 @@ export function createPatternView({
               field,
               trackId: track.id,
             },
-            text: cellText(project, note, field),
+            text: displayCellText(project, note, field, row, channel),
             on: {
               click: () => {
+                clearInputState();
                 cursorRow = row;
                 cursorChannel = channel;
                 cursorField = field;
@@ -227,6 +247,7 @@ export function createPatternView({
   }
 
   function moveVertical(delta) {
+    clearInputState();
     const { rowCount } = projectInfo();
     cursorRow = Math.max(0, Math.min(rowCount - 1, cursorRow + delta));
     renderWindow();
@@ -235,6 +256,7 @@ export function createPatternView({
   }
 
   function moveHorizontal(delta) {
+    clearInputState();
     const { tracks } = projectInfo();
     const fieldIndex = FIELDS.indexOf(cursorField);
     const flat = Math.max(
@@ -249,6 +271,7 @@ export function createPatternView({
   }
 
   function toggleMode() {
+    clearInputState();
     mode = mode === 'edit' ? 'audition' : 'edit';
     syncStatus();
     renderWindow();
@@ -269,6 +292,117 @@ export function createPatternView({
       pitch,
     });
     moveVertical(step);
+  }
+
+  function toolButton(action, label, icon, onClick) {
+    const button = Button({
+      label,
+      icon,
+      iconOnly: true,
+      variant: 'ghost',
+      onClick,
+    });
+    button.dataset.action = action;
+    return Tooltip({ text: label, child: button });
+  }
+
+  function clearInputState() {
+    pendingHex = null;
+    feedback = null;
+  }
+
+  function adjustOctave(delta) {
+    clearInputState();
+    octave = Math.max(0, Math.min(8, octave + delta));
+    syncStatus();
+    scroller.focus({ preventScroll: true });
+  }
+
+  function adjustStep(delta) {
+    clearInputState();
+    step = Math.max(0, Math.min(16, step + delta));
+    syncStatus();
+    scroller.focus({ preventScroll: true });
+  }
+
+  function handleHexInput(digit) {
+    if (mode !== 'edit' || cursorField === 'note') return false;
+
+    const { project, pattern, tracks } = projectInfo();
+    const track = tracks[cursorChannel];
+    const note = noteAtCell(project, { patternId: pattern.id, trackId: track.id, row: cursorRow });
+    if (!note) {
+      pendingHex = null;
+      feedback = { key: 'pattern.hintNeedsNote' };
+      renderWindow();
+      syncStatus();
+      return true;
+    }
+
+    const sameCell = pendingHex
+      && pendingHex.row === cursorRow
+      && pendingHex.channel === cursorChannel
+      && pendingHex.field === cursorField;
+
+    if (!sameCell) {
+      pendingHex = { row: cursorRow, channel: cursorChannel, field: cursorField, first: digit };
+      feedback = null;
+      renderWindow();
+      syncStatus();
+      return true;
+    }
+
+    const valueText = `${pendingHex.first}${digit}`;
+    const value = Number.parseInt(valueText, 16);
+    pendingHex = null;
+
+    if (cursorField === 'instrument') {
+      if (value < 1 || value > project.instruments.length) {
+        feedback = { key: 'pattern.invalidInstrument', vars: { value: valueText } };
+        renderWindow();
+        syncStatus();
+        return true;
+      }
+
+      feedback = null;
+      registry.execute('pattern.updateNote', {
+        patternId: pattern.id,
+        trackId: track.id,
+        row: cursorRow,
+        instrumentId: project.instruments[value - 1].id,
+      });
+      moveHorizontal(1);
+      return true;
+    }
+
+    if (value > 0x7F) {
+      feedback = { key: 'pattern.invalidVolume', vars: { value: valueText } };
+      renderWindow();
+      syncStatus();
+      return true;
+    }
+
+    feedback = null;
+    registry.execute('pattern.updateNote', {
+      patternId: pattern.id,
+      trackId: track.id,
+      row: cursorRow,
+      velocity: value,
+    });
+    moveVertical(step);
+    return true;
+  }
+
+  function displayCellText(project, note, field, row, channel) {
+    if (
+      pendingHex
+      && pendingHex.row === row
+      && pendingHex.channel === channel
+      && pendingHex.field === field
+    ) {
+      return `${pendingHex.first}_`;
+    }
+    return cellText(project, note, field);
   }
 
   function deleteCurrentEvent() {
@@ -293,11 +427,19 @@ export function createPatternView({
     scroller.classList.toggle('is-audition', mode !== 'edit');
     octaveText.textContent = `${t('status.octave')} ${octave}`;
     stepText.textContent = `${t('status.step')} ${step}`;
-    hint.textContent = cursorField === 'note'
-      ? t(mode === 'edit' ? 'pattern.hintEdit' : 'pattern.hintAudition')
-      : t('pattern.hintReadonlyField', {
-        field: t(cursorField === 'instrument' ? 'pattern.columnInstrument' : 'pattern.columnVolume'),
+    if (feedback) {
+      hint.textContent = t(feedback.key, feedback.vars);
+    } else if (mode !== 'edit') {
+      hint.textContent = t('pattern.hintAudition');
+    } else if (cursorField === 'note') {
+      hint.textContent = t('pattern.hintEdit');
+    } else if (cursorField === 'instrument') {
+      hint.textContent = t('pattern.hintInstrument', {
+        max: formatHexByte(projectInfo().project.instruments.length),
       });
+    } else {
+      hint.textContent = t('pattern.hintVolume');
+    }
     onStatus?.({ mode, octave, step, row: cursorRow });
   }
 
@@ -338,19 +480,26 @@ export function createPatternView({
     }
     if (event.code === 'Delete' || event.code === 'Backspace') {
       event.preventDefault();
+      clearInputState();
       deleteCurrentEvent();
       return;
     }
+
+    const hexDigit = HEX_CODES.get(event.code);
+    if (hexDigit !== undefined && cursorField !== 'note') {
+      event.preventDefault();
+      handleHexInput(hexDigit);
+      return;
+    }
+
     if (event.code === 'Minus') {
       event.preventDefault();
-      octave = Math.max(0, octave - 1);
-      syncStatus();
+      adjustOctave(-1);
       return;
     }
     if (event.code === 'Equal') {
       event.preventDefault();
-      octave = Math.min(8, octave + 1);
-      syncStatus();
+      adjustOctave(1);
       return;
     }
 
