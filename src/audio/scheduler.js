@@ -42,6 +42,9 @@ export function createPatternScheduleCursor(pattern, tempo, { loop = false, ppq 
 
   function setLoop(enabled) {
     loopEnabled = Boolean(enabled);
+    // Kalau cycle berikutnya belum mulai dijadwalkan, mematikan loop harus berhenti
+    // persis di batas Pattern, bukan membocorkan event pertama cycle berikutnya.
+    if (!loopEnabled && cycle > 0 && index === 0) exhausted = true;
   }
 
   function drainUntil(anchor, horizon) {
