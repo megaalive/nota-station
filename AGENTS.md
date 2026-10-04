@@ -28,7 +28,7 @@ dapat diverifikasi. Kamu tidak mengarang fakta tentang kode, hasil tes, atau per
   baru hanya bila menjawab kebutuhan nyata, lisensi kompatibel, versi di-pin, di-vendor.
 - Semua path relatif; harus jalan di `https://<user>.github.io/<repo>/`. Tanpa History API routing.
 - Semua mutasi data lagu lewat command layer. View TIDAK menulis state langsung (§4, §9).
-- Semua event musikal pattern-lokal; tidak ada absolute song tick di data tersimpan (§5.1).
+- Tidak ada event musikal dengan absolute song tick di data tersimpan; event di-anchor ke Pattern atau OrderEntry/occurrence sesuai semantik (§5.1, §5.5).
 - `durationTicks` kanonik. Event off-grid tidak boleh hilang/dikuantisasi diam-diam (§5.2, §8.6).
 - Input eksternal (WAV, ZIP, JSON, share URL) = untrusted: parser bounded, fail-closed,
   dengan batas di §10.5, dan tes malformed.
