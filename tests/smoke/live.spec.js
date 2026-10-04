@@ -122,6 +122,43 @@ test.describe('smoke build live', () => {
     await expect(page.locator('[data-action="pattern-step"]')).toHaveText('Step 2');
   });
 
+  test('tempo dan loop memakai scheduler audio clock pada build live', async ({ page }) => {
+    await gotoApp(page);
+
+    const tempo = page.locator('[data-action="tempo-input"]');
+    const loop = page.getByRole('button', { name: 'Loop Pattern' });
+
+    await expect(tempo).toHaveValue('120');
+    await expect(page.locator('[data-action="meter-display"]')).toHaveText('4/4');
+    await expect(loop).toHaveAttribute('aria-pressed', 'true');
+
+    await tempo.fill('240');
+    await tempo.press('Tab');
+    expect(await page.evaluate(() => window.tracker.getProject().song.initial.tempo)).toBe(240);
+
+    const grid = page.locator('[data-action="pattern-grid"]');
+    await grid.focus();
+    await page.keyboard.press('Control+e');
+    await page.keyboard.press('z');
+
+    await page.getByRole('button', { name: 'Putar' }).click();
+    await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain', { timeout: 5000 });
+
+    let audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.schedulerActive).toBe(true);
+    expect(audio.loop).toBe(true);
+    expect(audio.durationSeconds).toBeCloseTo(4, 6);
+
+    await loop.click();
+    await expect(loop).toHaveAttribute('aria-pressed', 'false');
+    audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.loop).toBe(false);
+
+    await page.getByRole('button', { name: 'Berhenti' }).click();
+    audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.schedulerActive).toBe(false);
+  });
+
   test('gestur pengguna membuka factory sound dan Pattern dapat dimainkan', async ({ page }) => {
     await gotoApp(page);
 
