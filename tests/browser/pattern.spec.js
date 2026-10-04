@@ -48,7 +48,13 @@ test.describe('Pattern R1 editing', () => {
     for (let i = 0; i < 23; i += 1) await page.keyboard.press('ArrowRight');
 
     await expect(volumeCell(page, 0, 7)).toHaveAttribute('aria-selected', 'true');
+    expect(await grid.evaluate((node) => node.scrollWidth)).toBeGreaterThan(
+      await grid.evaluate((node) => node.clientWidth),
+    );
     expect(await grid.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      await page.evaluate(() => document.documentElement.clientWidth),
+    );
 
     const visible = await volumeCell(page, 0, 7).evaluate((cell) => {
       const grid = cell.closest('[data-action="pattern-grid"]');
