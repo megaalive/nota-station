@@ -42,6 +42,8 @@ const messages = {
     'transport.tempoUnit': 'BPM',
     'transport.tempoInvalid': 'Tempo harus 20–300 BPM.',
     'transport.tempoPlaceholder': '♩120 4/4 Am',
+    'audio.activate': 'Aktifkan audio',
+    'audio.lockedBanner': 'Audio belum aktif. Aktifkan agar Play dan audisi dapat terdengar.',
 
     'status.edit': 'EDIT',
     'status.audisi': 'AUDISI',
@@ -151,6 +153,8 @@ const messages = {
     'transport.tempoUnit': 'BPM',
     'transport.tempoInvalid': 'Tempo must be 20–300 BPM.',
     'transport.tempoPlaceholder': '♩120 4/4 Am',
+    'audio.activate': 'Activate audio',
+    'audio.lockedBanner': 'Audio is not active yet. Activate it so Play and audition can be heard.',
 
     'status.edit': 'EDIT',
     'status.audisi': 'AUDISI',
