@@ -73,8 +73,8 @@ export function createShell({ root, t, registry, palette, store, build }) {
 
   /* ------------------------------------------------------------- panels */
 
-  const leftPanel = panel('left', t('shell.leftPanel'), t('left.placeholder'));
-  const rightPanel = panel('right', t('shell.rightPanel'), t('right.placeholder'));
+  const leftPanel = panel('left', t('shell.leftPanel'), t('left.placeholder'), { t, store });
+  const rightPanel = panel('right', t('shell.rightPanel'), t('right.placeholder'), { t, store });
 
   // Ukuran panel disimpan di localStorage: ini preference UI, bukan data lagu (§10.1).
   const leftSplit = Splitter({
@@ -146,15 +146,44 @@ export function createShell({ root, t, registry, palette, store, build }) {
   return { render, selectTab, getActiveTab: () => activeTab };
 }
 
-function panel(side, title, placeholder) {
-  return el('aside', {
+function panel(side, title, placeholder, { t, store }) {
+  const contentId = `panel-${side}-content`;
+  const storageKey = `notastation.panel.${side}.collapsed`;
+  const content = el('div', { class: 'panel__content', id: contentId }, [
+    el('ul', { class: 'panel__list' }, [el('li', { class: 'panel__item', text: placeholder })]),
+  ]);
+  const titleNode = el('h2', { class: 'panel__title', text: title });
+  const toggle = el('button', {
+    type: 'button',
+    class: 'panel__toggle',
+    'aria-controls': contentId,
+    dataset: { action: `panel-${side}-toggle` },
+  });
+
+  const root = el('aside', {
     class: `panel panel--${side}`,
     dataset: { action: `panel-${side}` },
     'aria-label': title,
   }, [
-    el('h2', { class: 'panel__title', text: title }),
-    el('ul', { class: 'panel__list' }, [el('li', { class: 'panel__item', text: placeholder })]),
+    el('div', { class: 'panel__header' }, [titleNode, toggle]),
+    content,
   ]);
+
+  function setCollapsed(collapsed, persist = true) {
+    root.classList.toggle('is-collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    toggle.setAttribute('aria-label', t(collapsed ? 'panel.expand' : 'panel.collapse', { panel: title }));
+    // Panahnya menunjukkan arah panel akan bergerak kalau tombol ditekan lagi.
+    toggle.textContent = side === 'left'
+      ? (collapsed ? '›' : '‹')
+      : (collapsed ? '‹' : '›');
+    if (persist) store?.setItem(storageKey, collapsed ? '1' : '0');
+  }
+
+  toggle.addEventListener('click', () => setCollapsed(!root.classList.contains('is-collapsed')));
+  setCollapsed(store?.getItem(storageKey) === '1', false);
+
+  return root;
 }
 
 /** Empty state bermakna di setiap view kosong: satu kalimat + satu petunjuk (§8.15). */
