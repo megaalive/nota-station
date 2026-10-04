@@ -50,7 +50,7 @@ test('setiap locale punya key yang sama — kalau tidak, ada teks yang akan hila
     'app.title', 'app.bootFailed', 'app.needsJs',
     'tab.song', 'tab.pattern', 'tab.pianoRoll', 'tab.lyrics', 'tab.guitar', 'tab.score', 'tab.sound',
     'shell.workspaceTabs', 'shell.leftPanel', 'shell.rightPanel', 'shell.dock', 'shell.statusBar',
-    'shell.buildUnknown', 'panel.collapse', 'panel.expand', 'topbar.transport',
+    'shell.buildUnknown', 'panel.collapse', 'panel.expand', 'panel.resize', 'topbar.transport',
     'transport.play', 'transport.stop', 'transport.loopPattern',
     'transport.tempoPlaceholder', 'status.edit', 'status.audisi', 'status.octave', 'status.step',
     'status.audio', 'status.idle', 'status.notSaved', 'position.barBeat', 'left.placeholder',
