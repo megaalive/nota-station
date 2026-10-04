@@ -49,6 +49,13 @@ jobs:
         with:
           name: dist
           path: dist
+      # Runner GitHub selalu baru, jadi Playwright browser (±200 MB) diunduh
+      # ulang tiap run kalau tidak di-cache. Kunci cache ikut versi Playwright
+      # supaya upgrading Playwright otomatis memakai cache baru.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium firefox
       - run: npm run test:browser
         env:
@@ -94,6 +101,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium
       - run: npm run test:smoke
         env:
