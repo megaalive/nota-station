@@ -2,10 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  createMetronomeScheduleCursor,
   createPatternScheduleCursor,
+  metronomeEventTemplates,
   patternDurationSeconds,
   patternEventTemplates,
   secondsPerTick,
+  transportTickAtAudioTime,
 } from '../../src/audio/scheduler.js';
 
 function patternFixture() {
@@ -94,4 +97,46 @@ test('loop dapat dimatikan sebelum cycle berikutnya dijadwalkan', () => {
   cursor.setLoop(false);
   assert.deepEqual(cursor.drainUntil(anchor, 20), []);
   assert.equal(cursor.isExhausted(), true);
+});
+
+
+test('seek memulai cursor dari tick lokal tanpa mengulang event sebelumnya', () => {
+  const cursor = createPatternScheduleCursor(patternFixture(), 120, { startTick: 480 });
+  const due = cursor.drainUntil(10, 10.01);
+  assert.deepEqual(due.map((event) => event.id), ['n2']);
+  assert.equal(due[0].when, 10);
+});
+
+test('posisi transport berasal dari audio clock dan wrap saat loop', () => {
+  const common = { anchorAudioTime: 5, anchorTick: 480, tempo: 120, patternLengthTicks: 7680 };
+  assert.equal(transportTickAtAudioTime({ ...common, nowAudioTime: 5.5 }), 960);
+  assert.equal(transportTickAtAudioTime({ ...common, nowAudioTime: 13.5, loop: true }), 960);
+  assert.equal(transportTickAtAudioTime({ ...common, nowAudioTime: 30, loop: false }), 7680);
+});
+
+test('metronome mengikuti meter Pattern dan accent pada awal bar', () => {
+  const pattern = { ...patternFixture(), meter: { num: 4, den: 4 } };
+  const events = metronomeEventTemplates(pattern);
+  assert.equal(events.length, 16);
+  assert.deepEqual(
+    events.filter((event) => event.accent).map((event) => event.startTickLocal),
+    [0, 1920, 3840, 5760],
+  );
+
+  const cursor = createMetronomeScheduleCursor(pattern, 120, { startTick: 1920 });
+  const due = cursor.drainUntil(3, 3.01);
+  assert.equal(due[0].startTickLocal, 1920);
+  assert.equal(due[0].accent, true);
+});
+
+test('100 loop tetap dihitung dari anchor tanpa drift progresif', () => {
+  const pattern = {
+    lengthTicks: 7680,
+    notes: [{ id: 'n1', trackId: 't1', startTickLocal: 0, durationTicks: 120, pitch: 60, velocity: 100 }],
+  };
+  const cursor = createPatternScheduleCursor(pattern, 120, { loop: true });
+  const anchor = 2.125;
+  const due = cursor.drainUntil(anchor, anchor + 800.01);
+  assert.equal(due.at(-1).cycle, 100);
+  assert.equal(due.at(-1).when, anchor + 800);
 });

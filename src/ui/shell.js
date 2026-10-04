@@ -25,7 +25,16 @@ export function createShell({
   store,
   build,
   renderView = null,
-  transport = { tempo: 120, meter: { num: 4, den: 4 }, loopPattern: true },
+  transport = {
+    tempo: 120,
+    meter: { num: 4, den: 4 },
+    loopPattern: true,
+    metronome: false,
+    audioState: 'locked',
+    positionTick: 0,
+    lengthTicks: 7680,
+    rowTicks: 120,
+  },
 }) {
   let activeTab = 'pattern';
 
@@ -46,6 +55,15 @@ export function createShell({
     iconOnly: true,
     onClick: () => registry.execute('playback.play'),
   });
+  const pauseButton = Button({
+    label: t('transport.pause'),
+    icon: '⏸',
+    iconOnly: true,
+    disabled: true,
+    onClick: () => registry.execute('playback.pause'),
+  });
+  pauseButton.dataset.action = 'transport-pause';
+
   const stopButton = Button({
     label: t('transport.stop'),
     icon: '■',
@@ -68,10 +86,24 @@ export function createShell({
   });
   loopButton.dataset.action = 'loop-mode';
 
+  const metronomeButton = Button({
+    label: t('transport.metronome'),
+    icon: '♩',
+    iconOnly: true,
+    variant: 'ghost',
+    onClick: () => registry.execute('playback.toggleMetronome'),
+  });
+  metronomeButton.dataset.action = 'metronome-mode';
+
   let currentTransport = {
     tempo: transport.tempo ?? 120,
     meter: transport.meter ?? { num: 4, den: 4 },
     loopPattern: transport.loopPattern ?? true,
+    metronome: transport.metronome ?? false,
+    audioState: transport.audioState ?? 'locked',
+    positionTick: transport.positionTick ?? 0,
+    lengthTicks: transport.lengthTicks ?? 7680,
+    rowTicks: transport.rowTicks ?? 120,
   };
 
   const tempoInput = el('input', {
@@ -118,16 +150,33 @@ export function createShell({
     dataset: { action: 'meter-display' },
   });
 
+  const seekInput = el('input', {
+    type: 'range',
+    class: 'topbar__seek',
+    min: '0',
+    max: String(currentTransport.lengthTicks),
+    step: String(currentTransport.rowTicks),
+    value: String(currentTransport.positionTick),
+    'aria-label': t('transport.seek'),
+    dataset: { action: 'transport-seek' },
+    on: {
+      change: () => registry.execute('playback.seek', { tick: Number(seekInput.value) }),
+    },
+  });
+
   const transportBar = el('div', {
     class: 'topbar__transport',
     role: 'group',
     'aria-label': t('topbar.transport'),
   }, [
     Tooltip({ text: t('transport.play'), child: playButton }),
+    Tooltip({ text: t('transport.pause'), child: pauseButton }),
     Tooltip({ text: t('transport.stop'), child: stopButton }),
     Tooltip({ text: t('transport.loopPattern'), child: loopButton }),
+    Tooltip({ text: t('transport.metronome'), child: metronomeButton }),
     tempoControl,
     meterDisplay,
+    Tooltip({ text: t('transport.seek'), child: seekInput }),
     el('span', { class: 'topbar__saved', role: 'status', dataset: { action: 'save-status' }, text: t('status.notSaved') }),
     buildId,
     Tooltip({ text: t('cmd.palette'), shortcut: 'Ctrl+K', child: paletteButton }),
@@ -274,6 +323,7 @@ export function createShell({
       locked: 'status.audioLocked',
       ready: 'status.audioReady',
       playing: 'status.audioPlaying',
+      paused: 'status.audioPaused',
       error: 'status.audioError',
     }[state] ?? 'status.audioReady';
     audioStatus.textContent = `${t('status.audio')} · ${t(key)}`;
@@ -286,10 +336,21 @@ export function createShell({
       ...next,
       meter: next.meter ?? currentTransport.meter,
     };
+    const playing = currentTransport.audioState === 'playing';
+    playButton.disabled = playing;
+    pauseButton.disabled = !playing;
     loopButton.setAttribute('aria-pressed', currentTransport.loopPattern ? 'true' : 'false');
     loopButton.classList.toggle('is-active', currentTransport.loopPattern);
+    metronomeButton.setAttribute('aria-pressed', currentTransport.metronome ? 'true' : 'false');
+    metronomeButton.classList.toggle('is-active', currentTransport.metronome);
     tempoInput.value = String(currentTransport.tempo);
     meterDisplay.textContent = `${currentTransport.meter.num}/${currentTransport.meter.den}`;
+    seekInput.max = String(currentTransport.lengthTicks);
+    seekInput.step = String(currentTransport.rowTicks);
+    seekInput.value = String(Math.max(0, Math.min(
+      currentTransport.lengthTicks,
+      Math.round(currentTransport.positionTick),
+    )));
   }
 
   function render() {

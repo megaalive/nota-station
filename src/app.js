@@ -30,9 +30,11 @@ let shell = null;
 let patternView = null;
 const transportState = {
   loopPattern: true,
+  metronome: false,
 };
 const audio = createAudioEngine({
-  onStateChange: (state) => shell?.setAudioStatus(state),
+  onStateChange: () => syncTransportUi(),
+  onPositionChange: () => syncTransportUi(),
 });
 
 applyTheme(theme);
@@ -119,12 +121,17 @@ function registerCommands() {
       },
     },
     {
+      id: 'playback.pause',
+      group: 'Playback',
+      labelKey: 'transport.pause',
+      run: () => audio.pause(),
+    },
+    {
       id: 'playback.stop',
       group: 'Playback',
       labelKey: 'transport.stop',
       run: () => {
         audio.stop();
-        shell?.setAudioStatus(audio.getState().state);
         return 'stop';
       },
     },
@@ -134,9 +141,30 @@ function registerCommands() {
       labelKey: 'transport.loopPattern',
       run: () => {
         transportState.loopPattern = !transportState.loopPattern;
-        audio.setLoop(transportState.loopPattern);
+        audio.setLoop(project, activePattern(project), transportState.loopPattern);
         syncTransportUi();
         return transportState.loopPattern;
+      },
+    },
+    {
+      id: 'playback.toggleMetronome',
+      group: 'Playback',
+      labelKey: 'transport.metronome',
+      run: () => {
+        transportState.metronome = !transportState.metronome;
+        audio.setMetronome(project, activePattern(project), transportState.metronome);
+        syncTransportUi();
+        return transportState.metronome;
+      },
+    },
+    {
+      id: 'playback.seek',
+      group: 'Playback',
+      labelKey: 'transport.seek',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('playback.seek', args);
+        return audio.seek(project, activePattern(project), Number(args.tick));
       },
     },
     {
@@ -146,8 +174,9 @@ function registerCommands() {
       requiresArgs: true,
       run: (args) => {
         requireCommandArgs('song.setTempo', args);
-        if (audio.getState().state === 'playing') audio.stop();
         commitProject(setInitialTempo(project, args.tempo), 'song.setTempo');
+        audio.setTempo(project, activePattern(project));
+        syncTransportUi();
         return { tempo: project.song.initial.tempo };
       },
     },
@@ -255,10 +284,18 @@ function setSaveStatus(key) {
 }
 
 function syncTransportUi() {
+  const pattern = activePattern(project);
+  const audioState = audio.getState();
+  shell?.setAudioStatus(audioState.state);
   shell?.setTransportStatus({
     tempo: project.song.initial.tempo,
     meter: project.song.initial.meter,
     loopPattern: transportState.loopPattern,
+    metronome: transportState.metronome,
+    audioState: audioState.state,
+    positionTick: audioState.positionTick,
+    lengthTicks: pattern.lengthTicks,
+    rowTicks: pattern.rowTicks,
   });
 }
 
@@ -285,6 +322,7 @@ function restoreHistory(direction) {
 
   project = nextProject;
   setSaveStatus('status.notSaved');
+  audio.setTempo(project, activePattern(project));
   syncTransportUi();
   patternView?.refresh();
   return history.getState();
@@ -295,6 +333,7 @@ async function playActivePattern() {
   try {
     const result = await audio.playPattern(project, activePattern(project), {
       loop: transportState.loopPattern,
+      metronome: transportState.metronome,
     });
     return result;
   } catch {
@@ -337,6 +376,7 @@ function mountShell(activeTab = 'pattern') {
       tempo: project.song.initial.tempo,
       meter: project.song.initial.meter,
       loopPattern: transportState.loopPattern,
+      metronome: transportState.metronome,
     },
   });
   shell.render();
@@ -406,6 +446,8 @@ async function boot() {
         tempo: project.song.initial.tempo,
         meter: project.song.initial.meter,
         loopPattern: transportState.loopPattern,
+        metronome: transportState.metronome,
+        positionTick: audio.getState().positionTick,
       },
       history: history.getState(),
       project: {
