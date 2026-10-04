@@ -230,7 +230,7 @@ function bindShortcuts() {
       return;
     }
     if (event.code === 'Space' && !event.ctrlKey && !event.altKey && !event.metaKey) {
-      if (event.target.closest?.('input, textarea, [contenteditable="true"], [data-action="pattern-grid"]')) return;
+      if (event.target.closest?.('input, textarea, [contenteditable="true"]')) return;
       event.preventDefault();
       registry.execute(audio.getState().state === 'playing' ? 'playback.stop' : 'playback.play');
     }
