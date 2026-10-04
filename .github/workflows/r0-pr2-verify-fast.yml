@@ -20,7 +20,12 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Use current Playwright for diagnosis
-        run: npm install --no-save @playwright/test@1.63.0
+        run: |
+          npm install -D @playwright/test@1.63.0
+          echo LOCK_BEGIN
+          base64 -w0 package-lock.json
+          echo
+          echo LOCK_END
       - run: npm test
       - run: npm run check
       - run: npm run build
