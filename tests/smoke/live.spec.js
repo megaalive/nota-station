@@ -95,6 +95,33 @@ test.describe('smoke build live', () => {
     expect(project.song.patterns[0].notes[0]).not.toHaveProperty('absoluteTick');
   });
 
+  test('field VOL dan stepper S3 bekerja pada build live', async ({ page }) => {
+    await gotoApp(page);
+
+    const grid = page.locator('[data-action="pattern-grid"]');
+    await grid.focus();
+    await page.keyboard.press('Control+e');
+    await page.keyboard.press('z');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+
+    const volume = page.locator(
+      '[data-action="pattern-cell"][data-row="0"][data-channel="0"][data-field="volume"]',
+    );
+    await page.keyboard.press('5');
+    await expect(volume).toHaveText('5_');
+    await page.keyboard.press('0');
+    await expect(volume).toHaveText('50');
+
+    const note = await page.evaluate(() => window.tracker.getProject().song.patterns[0].notes[0]);
+    expect(note.velocity).toBe(0x50);
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(2);
+
+    await page.getByRole('button', { name: 'Tambah step' }).click();
+    await expect(page.locator('[data-action="pattern-step"]')).toHaveText('Step 2');
+  });
+
   test('gestur pengguna membuka factory sound dan Pattern dapat dimainkan', async ({ page }) => {
     await gotoApp(page);
 
