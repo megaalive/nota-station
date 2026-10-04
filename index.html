@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- CSP lewat meta: GitHub Pages nggak bisa kirim header custom, jadi ini satu-satunya cara.
+     connect-src sengaja 'self' dulu — pelonggaran buat provider LLM diputuskan di R8 (§12.3). -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'" />
+<title>NotaStation</title>
+<link rel="stylesheet" href="./styles/tokens.css" />
+<link rel="stylesheet" href="./styles/app.css" />
+</head>
+<body>
+<div id="app" role="application" aria-label="NotaStation"></div>
+<script type="module" src="./src/app.js"></script>
+<noscript>NotaStation needs JavaScript to run.</noscript>
+</body>
+</html>

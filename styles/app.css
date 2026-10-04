@@ -1,0 +1,39 @@
+/* Styling dasar shell. Layout penuh §8.3 menyusul di S3; di sini cukup
+   placeholder yang kelihatan dan fokus yang jelas (§8.19). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: calc(100% * var(--font-scale));
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+#app {
+  min-height: 100vh;
+  padding: var(--space-4);
+}
+
+/* Fokus harus kelihatan jelas dan bukan cuma beda warna — garis tebal + offset. */
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
