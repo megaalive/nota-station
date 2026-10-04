@@ -229,8 +229,8 @@ export function createPatternView({
   function moveVertical(delta) {
     const { rowCount } = projectInfo();
     cursorRow = Math.max(0, Math.min(rowCount - 1, cursorRow + delta));
-    ensureCursorVisible();
     renderWindow();
+    ensureCursorVisible();
     syncStatus();
   }
 
@@ -243,8 +243,8 @@ export function createPatternView({
     );
     cursorChannel = Math.floor(flat / FIELDS.length);
     cursorField = FIELDS[flat % FIELDS.length];
-    ensureCursorVisible();
     renderWindow();
+    ensureCursorVisible();
     syncStatus();
   }
 
