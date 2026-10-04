@@ -169,9 +169,9 @@ export function createShell({
     role: 'group',
     'aria-label': t('topbar.transport'),
   }, [
-    Tooltip({ text: t('transport.play'), child: playButton }),
+    Tooltip({ text: t('transport.play'), shortcut: 'Space', child: playButton }),
     Tooltip({ text: t('transport.pause'), child: pauseButton }),
-    Tooltip({ text: t('transport.stop'), child: stopButton }),
+    Tooltip({ text: t('transport.stop'), shortcut: 'Space', child: stopButton }),
     Tooltip({ text: t('transport.loopPattern'), child: loopButton }),
     Tooltip({ text: t('transport.metronome'), child: metronomeButton }),
     tempoControl,

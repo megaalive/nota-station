@@ -60,9 +60,9 @@ export function createPatternView({
   const hint = el('span', { class: 'pattern-toolbar__hint', dataset: { action: 'pattern-hint' } });
 
   const octaveGroup = el('span', { class: 'pattern-toolbar__stepper' }, [
-    toolButton('pattern-octave-down', t('pattern.octaveDown'), '−', () => adjustOctave(-1)),
+    toolButton('pattern-octave-down', t('pattern.octaveDown'), '−', () => adjustOctave(-1), '-'),
     octaveText,
-    toolButton('pattern-octave-up', t('pattern.octaveUp'), '+', () => adjustOctave(1)),
+    toolButton('pattern-octave-up', t('pattern.octaveUp'), '+', () => adjustOctave(1), '='),
   ]);
   const stepGroup = el('span', { class: 'pattern-toolbar__stepper' }, [
     toolButton('pattern-step-down', t('pattern.stepDown'), '−', () => adjustStep(-1)),
@@ -70,8 +70,14 @@ export function createPatternView({
     toolButton('pattern-step-up', t('pattern.stepUp'), '+', () => adjustStep(1)),
   ]);
 
+  const modeControl = Tooltip({
+    text: t('pattern.toggleMode'),
+    shortcut: 'Ctrl+E',
+    child: modeButton,
+  });
+
   const toolbar = el('div', { class: 'pattern-toolbar' }, [
-    modeButton,
+    modeControl,
     octaveGroup,
     stepGroup,
     hint,
@@ -295,7 +301,7 @@ export function createPatternView({
     moveVertical(step);
   }
 
-  function toolButton(action, label, icon, onClick) {
+  function toolButton(action, label, icon, onClick, shortcut = null) {
     const button = Button({
       label,
       icon,
@@ -304,7 +310,7 @@ export function createPatternView({
       onClick,
     });
     button.dataset.action = action;
-    return Tooltip({ text: label, child: button });
+    return Tooltip({ text: label, shortcut, child: button });
   }
 
   function clearInputState() {
