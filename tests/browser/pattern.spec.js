@@ -172,6 +172,30 @@ test.describe('Pattern R1 editing', () => {
     expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
   });
 
+  test('Delete dan Backspace pada INST/VOL read-only tidak menghapus note', async ({ page }) => {
+    const grid = page.locator('[data-action="pattern-grid"]');
+    await grid.focus();
+    await page.keyboard.press('Control+e');
+    await page.keyboard.press('z');
+    await page.keyboard.press('ArrowUp');
+
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(1);
+
+    await page.keyboard.press('ArrowRight');
+    await expect(instrumentCell(page)).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Delete');
+
+    await page.keyboard.press('ArrowRight');
+    await expect(volumeCell(page)).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Backspace');
+
+    expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(1);
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(1);
+    await expect(noteCell(page)).toHaveText('C-4');
+    await expect(instrumentCell(page)).toHaveText('01');
+    await expect(volumeCell(page)).toHaveText('64');
+  });
+
   test('scroll ke bawah merender window row akhir tanpa membuat 64 row DOM sekaligus', async ({ page }) => {
     const grid = page.locator('[data-action="pattern-grid"]');
     await grid.evaluate((node) => {
