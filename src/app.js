@@ -92,7 +92,6 @@ function syncHtmlLang() {
 const palette = createPalette({
   registry,
   t: (key, vars) => i18n.t(key, vars),
-  onRun: () => shell?.render(),
 });
 
 function registerCommands() {
@@ -212,6 +211,8 @@ function requireCommandArgs(id, args) {
 }
 
 function commitProject(nextProject, label) {
+  if (nextProject === project) return project;
+
   project = history.commit(nextProject, label);
   setSaveStatus('status.notSaved');
   patternView?.refresh();
