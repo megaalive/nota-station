@@ -1,5 +1,5 @@
-// Entry point aplikasi. Yang penting di R0: boot tanpa galat console, semua path relatif,
-// shell §8.3 lengkap, dan window.tracker tersedia buat agent (§9).
+// Entry point aplikasi. R0 menyediakan shell/command layer; R1 mulai menambahkan
+// model Pattern dan audio tanpa membocorkan state mentah ke view/agent.
 
 import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
 import { commandError, createCommandRegistry } from './core/commands.js';
@@ -154,8 +154,8 @@ function registerCommands() {
       run: () => cycleTheme(),
     },
     {
-      // Sengaja nonaktif di R0: audio baru ada di R1. Tampilkan denngan alasan,
-      // bukan disembunyikan — user jadi tahu kenapa tidak bisa dipakai (§8.14).
+      // Ekspor WAV belum masuk slice R1-S1. Tetap tampil dengan alasan,
+      // bukan disembunyikan — user jadi tahu kenapa belum bisa dipakai (§8.14).
       id: 'io.exportWav',
       group: 'Ekspor',
       labelKey: 'palette.exportWav',
