@@ -13,7 +13,8 @@
     "check": "node tools/check.mjs",
     "build": "node tools/build.mjs",
     "test:browser": "playwright test",
-    "test:smoke": "playwright test --config=playwright.smoke.config.js"
+    "test:smoke": "playwright test --config=playwright.smoke.config.js",
+    "deploy": "node tools/deploy-pages.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.49.1"
