@@ -3,7 +3,8 @@
 
 import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
 import { commandError, createCommandRegistry } from './core/commands.js';
-import { activePattern, createBlankProject, enterNote } from './core/project.js';
+import { createHistory } from './core/history.js';
+import { activePattern, createBlankProject, deleteNote, enterNote } from './core/project.js';
 import { createAudioEngine } from './audio/engine.js';
 import { createPalette } from './ui/palette.js';
 import { createPatternView } from './ui/pattern.js';
@@ -16,9 +17,11 @@ const THEMES = ['light', 'dark', 'high-contrast'];
 
 let theme = readInitialTheme();
 let buildInfo = null;
-let project = createBlankProject();
+const history = createHistory(createBlankProject());
+let project = history.current();
 const audio = createAudioEngine();
 let shell = null;
+let patternView = null;
 
 applyTheme(theme);
 
@@ -118,14 +121,45 @@ function registerCommands() {
       id: 'pattern.enterNote',
       group: 'Pattern',
       labelKey: 'pattern.enterNote',
+      requiresArgs: true,
       run: (args) => {
-        if (!args || typeof args !== 'object') {
-          throw commandError('E_CMD_ARGS_REQUIRED', 'pattern.enterNote membutuhkan argumen sel dan pitch.');
-        }
-        project = enterNote(project, args);
-        setSaveStatus('status.notSaved');
+        requireCommandArgs('pattern.enterNote', args);
+        commitProject(enterNote(project, args), 'pattern.enterNote');
         return { noteCount: activePattern(project).notes.length };
       },
+    },
+    {
+      id: 'pattern.deleteNote',
+      group: 'Pattern',
+      labelKey: 'pattern.deleteNote',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.deleteNote', args);
+        const before = project;
+        commitProject(deleteNote(project, args), 'pattern.deleteNote');
+        return {
+          changed: project !== before,
+          noteCount: activePattern(project).notes.length,
+        };
+      },
+    },
+    {
+      id: 'history.undo',
+      group: 'Edit',
+      labelKey: 'history.undo',
+      shortcut: 'Ctrl+Z',
+      isEnabled: () => history.getState().canUndo,
+      disabledReason: () => i18n.t('history.nothingUndo'),
+      run: () => restoreHistory('undo'),
+    },
+    {
+      id: 'history.redo',
+      group: 'Edit',
+      labelKey: 'history.redo',
+      shortcut: 'Ctrl+Y',
+      isEnabled: () => history.getState().canRedo,
+      disabledReason: () => i18n.t('history.nothingRedo'),
+      run: () => restoreHistory('redo'),
     },
     {
       id: 'ui.showPattern',
@@ -171,6 +205,30 @@ function setSaveStatus(key) {
   if (chip) chip.textContent = i18n.t(key);
 }
 
+function requireCommandArgs(id, args) {
+  if (!args || typeof args !== 'object') {
+    throw commandError('E_CMD_ARGS_REQUIRED', `${id} membutuhkan argumen konteks editor.`);
+  }
+}
+
+function commitProject(nextProject, label) {
+  project = history.commit(nextProject, label);
+  setSaveStatus('status.notSaved');
+  patternView?.refresh();
+  return project;
+}
+
+function restoreHistory(direction) {
+  const nextProject = direction === 'undo' ? history.undo() : history.redo();
+  if (!nextProject) return history.getState();
+
+  project = nextProject;
+  setSaveStatus('status.notSaved');
+  patternView?.refresh();
+  return history.getState();
+}
+
+
 async function playActivePattern() {
   try {
     const result = await audio.playPattern(project, activePattern(project));
@@ -189,9 +247,10 @@ function auditionPitch(pitch) {
 }
 
 function renderWorkspace(tab, root) {
+  patternView = null;
   if (tab !== 'pattern') return false;
 
-  createPatternView({
+  patternView = createPatternView({
     root,
     t: (key, vars) => i18n.t(key, vars),
     getProject: () => project,
@@ -220,6 +279,18 @@ function bindShortcuts() {
   document.addEventListener('keydown', (event) => {
     // Shortcut pakai KeyboardEvent.code, bukan karakter, supaya tetap benar di
     // AZERTY/Dvorak/QWERTZ (§8.14 aturan 1).
+    if (event.ctrlKey && !event.altKey && !event.metaKey && !isTextInputTarget(event.target)) {
+      if (event.code === 'KeyZ') {
+        event.preventDefault();
+        if (registry.canRun('history.undo')) registry.execute('history.undo');
+        return;
+      }
+      if (event.code === 'KeyY') {
+        event.preventDefault();
+        if (registry.canRun('history.redo')) registry.execute('history.redo');
+        return;
+      }
+    }
     if (event.ctrlKey && event.code === 'KeyK') {
       event.preventDefault();
       registry.execute('ui.openPalette');
@@ -238,6 +309,10 @@ function bindShortcuts() {
       registry.execute(audio.getState().state === 'playing' ? 'playback.stop' : 'playback.play');
     }
   });
+}
+
+function isTextInputTarget(target) {
+  return Boolean(target?.closest?.('input, textarea, [contenteditable="true"]'));
 }
 
 async function boot() {
@@ -259,6 +334,7 @@ async function boot() {
       build: buildInfo,
       activeTab: shell.getActiveTab(),
       audio: audio.getState(),
+      history: history.getState(),
       project: {
         id: project.id,
         patternId: activePattern(project).id,
