@@ -1,14 +1,18 @@
-// Pattern editor R1-S1: 8 channel × 64 row, DOM windowed, input nada via
-// KeyboardEvent.code. View hanya memanggil command; project tidak pernah ditulis langsung.
+// Pattern editor R1: DOM windowed, 8 channel, kolom tracker NOTE | INST | VOL.
+// View tidak pernah menulis project langsung; semua mutasi lewat command registry.
 
 import { activePattern, noteAtCell } from '../core/project.js';
 import { el } from './dom.js';
 import { Button } from './kit.js';
 
 const ROW_HEIGHT = 28;
-const HEADER_HEIGHT = 32;
-const CHANNEL_WIDTH = 92;
+const HEADER_HEIGHT = 52;
 const ROW_NUMBER_WIDTH = 46;
+const NOTE_WIDTH = 64;
+const INST_WIDTH = 42;
+const VOL_WIDTH = 42;
+const CHANNEL_WIDTH = NOTE_WIDTH + INST_WIDTH + VOL_WIDTH;
+const FIELDS = ['note', 'instrument', 'volume'];
 const OVERSCAN = 4;
 
 const NOTE_CODES = new Map([
@@ -30,6 +34,7 @@ export function createPatternView({
 }) {
   let cursorRow = 0;
   let cursorChannel = 0;
+  let cursorField = 'note';
   let mode = 'audition';
   let octave = 4;
   let step = 1;
@@ -60,7 +65,7 @@ export function createPatternView({
     dataset: { action: 'pattern-grid' },
   });
   const surface = el('div', { class: 'pattern-grid__surface' });
-  const header = el('div', { class: 'pattern-grid__header', role: 'row' });
+  const header = el('div', { class: 'pattern-grid__header' });
   const rowsLayer = el('div', { class: 'pattern-grid__rows' });
 
   surface.append(header, rowsLayer);
@@ -79,19 +84,58 @@ export function createPatternView({
     };
   }
 
+  function dataColumns(tracks) {
+    return tracks.flatMap(() => [NOTE_WIDTH, INST_WIDTH, VOL_WIDTH]);
+  }
+
+  function rowTemplate(tracks) {
+    return `${ROW_NUMBER_WIDTH}px ${dataColumns(tracks).map((width) => `${width}px`).join(' ')}`;
+  }
+
   function renderHeader() {
     const { tracks } = projectInfo();
     header.textContent = '';
-    header.style.gridTemplateColumns = `${ROW_NUMBER_WIDTH}px repeat(${tracks.length}, ${CHANNEL_WIDTH}px)`;
-    header.append(el('div', { class: 'pattern-grid__corner', 'aria-hidden': 'true', text: '#' }));
+
+    const channelRow = el('div', { class: 'pattern-grid__header-row pattern-grid__header-row--channel', role: 'row' });
+    channelRow.style.gridTemplateColumns = `${ROW_NUMBER_WIDTH}px repeat(${tracks.length}, ${CHANNEL_WIDTH}px)`;
+    channelRow.append(el('div', {
+      class: 'pattern-grid__corner pattern-grid__corner--channel',
+      'aria-hidden': 'true',
+      text: '#',
+    }));
+
     tracks.forEach((track, index) => {
-      header.append(el('div', {
+      channelRow.append(el('div', {
         class: 'pattern-grid__channel',
         role: 'columnheader',
-        'aria-colindex': String(index + 1),
+        'aria-colindex': String(index * FIELDS.length + 1),
+        'aria-colspan': String(FIELDS.length),
         text: `${index + 1} · ${track.name}`,
       }));
     });
+
+    const fieldRow = el('div', { class: 'pattern-grid__header-row pattern-grid__header-row--field', role: 'row' });
+    fieldRow.style.gridTemplateColumns = rowTemplate(tracks);
+    fieldRow.append(el('div', { class: 'pattern-grid__corner', 'aria-hidden': 'true' }));
+
+    tracks.forEach((track, channel) => {
+      const labels = [
+        ['note', t('pattern.columnNote')],
+        ['instrument', t('pattern.columnInstrument')],
+        ['volume', t('pattern.columnVolume')],
+      ];
+      labels.forEach(([field, label], fieldIndex) => {
+        fieldRow.append(el('div', {
+          class: `pattern-grid__field-header pattern-grid__field-header--${field}`,
+          role: 'columnheader',
+          'aria-colindex': String(channel * FIELDS.length + fieldIndex + 1),
+          dataset: { channel: String(channel), field },
+          text: label,
+        }));
+      });
+    });
+
+    header.append(channelRow, fieldRow);
   }
 
   function renderWindow() {
@@ -101,7 +145,7 @@ export function createPatternView({
     surface.style.width = `${width}px`;
     surface.style.height = `${height}px`;
     scroller.setAttribute('aria-rowcount', String(rowCount));
-    scroller.setAttribute('aria-colcount', String(tracks.length));
+    scroller.setAttribute('aria-colcount', String(tracks.length * FIELDS.length));
 
     const viewportRows = Math.ceil((scroller.clientHeight || 420) / ROW_HEIGHT);
     const first = Math.max(0, Math.floor(Math.max(0, scroller.scrollTop - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN);
@@ -115,7 +159,7 @@ export function createPatternView({
         'aria-rowindex': String(row + 1),
       });
       rowNode.style.top = `${HEADER_HEIGHT + row * ROW_HEIGHT}px`;
-      rowNode.style.gridTemplateColumns = `${ROW_NUMBER_WIDTH}px repeat(${tracks.length}, ${CHANNEL_WIDTH}px)`;
+      rowNode.style.gridTemplateColumns = rowTemplate(tracks);
 
       rowNode.append(el('div', {
         class: 'pattern-grid__row-number',
@@ -125,30 +169,33 @@ export function createPatternView({
 
       tracks.forEach((track, channel) => {
         const note = noteAtCell(project, { patternId: pattern.id, trackId: track.id, row });
-        const selected = row === cursorRow && channel === cursorChannel;
-        const cell = el('div', {
-          class: `pattern-grid__cell${selected ? ' is-cursor' : ''}`,
-          role: 'gridcell',
-          'aria-colindex': String(channel + 1),
-          'aria-selected': selected ? 'true' : 'false',
-          dataset: {
-            action: 'pattern-cell',
-            row: String(row),
-            channel: String(channel),
-            trackId: track.id,
-          },
-          text: note ? formatPitch(note.pitch) : '···',
-          on: {
-            click: () => {
-              cursorRow = row;
-              cursorChannel = channel;
-              scroller.focus();
-              renderWindow();
-              syncStatus();
+        FIELDS.forEach((field, fieldIndex) => {
+          const selected = row === cursorRow && channel === cursorChannel && field === cursorField;
+          rowNode.append(el('div', {
+            class: `pattern-grid__cell pattern-grid__cell--${field}${selected ? ' is-cursor' : ''}`,
+            role: 'gridcell',
+            'aria-colindex': String(channel * FIELDS.length + fieldIndex + 1),
+            'aria-selected': selected ? 'true' : 'false',
+            dataset: {
+              action: 'pattern-cell',
+              row: String(row),
+              channel: String(channel),
+              field,
+              trackId: track.id,
             },
-          },
+            text: cellText(project, note, field),
+            on: {
+              click: () => {
+                cursorRow = row;
+                cursorChannel = channel;
+                cursorField = field;
+                scroller.focus();
+                renderWindow();
+                syncStatus();
+              },
+            },
+          }));
         });
-        rowNode.append(cell);
       });
       rowsLayer.append(rowNode);
     }
@@ -164,11 +211,23 @@ export function createPatternView({
     }
   }
 
-  function moveCursor(rowDelta, channelDelta = 0) {
-    const { tracks, rowCount } = projectInfo();
-    cursorRow = Math.max(0, Math.min(rowCount - 1, cursorRow + rowDelta));
-    cursorChannel = Math.max(0, Math.min(tracks.length - 1, cursorChannel + channelDelta));
+  function moveVertical(delta) {
+    const { rowCount } = projectInfo();
+    cursorRow = Math.max(0, Math.min(rowCount - 1, cursorRow + delta));
     ensureCursorVisible();
+    renderWindow();
+    syncStatus();
+  }
+
+  function moveHorizontal(delta) {
+    const { tracks } = projectInfo();
+    const fieldIndex = FIELDS.indexOf(cursorField);
+    const flat = Math.max(
+      0,
+      Math.min(tracks.length * FIELDS.length - 1, cursorChannel * FIELDS.length + fieldIndex + delta),
+    );
+    cursorChannel = Math.floor(flat / FIELDS.length);
+    cursorField = FIELDS[flat % FIELDS.length];
     renderWindow();
     syncStatus();
   }
@@ -180,6 +239,8 @@ export function createPatternView({
   }
 
   function enterPitch(pitch) {
+    if (cursorField !== 'note') return;
+
     const { pattern, tracks } = projectInfo();
     onAudition?.(pitch);
 
@@ -191,8 +252,20 @@ export function createPatternView({
       row: cursorRow,
       pitch,
     });
+    moveVertical(step);
+  }
+
+  function deleteCurrentEvent() {
+    if (mode !== 'edit') return;
+
+    const { pattern, tracks } = projectInfo();
+    registry.execute('pattern.deleteNote', {
+      patternId: pattern.id,
+      trackId: tracks[cursorChannel].id,
+      row: cursorRow,
+    });
     renderWindow();
-    moveCursor(step, 0);
+    syncStatus();
   }
 
   function syncStatus() {
@@ -206,6 +279,12 @@ export function createPatternView({
     onStatus?.({ mode, octave, step, row: cursorRow });
   }
 
+  function refresh() {
+    renderHeader();
+    renderWindow();
+    syncStatus();
+  }
+
   scroller.addEventListener('scroll', () => renderWindow());
   scroller.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.code === 'KeyE') {
@@ -213,24 +292,31 @@ export function createPatternView({
       toggleMode();
       return;
     }
+    if (event.ctrlKey || event.altKey || event.metaKey) return;
+
     if (event.code === 'ArrowUp') {
       event.preventDefault();
-      moveCursor(-1);
+      moveVertical(-1);
       return;
     }
     if (event.code === 'ArrowDown') {
       event.preventDefault();
-      moveCursor(1);
+      moveVertical(1);
       return;
     }
     if (event.code === 'ArrowLeft') {
       event.preventDefault();
-      moveCursor(0, -1);
+      moveHorizontal(-1);
       return;
     }
     if (event.code === 'ArrowRight') {
       event.preventDefault();
-      moveCursor(0, 1);
+      moveHorizontal(1);
+      return;
+    }
+    if (event.code === 'Delete' || event.code === 'Backspace') {
+      event.preventDefault();
+      deleteCurrentEvent();
       return;
     }
     if (event.code === 'Minus') {
@@ -245,7 +331,6 @@ export function createPatternView({
       syncStatus();
       return;
     }
-    if (event.ctrlKey || event.altKey || event.metaKey) return;
 
     const semitone = NOTE_CODES.get(event.code);
     if (semitone === undefined) return;
@@ -255,15 +340,37 @@ export function createPatternView({
     enterPitch(pitch);
   });
 
-  renderHeader();
-  renderWindow();
-  syncStatus();
+  refresh();
   requestAnimationFrame(() => renderWindow());
 
   return {
     focus: () => scroller.focus(),
-    getUiState: () => ({ mode, octave, step, row: cursorRow, channel: cursorChannel }),
+    refresh,
+    getUiState: () => ({
+      mode,
+      octave,
+      step,
+      row: cursorRow,
+      channel: cursorChannel,
+      field: cursorField,
+    }),
   };
+}
+
+function cellText(project, note, field) {
+  if (!note) return field === 'note' ? '···' : '··';
+  if (field === 'note') return formatPitch(note.pitch);
+  if (field === 'instrument') return formatInstrument(project, note.instrumentId);
+  return formatHexByte(note.velocity);
+}
+
+function formatInstrument(project, instrumentId) {
+  const index = project.instruments.findIndex((instrument) => instrument.id === instrumentId);
+  return index >= 0 ? (index + 1).toString(16).toUpperCase().padStart(2, '0') : '??';
+}
+
+function formatHexByte(value) {
+  return Number(value).toString(16).toUpperCase().padStart(2, '0');
 }
 
 function formatPitch(pitch) {
