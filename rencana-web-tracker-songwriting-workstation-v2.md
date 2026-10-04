@@ -1160,28 +1160,31 @@ Proposal LLM terstruktur melalui validator; app penuh tetap berfungsi tanpa LLM.
 
 ### 20.1 Ditunda
 
-Nama final aplikasi · ekspor XM/IT · bahasa DSP kustom · WebGPU · model LLM in-browser · kolaborasi · PWA installability · cloud sync · editor multisample lanjutan · MPE · lane automasi sembarang · arsitektur plugin publik · **editing di Score** · **editing penuh di ponsel** · **rekaman mikrofon ke sample** (kandidat ringan setelah v0.2).
+ekspor XM/IT · bahasa DSP kustom · WebGPU · model LLM in-browser · kolaborasi · PWA installability · cloud sync · editor multisample lanjutan · MPE · lane automasi sembarang · arsitektur plugin publik · **editing di Score** · **editing penuh di ponsel** · **rekaman mikrofon ke sample** (kandidat ringan setelah v0.2).
 
 ### 20.2 Checklist sebelum R0
 
 **Dari V1 (tetap):**
-- [ ] nama repo · [ ] lisensi source · [ ] bahasa UI default (usulan: Indonesia, English tersedia) · [ ] browser baseline resmi
-- [ ] PPQ = 480 dikonfirmasi · [ ] ekstensi `.webtrack` dikonfirmasi atau diganti **sebelum schema pertama**
-- [ ] jumlah channel awal untuk UI baseline · [ ] kebijakan lisensi factory sample · [ ] library notasi dipilih atau eksplisit ditunda ke R5d
+- [x] nama produk/repo = NotaStation / `nota-station` · [x] lisensi source = MIT
+- [x] bahasa UI default = Indonesia; English tersedia · [x] browser baseline = Chromium + Firefox
+- [x] PPQ = 480 · [x] ekstensi native = `.webtrack`
+- [x] jumlah channel awal UI R1 = 8
+- [x] factory sample = asset buatan proyek sendiri; lisensi CC0-1.0 dan dicatat bersama asset
+- [x] library notasi eksplisit ditunda ke R5d
 - [x] Pages source = branch `gh-pages` sebagai artifact; deploy manual lewat `npm run deploy` (§13)
 
 **Baru di V2 (keputusan model/UX yang mahal bila diubah belakangan):**
 - [x] **Aturan emas**: tidak ada absolute song tick; event di-anchor ke Pattern atau OrderEntry/occurrence sesuai semantik (§5.1, §5.5)
-- [ ] **Voice lane** untuk track polifonik disetujui (§5.4)
-- [ ] `repeatCount` **dihapus** (§5.5)
-- [ ] Resolusi LPB + kolom DLY untuk event off-grid disetujui (§5.2, §8.6)
+- [x] **Voice lane** untuk track polifonik (§5.4)
+- [x] `repeatCount` **dihapus** (§5.5)
+- [x] Resolusi LPB + kolom DLY untuk event off-grid (§5.2, §8.6)
 - [x] Mode awal Pattern mengikuti workflow: Tracker/OpenMPT-like = EDIT; Songwriter/default = AUDISI (§8.6)
-- [ ] Preset keymap: Songwriter (default) + OpenMPT-like (§8.14)
-- [ ] Istilah UI: "Channel" (bukan Track) dan daftar glosarium (§8.4)
-- [ ] Urutan rilis: Piano Roll → Lyrics → Guitar → Score (§15)
-- [ ] Template awal yang dikirim (Kosong, Pop 4/4, Balada 6/8, Demo lagu) (§6.5)
+- [x] Preset keymap: Songwriter (default) + OpenMPT-like; preset OpenMPT-like diverifikasi saat R3 (§8.14)
+- [x] Istilah UI: "Channel" untuk lane tracker; "Track" tetap nama model data (§8.4)
+- [x] Urutan rilis: Piano Roll → Lyrics → Guitar → Score (§15)
+- [x] Template dikirim bertahap: Kosong + Pop 4/4 di R1; Balada 6/8 + Demo lagu di R4 (§6.5, §15)
 - [ ] Peserta uji tugas UX (5 orang, campuran persona) dan tempat mencatat temuan (`docs/ux-findings.md`)
-- [ ] Batas parser awal (§10.5) disetujui
+- [x] Batas parser awal (§10.5)
 
 Nama produk final tidak diperlukan untuk memulai R0.
 
