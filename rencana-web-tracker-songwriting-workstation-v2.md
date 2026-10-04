@@ -842,90 +842,74 @@ Catatan CSP: mode ② memerlukan pelonggaran `connect-src`. Karena CSP meta stat
 
 ## 13. Deployment GitHub Pages
 
-### 13.1 Model
+### 13.1 Model saat ini
 
-Satu alur: **build sekali → uji artefak yang sama → deploy artefak itu → smoke terhadap build yang live.** Deploy hanya dari `main`.
+Source tetap di `main`. GitHub Pages menyajikan branch `gh-pages` dari root, dan branch itu
+diperlakukan sebagai **artifact branch**, bukan source history.
+
+Alur operasional:
+
+```text
+gate lokal
+→ npm run deploy
+→ npm run build
+→ dist/
+→ temporary repository
+→ commit artefak
+→ force-push gh-pages
+→ Pages
+→ smoke live manual
+```
+
+Tidak ada GitHub Actions yang menjadi jalur deploy saat ini. Keputusan ini diambil setelah full
+Playwright Chromium+Firefox berulang kali hang sangat lama pada GitHub-hosted runner, sementara
+build dan instalasi browser sendiri cepat. Masalah runner itu dipisahkan dari jalur deploy agar
+tidak menahan publikasi artefak yang sudah diverifikasi lokal.
 
 ### 13.2 Output build
 
-`npm run build` membuat `dist/` (bukan bundler wajib): bersihkan `dist/`, salin runtime statis, cap SHA/versi, salin vendor ter-pin, salin manifest factory sample, **validasi import relatif**, buat `.nojekyll`, sisipkan CSP meta.
+`npm run build` membuat `dist/` (bukan bundler wajib): bersihkan `dist/`, salin runtime
+statis, cap SHA/versi, salin vendor ter-pin bila ada, **validasi import relatif**, dan buat
+`.nojekyll`. CSP tetap berasal dari `index.html`.
 
-### 13.3 Workflow (kerangka)
+`npm run deploy` **wajib membangun ulang terlebih dahulu** sebelum
+`tools/deploy-pages.mjs` menyalin `dist/` ke repository sementara. Dengan demikian artefak
+lama tidak boleh ter-push hanya karena folder `dist/` kebetulan masih ada.
 
-```yaml
-name: Pages
-on:
-  push: { branches: [main] }
-  pull_request:
-  workflow_dispatch:
-permissions: { contents: read }
-concurrency: { group: pages-${{ github.ref }}, cancel-in-progress: true }
+### 13.3 Gate dan browser regression
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@...        # versi: verifikasi & pin SHA di R0
-      - uses: actions/setup-node@...
-        with: { node-version: 24, cache: npm }
-      - run: npm ci
-      - run: npm test
-      - run: npm run check
-      - run: npm run build
-      - uses: actions/upload-artifact@...
-        with: { name: dist, path: dist }
+Sebelum deploy, jalankan gate yang relevan terhadap perubahan:
 
-  browser:                                  # menguji ARTEFAK yang sama, di subpath /<repo>/
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@...
-      - uses: actions/setup-node@...
-        with: { node-version: 24, cache: npm }
-      - run: npm ci
-      - uses: actions/download-artifact@...
-        with: { name: dist, path: dist }
-      - run: npx playwright install --with-deps chromium firefox
-      - run: npm run test:browser
-        env: { BASE_PATH: "/${{ github.event.repository.name }}/" }
-
-  deploy:
-    needs: [build, browser]
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    permissions: { contents: read, pages: write, id-token: write }
-    environment: { name: github-pages, url: "${{ steps.deployment.outputs.page_url }}" }
-    outputs: { page_url: "${{ steps.deployment.outputs.page_url }}" }
-    steps:
-      - uses: actions/download-artifact@...
-        with: { name: dist, path: dist }
-      - uses: actions/configure-pages@...
-      - uses: actions/upload-pages-artifact@...
-        with: { path: dist }
-      - id: deployment
-        uses: actions/deploy-pages@...
-
-  smoke:                                    # terhadap build live
-    needs: deploy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@...
-      - uses: actions/setup-node@...
-        with: { node-version: 24, cache: npm }
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:smoke
-        env: { PAGE_URL: "${{ needs.deploy.outputs.page_url }}", EXPECT_SHA: "${{ github.sha }}" }
+```text
+npm test
+npm run check
+npm run build
+npm run test:browser
 ```
 
-Perubahan dari V1: build satu kali; `browser` menguji artefak yang akan dideploy; deploy memeriksa `ref == main` (bukan hanya "bukan PR", sehingga `workflow_dispatch` dari branch lain tidak ikut deploy); job `smoke` benar-benar ada. **Versi action (V1 menyebut `checkout@v6`, `setup-node@v4`, `node 24`) harus diverifikasi ulang terhadap dokumentasi resmi saat R0 dan di-pin ke SHA**, bukan disalin apa adanya.
+Full browser regression tetap menargetkan Chromium + Firefox (§16.3), tetapi tidak dijalankan
+otomatis sebagai blocking deploy pada GitHub-hosted runner selama root cause hang belum ditemukan.
+Ia dapat dijalankan lokal; eksperimen CI berikutnya harus bounded dan tidak boleh otomatis
+mengembalikan suite penuh sebagai blocking gate setiap push.
 
-### 13.4 Smoke test setelah deploy
+Jika CI ringan dikembalikan kelak, bentuk yang diinginkan adalah unit/check/build + smoke Chromium
+singkat untuk jalur cepat. Full regression dapat dijalankan pada PR tertentu, manual, atau
+non-blocking/nightly setelah runner terbukti stabil.
 
-`index.html` HTTP 200 · build metadata cocok dengan commit · JS entry termuat dari subpath · manifest factory sample dapat di-fetch · audio dapat diinisialisasi setelah gestur tepercaya · proyek baru dapat dibuat · minimal satu pattern dapat dimainkan · tidak ada galat console · CSP tidak memblokir aset sendiri.
+### 13.4 Smoke setelah deploy
+
+Setelah Pages mempropagasi artefak, jalankan:
+
+```bash
+PAGE_URL="https://<user>.github.io/<repo>/" EXPECT_SHA="$(git rev-parse HEAD)" npm run test:smoke
+```
+
+Cakupan R0: `index.html` HTTP 200 · build metadata cocok dengan commit · JS entry termuat dari
+subpath · tidak ada galat console · CSP tidak memblokir aset sendiri · refresh tidak 404. Butir
+yang membutuhkan audio, factory sample, atau project playable baru ditambahkan saat milestone
+pemilik fiturnya sudah ada.
 
 ---
-
 ## 14. Layout repository
 
 ```text
@@ -983,10 +967,10 @@ Setiap milestone memuat **Deliverable UX** di samping deliverable teknis.
 
 ### R0 — Fondasi statis + bukti Pages + UI shell
 
-**Teknis:** app shell, infrastruktur Indonesia/English, design token & tema (terang/gelap/kontras tinggi), skeleton command layer + `listCommands`, tipe galat stabil, metadata build, `npm test/check/build`, Playwright Chromium+Firefox, workflow §13, smoke pasca-deploy, CSP meta.
+**Teknis:** app shell, infrastruktur Indonesia/English, design token & tema (terang/gelap/kontras tinggi), skeleton command layer + `listCommands`, tipe galat stabil, metadata build, `npm test/check/build`, Playwright Chromium+Firefox, deployment artifact branch §13, smoke pasca-deploy, CSP meta.
 **UX:** **mini UI kit** (Button, Menu, Dialog+focus trap, Popover, Toast, Tabs, Splitter, Tooltip); tata letak §8.3 (top bar, tab, panel kiri/kanan, dock, status bar) dengan konten placeholder; Command Palette kosong tapi fungsional; penyimpanan ukuran panel.
 **Tidak masuk:** editing pattern nyata, sample, notasi, LLM.
-**Exit:** Pages live dari `main`; semua aset resolve di `/<repo>/`; refresh tidak 404; tanpa galat console; SHA/build id terbaca; PR tidak deploy; `main` deploy hanya setelah verifikasi PASS; shell lulus uji keyboard (Tab/Esc/focus trap).
+**Exit:** Pages live dari build `main`; branch `gh-pages` hanya berisi artefak dengan SHA build yang cocok; semua aset resolve di `/<repo>/`; refresh tidak 404; tanpa galat console; SHA/build id terbaca; deployment manual hanya dilakukan setelah gate lokal yang relevan PASS; shell lulus uji keyboard (Tab/Esc/focus trap).
 
 ### R1 — Tracker yang bisa dimainkan
 
@@ -1178,7 +1162,7 @@ Nama final aplikasi · ekspor XM/IT · bahasa DSP kustom · WebGPU · model LLM 
 - [ ] nama repo · [ ] lisensi source · [ ] bahasa UI default (usulan: Indonesia, English tersedia) · [ ] browser baseline resmi
 - [ ] PPQ = 480 dikonfirmasi · [ ] ekstensi `.webtrack` dikonfirmasi atau diganti **sebelum schema pertama**
 - [ ] jumlah channel awal untuk UI baseline · [ ] kebijakan lisensi factory sample · [ ] library notasi dipilih atau eksplisit ditunda ke R5d
-- [ ] Pages source = GitHub Actions
+- [x] Pages source = branch `gh-pages` sebagai artifact; deploy manual lewat `npm run deploy` (§13)
 
 **Baru di V2 (keputusan model/UX yang mahal bila diubah belakangan):**
 - [ ] **Aturan emas** "semua event pattern-lokal" disetujui (§5.1)
