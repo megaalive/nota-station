@@ -108,9 +108,9 @@ export function createAudioEngine({ onStateChange = null } = {}) {
       endAt: anchor + cursor.durationSeconds,
     };
 
+    setState('playing');
     scheduleWindow();
     schedulerTimer = setInterval(scheduleWindow, SCHEDULER_WAKE_MS);
-    setState('playing');
 
     return {
       anchor,
