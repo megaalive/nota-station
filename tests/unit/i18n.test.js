@@ -56,8 +56,11 @@ test('setiap locale punya key yang sama — kalau tidak, ada teks yang akan hila
     'status.audio', 'status.idle', 'status.audioLocked', 'status.audioReady', 'status.audioPlaying',
     'status.audioError', 'status.notSaved', 'position.barBeat', 'position.row', 'left.placeholder',
     'right.placeholder', 'view.placeholder', 'pattern.gridLabel', 'pattern.enterNote',
-    'pattern.hintAudition', 'pattern.hintEdit', 'dock.toggle', 'dock.keyboard', 'dock.problems',
+    'pattern.deleteNote', 'pattern.columnNote', 'pattern.columnInstrument', 'pattern.columnVolume',
+    'pattern.hintAudition', 'pattern.hintEdit', 'history.undo', 'history.redo',
+    'history.nothingUndo', 'history.nothingRedo', 'dock.toggle', 'dock.keyboard', 'dock.problems',
     'cmd.palette', 'palette.placeholder', 'palette.close', 'palette.noResults',
+    'palette.requiresContext',
   ];
   const missingInEn = probe.filter((key) => translate('en', key) === key);
   const missingInId = probe.filter((key) => translate('id', key) === key);
