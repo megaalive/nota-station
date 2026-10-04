@@ -29,8 +29,11 @@ export function createAudioEngine() {
   async function ensureReady() {
     if (!context) context = new AudioContext({ latencyHint: 'interactive' });
 
-    // resume dipanggil langsung dari click/keydown tepercaya sebelum pekerjaan async lain.
-    if (context.state === 'suspended') await context.resume();
+    // Minta resume langsung dari click/keydown tepercaya, tetapi jangan menjadikan
+    // penyelesaian Promise resume sebagai gate scheduler. Firefox headless dapat
+    // membiarkan Promise itu pending walau node audio tetap boleh dibuat/dijadwalkan.
+    // Di browser interaktif, context akan berpindah ke running setelah izin gestur.
+    requestResume();
 
     if (!buffer) {
       const bytes = await preload();
@@ -38,6 +41,22 @@ export function createAudioEngine() {
     }
     state = 'ready';
     return context;
+  }
+
+  function requestResume() {
+    if (!context || context.state !== 'suspended') return;
+    try {
+      const pending = context.resume();
+      if (pending && typeof pending.catch === 'function') {
+        void pending.catch(() => {
+          // Status context tetap tersedia lewat getState(); scheduler tidak dirusak
+          // hanya karena browser menolak/menunda unlock audio.
+        });
+      }
+    } catch {
+      // Beberapa implementasi bisa melempar sinkron. Node tetap dapat dijadwalkan
+      // dan UI dapat membaca contextState untuk diagnosa.
+    }
   }
 
   function scheduleVoice({ pitch, velocity = 100, when, durationSeconds }) {
@@ -109,6 +128,7 @@ export function createAudioEngine() {
   function getState() {
     return {
       state,
+      contextState: context?.state ?? 'none',
       sampleReady: Boolean(buffer),
       activeVoices: activeSources.size,
     };
