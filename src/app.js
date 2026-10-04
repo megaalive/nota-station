@@ -237,7 +237,7 @@ function registerCommands() {
       run: () => cycleTheme(),
     },
     {
-      // Ekspor WAV belum masuk slice R1-S1. Tetap tampil dengan alasan,
+      // Ekspor WAV belum masuk R1. Tetap tampil dengan alasan,
       // bukan disembunyikan — user jadi tahu kenapa belum bisa dipakai (§8.14).
       id: 'io.exportWav',
       group: 'Ekspor',
