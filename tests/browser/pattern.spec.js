@@ -39,8 +39,10 @@ test.describe('Pattern R1 editing', () => {
     await expect(page.locator('.pattern-grid__corner--channel')).toHaveCSS('position', 'sticky');
   });
 
-  test('cursor auto-scroll horizontal sampai channel terakhir', async ({ page }) => {
+  test('cursor auto-scroll horizontal sampai channel terakhir pada viewport sempit', async ({ page }) => {
+    await page.setViewportSize({ width: 900, height: 720 });
     const grid = page.locator('[data-action="pattern-grid"]');
+    await expect(grid).toBeVisible();
     await grid.focus();
 
     for (let i = 0; i < 23; i += 1) await page.keyboard.press('ArrowRight');
