@@ -50,7 +50,6 @@ const messages = {
     'status.notSaved': '○ Belum disimpan',
     'status.savedLocally': '● Tersimpan lokal',
     'position.barBeat': 'Bar {bar} · 00:00.0',
-    'position.row': 'Row {row}',
     'position.row': 'Baris {row}',
 
     'left.placeholder': 'Belum ada section.',
@@ -116,6 +115,7 @@ const messages = {
     'status.notSaved': '○ Not saved',
     'status.savedLocally': '● Saved locally',
     'position.barBeat': 'Bar {bar} · 00:00.0',
+    'position.row': 'Row {row}',
 
     'left.placeholder': 'No sections yet.',
     'right.placeholder': 'Select something to see its properties.',
