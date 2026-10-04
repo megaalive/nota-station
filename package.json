@@ -9,7 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "node --test tests/unit",
+    "test": "node tools/run-unit-tests.mjs",
     "check": "node tools/check.mjs",
     "build": "node tools/build.mjs",
     "test:browser": "playwright test",
