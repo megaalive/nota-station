@@ -971,7 +971,7 @@ R10 Impor format tracker lama bila masih bernilai
 
 Setiap milestone memuat **Deliverable UX** di samping deliverable teknis.
 
-### R0 — Fondasi statis + bukti Pages + UI shell
+### R0 — Fondasi statis + bukti Pages + UI shell — **CLOSED**
 
 **Teknis:** app shell, infrastruktur Indonesia/English, design token & tema (terang/gelap/kontras tinggi), skeleton command layer + `listCommands`, tipe galat stabil, metadata build, `npm test/check/build`, Playwright Chromium+Firefox, deployment artifact branch §13, smoke pasca-deploy, CSP meta.
 **UX:** **mini UI kit** (Button, Menu, Dialog+focus trap, Popover, Toast, Tabs, Splitter, Tooltip); tata letak §8.3 (top bar, tab, panel kiri/kanan, dock, status bar) dengan konten placeholder; Command Palette kosong tapi fungsional; penyimpanan ukuran panel.
