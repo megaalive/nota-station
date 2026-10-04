@@ -175,17 +175,33 @@ test.describe('Command Palette §8.14', () => {
     }
   });
 
-  test('pencarian menyaring dan Enter menjalankan perintah', async ({ page }) => {
+  test('pencarian menyaring dan Enter menjalankan perintah tanpa konteks', async ({ page }) => {
+    await page.locator('[data-action="workspace-tab"][data-entity="sound"]').click();
     await page.keyboard.press('Control+k');
-    await page.locator('[data-action="palette-input"]').fill('pattern');
+    await page.locator('[data-action="palette-input"]').fill('ui.showPattern');
 
     const rows = page.locator('[data-action="palette-item"]');
-    expect(await rows.count()).toBeGreaterThanOrEqual(1);
+    await expect(rows).toHaveCount(1);
     await expect(page.locator('[data-action="palette-item"][data-entity="ui.showPattern"]')).toBeVisible();
 
     await page.keyboard.press('Enter');
     await expect(page.locator('[data-action="palette"]')).toHaveCount(0);
     await expect(page.locator('[data-action="workspace-view"]')).toHaveAttribute('data-entity', 'pattern');
+  });
+
+  test('command kontekstual tetap discoverable tetapi palette tidak menebak argumen', async ({ page }) => {
+    await page.keyboard.press('Control+k');
+    await page.locator('[data-action="palette-input"]').fill('pattern.enterNote');
+
+    const row = page.locator('[data-action="palette-item"][data-entity="pattern.enterNote"]');
+    await expect(row).toBeVisible();
+    await expect(row).toHaveClass(/is-disabled/);
+    await expect(row).toHaveAttribute('aria-disabled', 'true');
+    await expect(row.locator('.palette__reason')).toHaveText('Jalankan dari konteks editor.');
+
+    await page.keyboard.press('Enter');
+    await expect(page.locator('[data-action="palette"]')).toBeVisible();
+    expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
   });
 
   test('perintah nonaktif tampil dengan alasan, dan Enter tidak menutup palette', async ({ page }) => {

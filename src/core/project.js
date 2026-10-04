@@ -154,6 +154,41 @@ export function enterNote(
   };
 }
 
+export function deleteNote(
+  project,
+  { patternId, trackId, row },
+  { now = isoNow } = {},
+) {
+  const patternIndex = project.song.patterns.findIndex((item) => item.id === patternId);
+  if (patternIndex < 0) throw projectError('E_PROJECT_PATTERN_MISSING', `Pattern tidak ditemukan: ${patternId}`);
+
+  const pattern = project.song.patterns[patternIndex];
+  if (!project.song.tracks.some((track) => track.id === trackId)) {
+    throw projectError('E_PROJECT_TRACK_MISSING', `Track tidak ditemukan: ${trackId}`);
+  }
+  if (!Number.isInteger(row) || row < 0 || row >= pattern.lengthTicks / pattern.rowTicks) {
+    throw projectError('E_PROJECT_ROW_RANGE', `Row di luar pattern: ${row}`);
+  }
+
+  const startTickLocal = row * pattern.rowTicks;
+  const notes = pattern.notes.filter(
+    (note) => !(note.trackId === trackId && note.startTickLocal === startTickLocal),
+  );
+  if (notes.length === pattern.notes.length) return project;
+
+  const patterns = [...project.song.patterns];
+  patterns[patternIndex] = { ...pattern, notes };
+
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      patterns,
+    },
+  };
+}
+
 export function projectError(code, message) {
   const error = new Error(message);
   error.name = 'ProjectError';

@@ -7,6 +7,7 @@ import {
   DEFAULT_ROW_TICKS,
   activePattern,
   createBlankProject,
+  deleteNote,
   enterNote,
   noteAtCell,
 } from '../../src/core/project.js';
@@ -86,6 +87,35 @@ test('note pada channel berbeda boleh berada pada row yang sama', () => {
   project = enterNote(project, { patternId: pattern.id, trackId: project.song.tracks[0].id, row: 8, pitch: 60 });
   project = enterNote(project, { patternId: pattern.id, trackId: project.song.tracks[1].id, row: 8, pitch: 64 });
   assert.equal(project.song.patterns[0].notes.length, 2);
+});
+
+test('deleteNote menghapus satu event tanpa memutasi project lama', () => {
+  let project = fixture();
+  const pattern = activePattern(project);
+  const trackId = project.song.tracks[0].id;
+  project = enterNote(project, { patternId: pattern.id, trackId, row: 3, pitch: 60 });
+  const before = project;
+
+  const next = deleteNote(
+    project,
+    { patternId: pattern.id, trackId, row: 3 },
+    { now: () => '2026-10-04T00:02:00.000Z' },
+  );
+
+  assert.equal(before.song.patterns[0].notes.length, 1);
+  assert.equal(next.song.patterns[0].notes.length, 0);
+  assert.notEqual(next, before);
+});
+
+test('deleteNote pada sel kosong adalah no-op supaya tidak membuat history palsu', () => {
+  const project = fixture();
+  const pattern = activePattern(project);
+  const next = deleteNote(project, {
+    patternId: pattern.id,
+    trackId: project.song.tracks[0].id,
+    row: 9,
+  });
+  assert.equal(next, project);
 });
 
 test('row, pitch, velocity, dan instrument invalid gagal dengan kode stabil', () => {

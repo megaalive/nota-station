@@ -20,6 +20,7 @@ test('listCommands mengembalikan descriptor serializable dengan status aktif', (
     group: 'Playback',
     labelKey: 'cmd.play',
     shortcut: 'Space',
+    requiresArgs: false,
     enabled: true,
     disabledReason: null,
   });
@@ -43,6 +44,22 @@ test('command nonaktif melaporkan alasan, dan execute menolak', () => {
   assert.equal(entry.disabledReason, 'Audio belum aktif');
 
   assert.throws(() => registry.execute('io.exportWav'), (err) => err.code === 'E_CMD_DISABLED');
+});
+
+test('command requiresArgs tetap dapat dieksekusi agent/view dengan argumen', () => {
+  const registry = createCommandRegistry();
+  registry.register({
+    id: 'pattern.enterNote',
+    group: 'Pattern',
+    labelKey: 'pattern.enterNote',
+    requiresArgs: true,
+    run: (args) => args.pitch,
+  });
+
+  const [entry] = registry.listCommands();
+  assert.equal(entry.requiresArgs, true);
+  assert.equal(entry.enabled, true);
+  assert.equal(registry.execute('pattern.enterNote', { pitch: 60 }), 60);
 });
 
 test('command tak dikenal punya kode galat stabil E_CMD_NOT_FOUND', () => {

@@ -77,7 +77,7 @@ test.describe('smoke build live', () => {
     const grid = page.locator('[data-action="pattern-grid"]');
     await expect(grid).toBeVisible();
     await expect(grid).toHaveAttribute('aria-rowcount', '64');
-    await expect(grid).toHaveAttribute('aria-colcount', '8');
+    await expect(grid).toHaveAttribute('aria-colcount', '24');
 
     await grid.focus();
     await page.keyboard.press('Control+e');
