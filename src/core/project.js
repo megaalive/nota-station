@@ -94,14 +94,15 @@ export function noteAtCell(project, { patternId, trackId, row }) {
 
 export function enterNote(
   project,
-  { patternId, trackId, row, pitch, velocity = 100, instrumentId = FACTORY_INSTRUMENT_ID },
+  { patternId, trackId, row, pitch, velocity = 100, instrumentId = null },
   { idFactory = makeId, now = isoNow } = {},
 ) {
   const patternIndex = project.song.patterns.findIndex((item) => item.id === patternId);
   if (patternIndex < 0) throw projectError('E_PROJECT_PATTERN_MISSING', `Pattern tidak ditemukan: ${patternId}`);
 
   const pattern = project.song.patterns[patternIndex];
-  if (!project.song.tracks.some((track) => track.id === trackId)) {
+  const track = project.song.tracks.find((item) => item.id === trackId);
+  if (!track) {
     throw projectError('E_PROJECT_TRACK_MISSING', `Track tidak ditemukan: ${trackId}`);
   }
   if (!Number.isInteger(row) || row < 0 || row >= pattern.lengthTicks / pattern.rowTicks) {
@@ -109,6 +110,14 @@ export function enterNote(
   }
   if (!Number.isInteger(pitch) || pitch < 0 || pitch > 127) {
     throw projectError('E_PROJECT_PITCH_RANGE', `Pitch di luar MIDI 0..127: ${pitch}`);
+  }
+  if (!Number.isInteger(velocity) || velocity < 0 || velocity > 127) {
+    throw projectError('E_PROJECT_VELOCITY_RANGE', `Velocity di luar MIDI 0..127: ${velocity}`);
+  }
+
+  const resolvedInstrumentId = instrumentId ?? track.defaultInstrumentId ?? FACTORY_INSTRUMENT_ID;
+  if (!project.instruments.some((item) => item.id === resolvedInstrumentId)) {
+    throw projectError('E_PROJECT_INSTRUMENT_MISSING', `Instrument tidak ditemukan: ${resolvedInstrumentId}`);
   }
 
   const startTickLocal = row * pattern.rowTicks;
@@ -121,7 +130,7 @@ export function enterNote(
     startTickLocal,
     durationTicks: pattern.rowTicks,
     pitch,
-    instrumentId,
+    instrumentId: resolvedInstrumentId,
     velocity,
     source: 'user',
     locked: false,
