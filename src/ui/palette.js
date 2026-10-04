@@ -38,13 +38,18 @@ export function createPalette({ registry, t, onRun }) {
 
     list.textContent = '';
     entries.forEach((command, index) => {
+      const paletteEnabled = command.enabled && !command.requiresArgs;
+      const paletteReason = !command.enabled
+        ? command.disabledReason
+        : (command.requiresArgs ? t('palette.requiresContext') : null);
       const row = el(
         'div',
         {
           role: 'option',
           id: `palette-option-${index}`,
           'aria-selected': index === activeIndex ? 'true' : 'false',
-          class: `palette__row${index === activeIndex ? ' is-active' : ''}${command.enabled ? '' : ' is-disabled'}`,
+          class: `palette__row${index === activeIndex ? ' is-active' : ''}${paletteEnabled ? '' : ' is-disabled'}`,
+          'aria-disabled': paletteEnabled ? 'false' : 'true',
           dataset: { action: 'palette-item', entity: command.id },
           on: {
             click: () => run(index),
@@ -57,7 +62,7 @@ export function createPalette({ registry, t, onRun }) {
         [
           el('span', { class: 'palette__label', text: t(command.labelKey) }),
           command.shortcut ? el('kbd', { class: 'palette__shortcut', text: command.shortcut }) : null,
-          command.enabled ? null : el('span', { class: 'palette__reason', text: command.disabledReason ?? '' }),
+          paletteEnabled ? null : el('span', { class: 'palette__reason', text: paletteReason ?? '' }),
         ],
       );
       list.append(row);
@@ -82,8 +87,9 @@ export function createPalette({ registry, t, onRun }) {
   function run(index) {
     const command = entries[index];
     if (!command) return;
-    if (!command.enabled) {
-      // Jangan tutup: user mungkin masih mau baca alasannya.
+    if (!command.enabled || command.requiresArgs) {
+      // Command kontekstual tetap discoverable, tetapi palette tidak menebak argumen
+      // seperti pitch/sel. Jangan tutup supaya alasannya tetap terbaca.
       input.focus();
       return;
     }
