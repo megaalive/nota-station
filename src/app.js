@@ -9,8 +9,12 @@ import { createShell } from './ui/shell.js';
 const i18n = createI18n(readInitialLocale());
 const registry = createCommandRegistry();
 const store = window.localStorage;
+const THEMES = ['light', 'dark', 'high-contrast'];
 
+let theme = readInitialTheme();
 let shell = null;
+
+applyTheme(theme);
 
 /**
  * Metadata build dibaca relatif, bukan dari path absolut — biar tetap jalan di
@@ -42,6 +46,30 @@ function setLocale(next) {
   syncHtmlLang();
   shell?.render();
   return true;
+}
+
+function readInitialTheme() {
+  const stored = store?.getItem('notastation.theme');
+  return THEMES.includes(stored) ? stored : 'light';
+}
+
+function applyTheme(next) {
+  document.documentElement.dataset.theme = next;
+}
+
+function setTheme(next) {
+  if (!THEMES.includes(next)) return false;
+  theme = next;
+  store?.setItem('notastation.theme', next);
+  applyTheme(next);
+  return true;
+}
+
+function cycleTheme() {
+  const index = THEMES.indexOf(theme);
+  const next = THEMES[(index + 1) % THEMES.length];
+  setTheme(next);
+  return next;
 }
 
 /** Satu-satunya tempat yang menulis `lang` di <html> — jangan disalin ke tempat lain. */
@@ -92,6 +120,12 @@ function registerCommands() {
         palette.open();
         return 'palette';
       },
+    },
+    {
+      id: 'ui.cycleTheme',
+      group: 'Tampilan',
+      labelKey: 'palette.toggleTheme',
+      run: () => cycleTheme(),
     },
     {
       // Sengaja nonaktif di R0: audio baru ada di R1. Tampilkan denngan alasan,
@@ -148,7 +182,13 @@ async function boot() {
   // Hook agent: satu-satunya jalan keluar state/aksi (§9). Nggak ada AudioContext
   // atau raw storage yang di-expose lewat sini.
   window.tracker = {
-    getState: () => ({ ready: true, locale: i18n.getLocale(), build, activeTab: shell.getActiveTab() }),
+    getState: () => ({
+      ready: true,
+      locale: i18n.getLocale(),
+      theme,
+      build,
+      activeTab: shell.getActiveTab(),
+    }),
     commands: registry,
     setLocale,
     i18n,
