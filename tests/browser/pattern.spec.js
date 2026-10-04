@@ -18,6 +18,10 @@ test.describe('Pattern R1-S1', () => {
     expect(await page.locator('.pattern-grid__row').count()).toBeLessThan(64);
     await expect(page.locator('[data-action="pattern-mode"]')).toContainText('AUDISI');
     await expect(page.locator('[data-action="edit-mode"]')).toContainText('AUDISI');
+    await expect(page.locator('[data-action="pattern-cell"][data-row="0"][data-channel="0"]')).toHaveCSS(
+      'outline-style',
+      'dashed',
+    );
   });
 
   test('AUDISI memainkan tombol nada tanpa menulis project', async ({ page }) => {
