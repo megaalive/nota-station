@@ -5,6 +5,17 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S14 — Tooltip shortcut R1 (PASS)
+
+- Tooltip untuk kontrol yang memang punya shortcut kini menampilkan shortcut nyata:
+  Play/Stop = `Space`, mode EDIT/AUDISI = `Ctrl+E`, oktaf turun/naik = `-` / `=`,
+  dan Command Palette tetap `Ctrl+K`.
+- Tidak ada shortcut baru atau pemetaan palsu; slice ini hanya membuat affordance keyboard
+  yang sudah aktif menjadi terlihat sesuai UX R1.
+- Gate final run **37243473096**: `npm ci` 0 vulnerability, unit **50/50 PASS**,
+  `npm run check` PASS, build **150.5 KiB PASS**, Playwright Chromium+Firefox
+  **136/136 PASS** (47,1 dtk).
+
 ### S11 — Banner aktivasi audio (PASS)
 
 - Saat Web Audio masih terkunci, shell menampilkan banner eksplisit dengan aksi
