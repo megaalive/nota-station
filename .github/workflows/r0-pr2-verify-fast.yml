@@ -19,6 +19,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Use current Playwright for diagnosis
+        run: npm install --no-save @playwright/test@1.63.0
       - run: npm test
       - run: npm run check
       - run: npm run build
