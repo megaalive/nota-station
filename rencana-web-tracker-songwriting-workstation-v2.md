@@ -183,7 +183,7 @@ Aturan:
 
 1. Pattern UI boleh terlihat seperti tracker klasik, tetapi model kanonik **bukan** array teks seperti `C-4 01 40 A03`.
 2. Setiap event harus dapat dipahami oleh Pattern, Piano Roll, Score, Guitar, Lyrics, playback, theory engine, dan validator LLM.
-3. **Aturan emas V2: tidak ada data musikal yang disimpan dengan absolute song tick.** Semua event bersifat pattern-lokal. Absolute tick hanya ada di SongTimeline turunan. (Menyusun ulang Order tidak boleh menggeser chord, tempo, atau lirik.)
+3. **Aturan emas V2: tidak ada data musikal yang disimpan dengan absolute song tick.** Event disimpan relatif terhadap **Pattern** atau **OrderEntry/occurrence** sesuai semantiknya; absolute tick hanya ada di SongTimeline turunan. Event yang memang bagian dari definisi pattern (note, effect, chord/tempo yang harus ikut setiap reuse) tetap pattern-lokal. Perbedaan yang sengaja hanya berlaku pada satu occurrence boleh memakai overlay bertipe di OrderEntry. Menyusun ulang Order tidak boleh menggeser atau memutus makna event.
 
 ### 5.2 Timing
 
@@ -248,11 +248,17 @@ Pattern
 OrderEntry
 ├── id, patternId
 ├── sectionId?             // referensi ke Section
-└── keyOverride?           // konteks tonal untuk occurrence ini
+├── keyOverride?           // konteks tonal untuk occurrence ini
+└── overlays?              // opsional; hanya bila occurrence memang berbeda
+    ├── chords[]?
+    ├── tempoEvents[]?
+    └── automation[]?
 ```
 
 - **`repeatCount` dihapus.** "Ulangi ×N" di UI = membuat N OrderEntry (opsional dikelompokkan). Dengan begitu setiap *occurrence* punya `orderEntryId` unik dan lirik tidak ambigu.
-- Memakai ulang pattern mengikuti semantik tracker: mengedit definisi mengubah semua occurrence. UI wajib memperingatkan (§8.12).
+- Memakai ulang pattern mengikuti semantik tracker: mengedit event pattern-lokal mengubah semua occurrence. UI wajib memperingatkan (§8.12).
+- Overlay occurrence hanya mengubah OrderEntry itu. Contoh: Verse 1 dan Verse 2 memakai melodi Pattern 03 yang sama, sementara Verse 3 dapat mengganti chord atau tempo tanpa meng-clone seluruh pattern.
+- `overlays` **bukan scope implementasi R1**. Ia dicatat sekarang supaya schema awal tidak mengunci asumsi "semua event harus pattern-lokal"; UI/editor overlay baru dikerjakan ketika kebutuhan arrangement-nya masuk milestone.
 - Perubahan key antar-section lewat `Section`/`OrderEntry.keyOverride`, bukan `keyMap` absolut.
 
 ### 5.6 Note event
@@ -526,14 +532,14 @@ Channel polifonik :  sub-kolom Lane 1 · Lane 2 · … (bisa dilipat)
 
 | Mode | Perilaku tombol nada | Penanda |
 |---|---|---|
-| **EDIT** (default saat Pattern pertama kali dibuka) | Mengisi sel di kursor, memainkan nada (audisi), maju sebesar *step* | Kursor **merah**, badge `● EDIT` di status bar |
+| **EDIT** | Mengisi sel di kursor, memainkan nada (audisi), maju sebesar *step* | Kursor **merah**, badge `● EDIT` di status bar |
 | **AUDISI** | Hanya memainkan nada, tidak menulis | Kursor **biru**, badge `○ AUDISI` |
 
-Peralihan: `Ctrl+E` atau klik badge. Keputusan default ke EDIT mengutamakan pengguna baru ("saya ketik tapi tak terjadi apa-apa"); keselamatannya datang dari badge permanen + undo.
+Peralihan: `Ctrl+E` atau klik badge. **Mode awal mengikuti pintu masuk/workflow, bukan satu default global:** preset **Tracker/OpenMPT-like → EDIT** supaya veteran tracker bisa langsung mengetik; preset **Songwriter → AUDISI** supaya klik/tombol nada aman untuk eksplorasi. Bila belum ada preset yang terselesaikan, gunakan default produk Songwriter → AUDISI. Pergantian mode tidak mengubah model lagu, hanya perilaku input Pattern.
 
 **Seleksi bertahap:** `Ctrl+A` berulang → sel/kolom → channel → pattern. Seret di header channel memilih seluruh channel. Shift+panah / seret mouse memilih blok.
 
-**Empty state sel pertama:** teks samar "Ketik **Z** untuk C, atau klik dua kali" yang hilang setelah note pertama.
+**Empty state sel pertama:** petunjuk mengikuti mode. EDIT: "Ketik **Z** untuk C". AUDISI: "**Z** mengaudisi C · **Ctrl+E** untuk EDIT". Petunjuk hilang setelah note pertama ditulis.
 
 **Operasi minimum:** note entry, oktaf, step, navigasi, follow playback, blok seleksi, salin/tempel, hapus, transpose (±1/±12), interpolasi volume, sisip/hapus baris, duplikat pattern, **clone vs reuse**, undo/redo.
 
@@ -1165,11 +1171,11 @@ Nama final aplikasi · ekspor XM/IT · bahasa DSP kustom · WebGPU · model LLM 
 - [x] Pages source = branch `gh-pages` sebagai artifact; deploy manual lewat `npm run deploy` (§13)
 
 **Baru di V2 (keputusan model/UX yang mahal bila diubah belakangan):**
-- [ ] **Aturan emas** "semua event pattern-lokal" disetujui (§5.1)
+- [x] **Aturan emas**: tidak ada absolute song tick; event di-anchor ke Pattern atau OrderEntry/occurrence sesuai semantik (§5.1, §5.5)
 - [ ] **Voice lane** untuk track polifonik disetujui (§5.4)
 - [ ] `repeatCount` **dihapus** (§5.5)
 - [ ] Resolusi LPB + kolom DLY untuk event off-grid disetujui (§5.2, §8.6)
-- [ ] Mode EDIT sebagai **default** di Pattern (§8.6) — setuju / ganti AUDISI
+- [x] Mode awal Pattern mengikuti workflow: Tracker/OpenMPT-like = EDIT; Songwriter/default = AUDISI (§8.6)
 - [ ] Preset keymap: Songwriter (default) + OpenMPT-like (§8.14)
 - [ ] Istilah UI: "Channel" (bukan Track) dan daftar glosarium (§8.4)
 - [ ] Urutan rilis: Piano Roll → Lyrics → Guitar → Score (§15)
@@ -1196,7 +1202,7 @@ Dokumen: docs.github.com (Pages custom workflows), developer.mozilla.org (Web Au
 
 Lima keputusan terpenting V2:
 
-1. **Pattern adalah UI utama, bukan bentuk tunggal data** — dan **semua event pattern-lokal**. Inilah yang menjaga reorder, reuse, lirik, dan chord tetap benar.
+1. **Pattern adalah UI utama, bukan bentuk tunggal data** — dan **tidak ada event tersimpan dengan absolute song tick**. Event di-anchor ke Pattern atau OrderEntry/occurrence sesuai semantik; inilah yang menjaga reorder, reuse, lirik, chord, dan variasi occurrence tetap benar.
 2. **UI dibangun di sekitar dua pintu masuk (Songwriter/Tracker) dengan satu model fokus bersama.** Tab workspace jelas, split view, lyric & chord sebagai lane, Inspector kontekstual, Command Palette, onboarding berbasis template.
 3. **Rilis pertama (v0.1) = tracker yang benar-benar bisa dipakai dan disimpan**, lengkap dengan ekspor WAV/MIDI; view songwriting menyusul bertahap (Piano Roll → Lyrics → Guitar → Score).
 4. **Web Audio dulu; AudioWorklet/WASM hanya berdasarkan bukti.**
@@ -1227,7 +1233,7 @@ Model kanonik berbasis tick dengan durasi eksplisit · command layer tunggal · 
 
 | ID | Sev | Temuan | Perbaikan V2 |
 |---|---|---|---|
-| B1 | T | Chord/tempo/key memakai absolute tick, sedangkan note pattern-lokal dan Order dapat disusun ulang → data bergeser | Semua event pattern-lokal; SongTimeline turunan; tes properti reorder (§4, §5.1, §5.5, §16.2) |
+| B1 | T | Chord/tempo/key memakai absolute tick, sedangkan note pattern-lokal dan Order dapat disusun ulang → data bergeser | Tidak ada absolute song tick; event di-anchor ke Pattern atau occurrence sesuai semantik; SongTimeline turunan; tes properti reorder (§4, §5.1, §5.5, §16.2) |
 | B2 | T | Channel tracker monofonik vs Piano Roll/gitar polifonik tak diputuskan | Track `mono/poly` + voice lane (§5.4) |
 | B3 | T | Note off-grid (Piano Roll bebas, triplet) tak punya proyeksi di Pattern → tersembunyi atau dikuantisasi diam-diam | LPB + kolom DLY + kuantisasi eksplisit (§5.2, §8.6) |
 | B4 | S | `repeatCount` membuat "occurrence" lirik ambigu | Dihapus; ulangi = N OrderEntry (§5.5) |
