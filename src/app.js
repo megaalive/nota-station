@@ -2,7 +2,7 @@
 // shell §8.3 lengkap, dan window.tracker tersedia buat agent (§9).
 
 import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
-import { createCommandRegistry } from './core/commands.js';
+import { commandError, createCommandRegistry } from './core/commands.js';
 import { activePattern, createBlankProject, enterNote } from './core/project.js';
 import { createAudioEngine } from './audio/engine.js';
 import { createPalette } from './ui/palette.js';
@@ -119,6 +119,9 @@ function registerCommands() {
       group: 'Pattern',
       labelKey: 'pattern.enterNote',
       run: (args) => {
+        if (!args || typeof args !== 'object') {
+          throw commandError('E_CMD_ARGS_REQUIRED', 'pattern.enterNote membutuhkan argumen sel dan pitch.');
+        }
         project = enterNote(project, args);
         setSaveStatus('status.notSaved');
         return { noteCount: activePattern(project).notes.length };
@@ -230,7 +233,7 @@ function bindShortcuts() {
       return;
     }
     if (event.code === 'Space' && !event.ctrlKey && !event.altKey && !event.metaKey) {
-      if (event.target.closest?.('input, textarea, [contenteditable="true"]')) return;
+      if (event.target.closest?.('input, textarea, button, [role="tab"], [contenteditable="true"]')) return;
       event.preventDefault();
       registry.execute(audio.getState().state === 'playing' ? 'playback.stop' : 'playback.play');
     }
