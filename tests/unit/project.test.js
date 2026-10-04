@@ -24,6 +24,21 @@ test('project kosong R1 punya 8 channel, 64 row, dan satu occurrence', () => {
   const pattern = activePattern(project);
 
   assert.equal(project.song.tracks.length, DEFAULT_CHANNELS);
+  assert.deepEqual(
+    {
+      color: project.song.tracks[0].color,
+      kind: project.song.tracks[0].kind,
+      defaultInstrumentId: project.song.tracks[0].defaultInstrumentId,
+      polyphony: project.song.tracks[0].polyphony,
+    },
+    {
+      color: null,
+      kind: 'instrument',
+      defaultInstrumentId: 'factory.basic',
+      polyphony: 'mono',
+    },
+  );
+  assert.equal('voiceMode' in project.song.tracks[0], false);
   assert.equal(pattern.lengthTicks / pattern.rowTicks, DEFAULT_ROWS);
   assert.equal(pattern.rowTicks, DEFAULT_ROW_TICKS);
   assert.equal(project.song.order.length, 1);
