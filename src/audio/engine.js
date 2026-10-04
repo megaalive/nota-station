@@ -111,6 +111,11 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     oscillator.stop(when + 0.04);
   }
 
+  async function activate() {
+    await ensureReady();
+    return getState();
+  }
+
   async function preview(pitch, velocity = 100) {
     await ensureReady();
     const when = context.currentTime + 0.005;
@@ -407,6 +412,7 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
 
   return {
     preload,
+    activate,
     preview,
     playPattern,
     pause,
