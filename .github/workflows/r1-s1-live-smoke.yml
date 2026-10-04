@@ -1,0 +1,39 @@
+name: r1-s1-live-smoke
+
+on:
+  push:
+    branches:
+      - r1/s1-live-smoke
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Tunggu artifact Pages terbaru
+        run: |
+          for i in {1..60}; do
+            BODY="$(curl -fsS https://megaalive.github.io/nota-station/build.json || true)"
+            if printf '%s' "$BODY" | grep -q 'c0a9ec86f93631b43c7b86d1c863680b8d6f7243'; then
+              printf '%s\n' "$BODY"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "build live belum cocok"
+          exit 1
+      - name: Smoke live R1 S1
+        run: npm run test:smoke
+        env:
+          PAGE_URL: https://megaalive.github.io/nota-station/
+          EXPECT_SHA: c0a9ec86f93631b43c7b86d1c863680b8d6f7243
