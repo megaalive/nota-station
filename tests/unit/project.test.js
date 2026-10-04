@@ -10,6 +10,7 @@ import {
   deleteNote,
   enterNote,
   noteAtCell,
+  setInitialTempo,
   updateNoteAtCell,
 } from '../../src/core/project.js';
 
@@ -20,6 +21,29 @@ function fixture() {
     now: () => '2026-10-04T00:00:00.000Z',
   });
 }
+
+test('setInitialTempo mengubah tempo secara immutable dan menjaga no-op', () => {
+  const project = fixture();
+  const next = setInitialTempo(
+    project,
+    138,
+    { now: () => '2026-10-04T00:04:00.000Z' },
+  );
+
+  assert.equal(project.song.initial.tempo, 120);
+  assert.equal(next.song.initial.tempo, 138);
+  assert.notEqual(next, project);
+
+  assert.equal(setInitialTempo(next, 138), next);
+  assert.throws(
+    () => setInitialTempo(project, 19),
+    (error) => error.code === 'E_PROJECT_TEMPO_RANGE',
+  );
+  assert.throws(
+    () => setInitialTempo(project, 301),
+    (error) => error.code === 'E_PROJECT_TEMPO_RANGE',
+  );
+});
 
 test('project kosong R1 punya 8 channel, 64 row, dan satu occurrence', () => {
   const project = fixture();

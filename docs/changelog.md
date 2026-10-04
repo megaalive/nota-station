@@ -5,6 +5,26 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S4 — Scheduler look-ahead + tempo + loop Pattern (PASS)
+
+- Playback Pattern dipindahkan dari "jadwalkan semua sekali" ke scheduler look-ahead
+  berbasis `AudioContext.currentTime`: horizon 120 ms, wake 25 ms. `setInterval`
+  hanya membangunkan scheduler; waktu musikal tetap dihitung dari audio clock.
+- Cursor scheduler murni menghitung event dari `anchor + cycle × duration`, sehingga
+  loop tidak mengakumulasi rounding. Mematikan loop di batas Pattern tidak membocorkan
+  event cycle berikutnya.
+- Tempo awal menjadi data project yang editable (20–300 BPM), immutable, satu transaksi
+  history, dan ikut Undo/Redo. Mengubah tempo saat playback menghentikan playback pada
+  S4; re-anchor live disisakan untuk slice live-edit scheduler.
+- Topbar tidak lagi menampilkan placeholder key palsu. Ia menampilkan meter project nyata,
+  input tempo ringkas, dan loop Pattern sebagai ikon `↻` dengan `aria-pressed` + tooltip.
+- Audio state mengekspos anchor, duration, scheduler aktif, dan jumlah event terjadwal
+  untuk regression/agent tanpa mengekspos `AudioContext`.
+- Gate final: `npm ci` **0 vulnerability**, unit **35/35 PASS**, `npm run check` PASS,
+  build **114.1 KiB PASS**, Playwright Chromium+Firefox **96/96 PASS** (47,1 dtk).
+- **Belum menutup R1**: metronome, pause/seek, JSON debug import/export, live-edit
+  re-anchor/cancel scheduler, pitch-effect spike, template, serta UAT/performance exit.
+
 ### S3 — Field editing + input ergonomics (PASS)
 
 - `VOL` sekarang editable sebagai dua digit hex `00–7F`. Nibble pertama hanya
@@ -21,6 +41,7 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
   name + tooltip; tombol mengembalikan fokus ke grid. Step mendukung 0–16.
 - Gate final: `npm ci` **0 vulnerability**, unit **30/30 PASS**, `npm run check` PASS,
   build **105.3 KiB PASS**, Playwright Chromium+Firefox **88/88 PASS** (35,8 dtk).
+- Publish `8f5f7ba9…` ke Pages berhasil dan live smoke S3 **10/10 PASS**.
 - **Belum menutup R1**: transport tempo/loop/metronome/pause/seek, JSON debug
   import/export, live-edit scheduler penuh, pitch-effect spike, template, serta
   UAT/performance exit R1 tetap slice berikutnya.

@@ -17,7 +17,16 @@ const WORKSPACE_TABS = [
   { id: 'sound', labelKey: 'tab.sound' },
 ];
 
-export function createShell({ root, t, registry, palette, store, build, renderView = null }) {
+export function createShell({
+  root,
+  t,
+  registry,
+  palette,
+  store,
+  build,
+  renderView = null,
+  transport = { tempo: 120, meter: { num: 4, den: 4 }, loopPattern: true },
+}) {
   let activeTab = 'pattern';
 
   /* ------------------------------------------------------------- top bar */
@@ -50,25 +59,81 @@ export function createShell({ root, t, registry, palette, store, build, renderVi
     variant: 'ghost',
     onClick: () => palette.open(),
   });
+  const loopButton = Button({
+    label: t('transport.loopPattern'),
+    icon: '↻',
+    iconOnly: true,
+    variant: 'ghost',
+    onClick: () => registry.execute('playback.toggleLoop'),
+  });
+  loopButton.dataset.action = 'loop-mode';
 
-  const transport = el('div', { class: 'topbar__transport', role: 'group', 'aria-label': t('topbar.transport') }, [
+  let currentTransport = {
+    tempo: transport.tempo ?? 120,
+    meter: transport.meter ?? { num: 4, den: 4 },
+    loopPattern: transport.loopPattern ?? true,
+  };
+
+  const tempoInput = el('input', {
+    type: 'number',
+    class: 'topbar__tempo-input',
+    min: '20',
+    max: '300',
+    step: '1',
+    inputmode: 'numeric',
+    'aria-label': t('transport.tempo'),
+    dataset: { action: 'tempo-input' },
+    value: String(currentTransport.tempo),
+    on: {
+      change: () => {
+        const tempo = Number(tempoInput.value);
+        if (!Number.isInteger(tempo) || tempo < 20 || tempo > 300) {
+          tempoInput.setCustomValidity(t('transport.tempoInvalid'));
+          tempoInput.reportValidity();
+          tempoInput.value = String(currentTransport.tempo);
+          return;
+        }
+        tempoInput.setCustomValidity('');
+        try {
+          registry.execute('song.setTempo', { tempo });
+        } catch {
+          tempoInput.setCustomValidity(t('transport.tempoInvalid'));
+          tempoInput.reportValidity();
+          tempoInput.value = String(currentTransport.tempo);
+        }
+      },
+    },
+  });
+
+  const tempoControl = el('label', {
+    class: 'topbar__tempo',
+    title: t('transport.tempoUnit'),
+  }, [
+    el('span', { 'aria-hidden': 'true', text: '♩' }),
+    tempoInput,
+  ]);
+
+  const meterDisplay = el('span', {
+    class: 'topbar__meta',
+    dataset: { action: 'meter-display' },
+  });
+
+  const transportBar = el('div', {
+    class: 'topbar__transport',
+    role: 'group',
+    'aria-label': t('topbar.transport'),
+  }, [
     Tooltip({ text: t('transport.play'), child: playButton }),
     Tooltip({ text: t('transport.stop'), child: stopButton }),
-    el('span', {
-      class: 'topbar__meta topbar__loop',
-      'aria-label': t('transport.loopPattern'),
-      dataset: { action: 'loop-mode' },
-    }, [
-      el('span', { 'aria-hidden': 'true', text: '↻' }),
-      el('span', { text: t('tab.pattern') }),
-    ]),
-    el('span', { class: 'topbar__meta', dataset: { action: 'tempo-display' }, text: t('transport.tempoPlaceholder') }),
+    Tooltip({ text: t('transport.loopPattern'), child: loopButton }),
+    tempoControl,
+    meterDisplay,
     el('span', { class: 'topbar__saved', role: 'status', dataset: { action: 'save-status' }, text: t('status.notSaved') }),
     buildId,
     Tooltip({ text: t('cmd.palette'), shortcut: 'Ctrl+K', child: paletteButton }),
   ]);
 
-  const topbar = el('header', { class: 'topbar', dataset: { action: 'topbar' } }, [transport]);
+  const topbar = el('header', { class: 'topbar', dataset: { action: 'topbar' } }, [transportBar]);
 
   /* ---------------------------------------------------- workspace tabs */
 
@@ -215,9 +280,22 @@ export function createShell({ root, t, registry, palette, store, build, renderVi
     audioStatus.dataset.state = state;
   }
 
+  function setTransportStatus(next) {
+    currentTransport = {
+      ...currentTransport,
+      ...next,
+      meter: next.meter ?? currentTransport.meter,
+    };
+    loopButton.setAttribute('aria-pressed', currentTransport.loopPattern ? 'true' : 'false');
+    loopButton.classList.toggle('is-active', currentTransport.loopPattern);
+    tempoInput.value = String(currentTransport.tempo);
+    meterDisplay.textContent = `${currentTransport.meter.num}/${currentTransport.meter.den}`;
+  }
+
   function render() {
     root.textContent = '';
     root.append(topbar, workspace, dock, statusbar);
+    setTransportStatus(currentTransport);
     renderActiveView();
     return root;
   }
@@ -228,6 +306,7 @@ export function createShell({ root, t, registry, palette, store, build, renderVi
     getActiveTab: () => activeTab,
     setPatternStatus,
     setAudioStatus,
+    setTransportStatus,
     refreshView: renderActiveView,
   };
 }

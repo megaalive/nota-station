@@ -9,6 +9,7 @@ import {
   createBlankProject,
   deleteNote,
   enterNote,
+  setInitialTempo,
   updateNoteAtCell,
 } from './core/project.js';
 import { createAudioEngine } from './audio/engine.js';
@@ -25,9 +26,14 @@ let theme = readInitialTheme();
 let buildInfo = null;
 const history = createHistory(createBlankProject());
 let project = history.current();
-const audio = createAudioEngine();
 let shell = null;
 let patternView = null;
+const transportState = {
+  loopPattern: true,
+};
+const audio = createAudioEngine({
+  onStateChange: (state) => shell?.setAudioStatus(state),
+});
 
 applyTheme(theme);
 
@@ -123,6 +129,29 @@ function registerCommands() {
       },
     },
     {
+      id: 'playback.toggleLoop',
+      group: 'Playback',
+      labelKey: 'transport.loopPattern',
+      run: () => {
+        transportState.loopPattern = !transportState.loopPattern;
+        audio.setLoop(transportState.loopPattern);
+        syncTransportUi();
+        return transportState.loopPattern;
+      },
+    },
+    {
+      id: 'song.setTempo',
+      group: 'Song',
+      labelKey: 'transport.tempo',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('song.setTempo', args);
+        if (audio.getState().state === 'playing') audio.stop();
+        commitProject(setInitialTempo(project, args.tempo), 'song.setTempo');
+        return { tempo: project.song.initial.tempo };
+      },
+    },
+    {
       id: 'pattern.enterNote',
       group: 'Pattern',
       labelKey: 'pattern.enterNote',
@@ -208,7 +237,7 @@ function registerCommands() {
       run: () => cycleTheme(),
     },
     {
-      // Ekspor WAV belum masuk slice R1-S1. Tetap tampil dengan alasan,
+      // Ekspor WAV belum masuk R1. Tetap tampil dengan alasan,
       // bukan disembunyikan — user jadi tahu kenapa belum bisa dipakai (§8.14).
       id: 'io.exportWav',
       group: 'Ekspor',
@@ -225,6 +254,15 @@ function setSaveStatus(key) {
   if (chip) chip.textContent = i18n.t(key);
 }
 
+function syncTransportUi() {
+  shell?.setTransportStatus({
+    tempo: project.song.initial.tempo,
+    meter: project.song.initial.meter,
+    loopPattern: transportState.loopPattern,
+  });
+}
+
+
 function requireCommandArgs(id, args) {
   if (!args || typeof args !== 'object') {
     throw commandError('E_CMD_ARGS_REQUIRED', `${id} membutuhkan argumen konteks editor.`);
@@ -236,6 +274,7 @@ function commitProject(nextProject, label) {
 
   project = history.commit(nextProject, label);
   setSaveStatus('status.notSaved');
+  syncTransportUi();
   patternView?.refresh();
   return project;
 }
@@ -246,6 +285,7 @@ function restoreHistory(direction) {
 
   project = nextProject;
   setSaveStatus('status.notSaved');
+  syncTransportUi();
   patternView?.refresh();
   return history.getState();
 }
@@ -253,8 +293,9 @@ function restoreHistory(direction) {
 
 async function playActivePattern() {
   try {
-    const result = await audio.playPattern(project, activePattern(project));
-    shell?.setAudioStatus('playing');
+    const result = await audio.playPattern(project, activePattern(project), {
+      loop: transportState.loopPattern,
+    });
     return result;
   } catch {
     shell?.setAudioStatus('error');
@@ -292,6 +333,11 @@ function mountShell(activeTab = 'pattern') {
     store,
     build: buildInfo,
     renderView: renderWorkspace,
+    transport: {
+      tempo: project.song.initial.tempo,
+      meter: project.song.initial.meter,
+      loopPattern: transportState.loopPattern,
+    },
   });
   shell.render();
   if (activeTab !== 'pattern') shell.selectTab(activeTab);
@@ -356,6 +402,11 @@ async function boot() {
       build: buildInfo,
       activeTab: shell.getActiveTab(),
       audio: audio.getState(),
+      transport: {
+        tempo: project.song.initial.tempo,
+        meter: project.song.initial.meter,
+        loopPattern: transportState.loopPattern,
+      },
       history: history.getState(),
       project: {
         id: project.id,

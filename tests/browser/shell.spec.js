@@ -53,6 +53,62 @@ test.describe('shell layout §8.3', () => {
     await expect(page.locator(`#${describedBy}`)).toContainText('Ctrl+K');
   });
 
+  test('transport menampilkan state project nyata dan loop sebagai tombol ikon', async ({ page }) => {
+    const topbar = page.locator('[data-action="topbar"]');
+    const loop = topbar.getByRole('button', { name: 'Loop Pattern' });
+    const tempo = page.locator('[data-action="tempo-input"]');
+
+    await expect(loop).toHaveClass(/btn--icon-only/);
+    await expect(loop).toHaveText('↻');
+    await expect(loop).toHaveAttribute('aria-pressed', 'true');
+    await expect(tempo).toHaveValue('120');
+    await expect(page.locator('[data-action="meter-display"]')).toHaveText('4/4');
+
+    const state = await page.evaluate(() => window.tracker.getState().transport);
+    expect(state).toMatchObject({ tempo: 120, meter: { num: 4, den: 4 }, loopPattern: true });
+  });
+
+  test('tempo adalah data project, satu transaksi, dan ikut Undo/Redo', async ({ page }) => {
+    const tempo = page.locator('[data-action="tempo-input"]');
+
+    await tempo.fill('138');
+    await tempo.press('Tab');
+
+    await expect(tempo).toHaveValue('138');
+    expect(await page.evaluate(() => window.tracker.getProject().song.initial.tempo)).toBe(138);
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(1);
+
+    await page.keyboard.press('Control+z');
+    await expect(tempo).toHaveValue('120');
+    expect(await page.evaluate(() => window.tracker.getProject().song.initial.tempo)).toBe(120);
+
+    await page.keyboard.press('Control+y');
+    await expect(tempo).toHaveValue('138');
+    expect(await page.evaluate(() => window.tracker.getProject().song.initial.tempo)).toBe(138);
+  });
+
+  test('tempo di luar 20–300 ditolak tanpa mengubah project', async ({ page }) => {
+    const tempo = page.locator('[data-action="tempo-input"]');
+    await tempo.fill('301');
+    await tempo.press('Tab');
+
+    await expect(tempo).toHaveValue('120');
+    expect(await page.evaluate(() => window.tracker.getProject().song.initial.tempo)).toBe(120);
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(0);
+  });
+
+  test('loop Pattern bisa dimatikan dan state transport tetap sinkron', async ({ page }) => {
+    const loop = page.getByRole('button', { name: 'Loop Pattern' });
+    await loop.click();
+
+    await expect(loop).toHaveAttribute('aria-pressed', 'false');
+    expect(await page.evaluate(() => window.tracker.getState().transport.loopPattern)).toBe(false);
+
+    await loop.click();
+    await expect(loop).toHaveAttribute('aria-pressed', 'true');
+    expect(await page.evaluate(() => window.tracker.getState().transport.loopPattern)).toBe(true);
+  });
+
   test('tab berganti hanya lewat aksi eksplisit (klik atau Alt+digit)', async ({ page }) => {
     await page.locator('[data-action="workspace-tab"][data-entity="sound"]').click();
     await expect(page.locator('[data-action="workspace-view"]')).toHaveAttribute('data-entity', 'sound');

@@ -85,6 +85,29 @@ export function activePattern(project) {
   return pattern;
 }
 
+export function setInitialTempo(
+  project,
+  tempo,
+  { now = isoNow } = {},
+) {
+  if (!Number.isInteger(tempo) || tempo < 20 || tempo > 300) {
+    throw projectError('E_PROJECT_TEMPO_RANGE', `Tempo di luar 20..300 BPM: ${tempo}`);
+  }
+  if (project.song.initial.tempo === tempo) return project;
+
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      initial: {
+        ...project.song.initial,
+        tempo,
+      },
+    },
+  };
+}
+
 export function noteAtCell(project, { patternId, trackId, row }) {
   const pattern = project.song.patterns.find((item) => item.id === patternId);
   if (!pattern) return null;

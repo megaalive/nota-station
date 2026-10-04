@@ -293,18 +293,35 @@ test.describe('Pattern R1 editing', () => {
     expect(await page.locator('.pattern-grid__row').count()).toBeLessThan(64);
   });
 
-  test('Play setelah gestur pengguna menjadwalkan note dengan Web Audio lalu Stop membersihkan voice', async ({ page }) => {
+  test('Play memakai look-ahead scheduler, tempo project, dan loop Pattern', async ({ page }) => {
     const grid = page.locator('[data-action="pattern-grid"]');
     await grid.focus();
     await page.keyboard.press('Control+e');
     await page.keyboard.press('z');
 
+    const tempo = page.locator('[data-action="tempo-input"]');
+    await tempo.fill('240');
+    await tempo.press('Tab');
+
     await page.getByRole('button', { name: 'Putar' }).click();
     await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain', { timeout: 5000 });
-    expect(await page.evaluate(() => window.tracker.getState().audio.sampleReady)).toBe(true);
+
+    let audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.sampleReady).toBe(true);
+    expect(audio.schedulerActive).toBe(true);
+    expect(audio.loop).toBe(true);
+    expect(audio.durationSeconds).toBeCloseTo(4, 6);
+    expect(audio.notesScheduled).toBeGreaterThanOrEqual(1);
+
+    await page.getByRole('button', { name: 'Loop Pattern' }).click();
+    await expect(page.getByRole('button', { name: 'Loop Pattern' })).toHaveAttribute('aria-pressed', 'false');
+    audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.loop).toBe(false);
 
     await page.getByRole('button', { name: 'Berhenti' }).click();
     await expect(page.locator('[data-action="audio-status"]')).toContainText('siap');
-    expect(await page.evaluate(() => window.tracker.getState().audio.activeVoices)).toBe(0);
+    audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.activeVoices).toBe(0);
+    expect(audio.schedulerActive).toBe(false);
   });
 });
