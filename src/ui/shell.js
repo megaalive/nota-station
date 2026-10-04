@@ -60,7 +60,7 @@ export function createShell({ root, t, registry, palette, store, build }) {
       dataset: { action: 'loop-mode' },
     }, [
       el('span', { 'aria-hidden': 'true', text: '↻' }),
-      el('span', { text: 'Pattern' }),
+      el('span', { text: t('tab.pattern') }),
     ]),
     el('span', { class: 'topbar__meta', dataset: { action: 'tempo-display' }, text: t('transport.tempoPlaceholder') }),
     el('span', { class: 'topbar__saved', role: 'status', dataset: { action: 'save-status' }, text: t('status.notSaved') }),
