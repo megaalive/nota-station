@@ -406,8 +406,8 @@ export function createPatternView({
   }
 
   function deleteCurrentEvent() {
-    // INST/VOL masih read-only pada slice ini. Delete di sana tidak boleh
-    // diam-diam menghapus seluruh NoteEvent.
+    // Instrument dan velocity wajib ada pada NoteEvent, jadi Delete pada INST/VOL
+    // tidak dimaknai "kosongkan field". Hanya NOTE yang menghapus seluruh event.
     if (mode !== 'edit' || cursorField !== 'note') return;
 
     const { pattern, tracks } = projectInfo();
