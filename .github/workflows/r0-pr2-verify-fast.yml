@@ -29,7 +29,7 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox
       - name: Start server
         run: |
           node tools/serve.mjs >/tmp/notastation-serve.log 2>&1 &
@@ -45,12 +45,13 @@ jobs:
         env:
           BASE_PATH: /nota-station/
           PORT: "4173"
-      - name: Chromium R0 shell
-        run: npx playwright test tests/browser/boot.spec.js tests/browser/shell.spec.js --project=chromium --workers=1 --reporter=list
+      - name: Browser R0 full
+        run: npx playwright test --workers=2 --reporter=list
         env:
           BASE_PATH: /nota-station/
           PORT: "4173"
           CI: ""
+          PW_PROJECTS: chromium,firefox
       - if: always()
         run: |
           cat /tmp/notastation-serve.log || true
