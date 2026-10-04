@@ -263,8 +263,8 @@ test.describe('keyboard & focus', () => {
     }
   });
 
-  test('status bar dan mode edit punya teks, bukan hanya warna', async ({ page }) => {
-    await expect(page.locator('[data-action="edit-mode"]')).toHaveText(/EDIT/);
+  test('status bar dan mode input punya teks, bukan hanya warna', async ({ page }) => {
+    await expect(page.locator('[data-action="edit-mode"]')).toHaveText(/AUDISI/);
     await expect(page.locator('[data-action="statusbar"]')).toBeVisible();
   });
 });
