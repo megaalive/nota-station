@@ -22,28 +22,76 @@ export function patternEventTemplates(pattern, tempo, ppq = PPQ) {
       id: note.id,
       pitch: note.pitch,
       velocity: note.velocity,
+      startTickLocal: note.startTickLocal,
       offsetSeconds: note.startTickLocal * tickSeconds,
       durationSeconds: note.durationTicks * tickSeconds,
     }));
 }
 
-/**
- * Cursor scheduler murni. Ia tidak memakai wall-clock; caller memberi anchor audio
- * clock dan horizon. Loop dihitung dari cycle integer * durasi Pattern agar tidak
- * mengakumulasi rounding dari penjumlahan waktu sebelumnya.
- */
-export function createPatternScheduleCursor(pattern, tempo, { loop = false, ppq = PPQ } = {}) {
-  const events = patternEventTemplates(pattern, tempo, ppq);
-  const durationSeconds = patternDurationSeconds(pattern, tempo, ppq);
+export function metronomeEventTemplates(pattern, ppq = PPQ) {
+  const meter = pattern.meter ?? { num: 4, den: 4 };
+  const beatTicks = ppq * (4 / meter.den);
+  const barTicks = beatTicks * meter.num;
+  const events = [];
+
+  for (let tick = 0; tick < pattern.lengthTicks; tick += beatTicks) {
+    events.push({
+      id: `metronome-${tick}`,
+      startTickLocal: tick,
+      accent: tick % barTicks === 0,
+    });
+  }
+  return events;
+}
+
+export function transportTickAtAudioTime({
+  anchorAudioTime,
+  anchorTick,
+  nowAudioTime,
+  tempo,
+  patternLengthTicks,
+  loop = false,
+  ppq = PPQ,
+}) {
+  if (![anchorAudioTime, anchorTick, nowAudioTime, patternLengthTicks].every(Number.isFinite)) {
+    throw new TypeError('Posisi transport membutuhkan angka finite.');
+  }
+  if (patternLengthTicks <= 0) return 0;
+
+  const elapsed = Math.max(0, nowAudioTime - anchorAudioTime);
+  const raw = anchorTick + elapsed / secondsPerTick(tempo, ppq);
+  if (loop) return ((raw % patternLengthTicks) + patternLengthTicks) % patternLengthTicks;
+  return Math.max(0, Math.min(patternLengthTicks, raw));
+}
+
+function createTickScheduleCursor(events, patternLengthTicks, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  if (!Number.isFinite(startTick) || startTick < 0 || startTick > patternLengthTicks) {
+    throw new RangeError(`startTick di luar Pattern: ${startTick}`);
+  }
+
+  const tickSeconds = secondsPerTick(tempo, ppq);
+  const normalizedStart = loop && startTick === patternLengthTicks ? 0 : startTick;
   let cycle = 0;
-  let index = 0;
+  let index = events.findIndex((event) => event.startTickLocal >= normalizedStart);
   let loopEnabled = Boolean(loop);
   let exhausted = events.length === 0;
 
+  if (!exhausted && index < 0) {
+    if (loopEnabled) {
+      cycle = 1;
+      index = 0;
+    } else {
+      exhausted = true;
+      index = 0;
+    }
+  }
+
   function setLoop(enabled) {
     loopEnabled = Boolean(enabled);
-    // Kalau cycle berikutnya belum mulai dijadwalkan, mematikan loop harus berhenti
-    // persis di batas Pattern, bukan membocorkan event pertama cycle berikutnya.
     if (!loopEnabled && cycle > 0 && index === 0) exhausted = true;
   }
 
@@ -56,11 +104,11 @@ export function createPatternScheduleCursor(pattern, tempo, { loop = false, ppq 
     const due = [];
     while (!exhausted) {
       const event = events[index];
-      const when = anchor + cycle * durationSeconds + event.offsetSeconds;
+      const absoluteTick = cycle * patternLengthTicks + event.startTickLocal;
+      const when = anchor + (absoluteTick - normalizedStart) * tickSeconds;
       if (when > horizon) break;
 
       due.push({ ...event, when, cycle });
-
       index += 1;
       if (index >= events.length) {
         if (!loopEnabled) {
@@ -74,11 +122,32 @@ export function createPatternScheduleCursor(pattern, tempo, { loop = false, ppq 
     return due;
   }
 
+  return { drainUntil, setLoop, isExhausted: () => exhausted };
+}
+
+export function createPatternScheduleCursor(pattern, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  const events = patternEventTemplates(pattern, tempo, ppq);
+  const cursor = createTickScheduleCursor(events, pattern.lengthTicks, tempo, { loop, startTick, ppq });
   return {
-    drainUntil,
-    setLoop,
-    isExhausted: () => exhausted,
-    durationSeconds,
+    ...cursor,
+    durationSeconds: patternDurationSeconds(pattern, tempo, ppq),
     eventCount: events.length,
   };
+}
+
+export function createMetronomeScheduleCursor(pattern, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  return createTickScheduleCursor(
+    metronomeEventTemplates(pattern, ppq),
+    pattern.lengthTicks,
+    tempo,
+    { loop, startTick, ppq },
+  );
 }

@@ -77,6 +77,11 @@
   box-shadow: inset 0 -2px 0 var(--accent-1);
 }
 
+.topbar__seek {
+  width: clamp(88px, 14vw, 160px);
+  accent-color: var(--accent-1);
+}
+
 .topbar__saved {
   color: var(--text-2);
 }

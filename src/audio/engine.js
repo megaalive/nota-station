@@ -1,5 +1,5 @@
-// Audio R1 memakai AudioContext.currentTime sebagai jam musik (§7.2).
-// S4 menambahkan look-ahead scheduler; setInterval hanya wake-up, bukan sumber waktu musikal.
+// Transport R1-S5. AudioContext.currentTime adalah jam musik; timer hanya
+// membangunkan look-ahead scheduler (§7.2).
 
 import {
   FACTORY_BASIC_ROOT_PITCH,
@@ -8,25 +8,31 @@ import {
 import {
   SCHEDULE_AHEAD_SECONDS,
   SCHEDULER_WAKE_MS,
+  createMetronomeScheduleCursor,
   createPatternScheduleCursor,
+  secondsPerTick,
+  transportTickAtAudioTime,
 } from './scheduler.js';
 
 const ROOT_PITCH = FACTORY_BASIC_ROOT_PITCH;
 const PREVIEW_SECONDS = 0.18;
 
-export function createAudioEngine({ onStateChange = null } = {}) {
+export function createAudioEngine({ onStateChange = null, onPositionChange = null } = {}) {
   let context = null;
   let sampleBytesPromise = null;
   let buffer = null;
   let state = 'locked';
   let schedulerTimer = null;
   let playback = null;
+  let positionTick = 0;
+  let loopEnabled = true;
+  let metronomeEnabled = false;
+  let lastTempo = 120;
+  let scheduleRevision = 0;
   const activeSources = new Map();
 
   function preload() {
     if (!sampleBytesPromise) {
-      // Sample kecil sengaja embedded di R1 supaya first sound tidak bergantung request
-      // tambahan. Factory pack lazy yang sebenarnya baru masuk R2.
       sampleBytesPromise = Promise.resolve(decodeBase64(FACTORY_BASIC_WAV_BASE64));
     }
     return sampleBytesPromise;
@@ -34,18 +40,13 @@ export function createAudioEngine({ onStateChange = null } = {}) {
 
   async function ensureReady() {
     if (!context) context = new AudioContext({ latencyHint: 'interactive' });
-
-    // Minta resume langsung dari click/keydown tepercaya, tetapi jangan menjadikan
-    // penyelesaian Promise resume sebagai gate scheduler. Firefox headless dapat
-    // membiarkan Promise itu pending walau node audio tetap boleh dibuat/dijadwalkan.
-    // Di browser interaktif, context akan berpindah ke running setelah izin gestur.
     requestResume();
 
     if (!buffer) {
       const bytes = await preload();
       buffer = await context.decodeAudioData(bytes.slice(0));
     }
-    state = 'ready';
+    if (state === 'locked') setState('ready');
     return context;
   }
 
@@ -53,16 +54,15 @@ export function createAudioEngine({ onStateChange = null } = {}) {
     if (!context || context.state !== 'suspended') return;
     try {
       const pending = context.resume();
-      if (pending && typeof pending.catch === 'function') {
-        void pending.catch(() => {
-          // Status context tetap tersedia lewat getState(); scheduler tidak dirusak
-          // hanya karena browser menolak/menunda unlock audio.
-        });
-      }
+      if (pending && typeof pending.catch === 'function') void pending.catch(() => {});
     } catch {
-      // Beberapa implementasi bisa melempar sinkron. Node tetap dapat dijadwalkan
-      // dan UI dapat membaca contextState untuk diagnosa.
+      // Browser boleh menunda unlock; scheduler tetap dapat menyiapkan node.
     }
+  }
+
+  function trackSource(source, when, kind) {
+    activeSources.set(source, { when, kind });
+    source.onended = () => activeSources.delete(source);
   }
 
   function scheduleVoice({ pitch, velocity = 100, when, durationSeconds }) {
@@ -77,11 +77,23 @@ export function createAudioEngine({ onStateChange = null } = {}) {
 
     source.connect(gain);
     gain.connect(context.destination);
-    source.onended = () => activeSources.delete(source);
-    activeSources.set(source, { when });
+    trackSource(source, when, 'note');
     source.start(when);
     source.stop(when + Math.max(0.04, durationSeconds));
-    return source;
+  }
+
+  function scheduleClick({ when, accent }) {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = 'square';
+    oscillator.frequency.setValueAtTime(accent ? 1760 : 1320, when);
+    gain.gain.setValueAtTime(accent ? 0.16 : 0.09, when);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.035);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    trackSource(oscillator, when, 'metronome');
+    oscillator.start(when);
+    oscillator.stop(when + 0.04);
   }
 
   async function preview(pitch, velocity = 100) {
@@ -91,33 +103,71 @@ export function createAudioEngine({ onStateChange = null } = {}) {
     return when;
   }
 
-  async function playPattern(project, pattern, { loop = false } = {}) {
-    await ensureReady();
-    stop();
+  function currentTick() {
+    if (!playback || state !== 'playing' || !context) return positionTick;
+    return transportTickAtAudioTime({
+      anchorAudioTime: playback.anchor,
+      anchorTick: playback.startTick,
+      nowAudioTime: context.currentTime,
+      tempo: playback.tempo,
+      patternLengthTicks: playback.pattern.lengthTicks,
+      loop: playback.loop,
+    });
+  }
+
+  function startPlayback(project, pattern, startTick) {
+    clearScheduler();
+    stopSources();
 
     const tempo = project.song.initial.tempo;
+    lastTempo = tempo;
+    const normalizedTick = loopEnabled && startTick === pattern.lengthTicks ? 0 : startTick;
     const anchor = context.currentTime + 0.05;
-    const cursor = createPatternScheduleCursor(pattern, tempo, { loop });
 
     playback = {
+      pattern,
+      tempo,
       anchor,
-      cursor,
-      loop: Boolean(loop),
-      durationSeconds: cursor.durationSeconds,
+      startTick: normalizedTick,
+      loop: loopEnabled,
+      noteCursor: createPatternScheduleCursor(pattern, tempo, {
+        loop: loopEnabled,
+        startTick: normalizedTick,
+      }),
+      metronomeCursor: metronomeEnabled
+        ? createMetronomeScheduleCursor(pattern, tempo, {
+          loop: loopEnabled,
+          startTick: normalizedTick,
+        })
+        : null,
+      durationSeconds: pattern.lengthTicks * secondsPerTick(tempo),
+      endAt: anchor + Math.max(0, pattern.lengthTicks - normalizedTick) * secondsPerTick(tempo),
+      revision: ++scheduleRevision,
       notesScheduled: 0,
-      endAt: anchor + cursor.durationSeconds,
+      clicksScheduled: 0,
     };
 
+    positionTick = normalizedTick;
     setState('playing');
     scheduleWindow();
     schedulerTimer = setInterval(scheduleWindow, SCHEDULER_WAKE_MS);
+    notifyPosition();
+  }
 
-    return {
-      anchor,
-      durationSeconds: cursor.durationSeconds,
-      notesScheduled: playback.notesScheduled,
-      loop: playback.loop,
-    };
+  async function playPattern(project, pattern, {
+    startTick = null,
+    loop = loopEnabled,
+    metronome = metronomeEnabled,
+  } = {}) {
+    await ensureReady();
+    if (state === 'playing') return getState();
+
+    loopEnabled = Boolean(loop);
+    metronomeEnabled = Boolean(metronome);
+    let nextTick = startTick ?? positionTick;
+    if (nextTick >= pattern.lengthTicks && !loopEnabled) nextTick = 0;
+    startPlayback(project, pattern, nextTick);
+    return getState();
   }
 
   function scheduleWindow() {
@@ -125,9 +175,8 @@ export function createAudioEngine({ onStateChange = null } = {}) {
 
     const now = context.currentTime;
     const horizon = now + SCHEDULE_AHEAD_SECONDS;
-    const due = playback.cursor.drainUntil(playback.anchor, horizon);
 
-    for (const event of due) {
+    for (const event of playback.noteCursor.drainUntil(playback.anchor, horizon)) {
       scheduleVoice({
         pitch: event.pitch,
         velocity: event.velocity,
@@ -137,18 +186,86 @@ export function createAudioEngine({ onStateChange = null } = {}) {
       playback.notesScheduled += 1;
     }
 
-    if (!playback.loop && playback.cursor.isExhausted() && now >= playback.endAt) {
+    if (playback.metronomeCursor) {
+      for (const click of playback.metronomeCursor.drainUntil(playback.anchor, horizon)) {
+        scheduleClick({
+          when: Math.max(click.when, now + 0.001),
+          accent: click.accent,
+        });
+        playback.clicksScheduled += 1;
+      }
+    }
+
+    positionTick = currentTick();
+    notifyPosition();
+
+    if (!playback.loop && playback.noteCursor.isExhausted() && now >= playback.endAt) {
       clearScheduler();
+      stopSources();
       playback = null;
+      positionTick = 0;
       setState('ready');
+      notifyPosition();
     }
   }
 
-  function setLoop(enabled) {
-    if (!playback) return false;
-    playback.loop = Boolean(enabled);
-    playback.cursor.setLoop(playback.loop);
+  function pause() {
+    if (!playback || state !== 'playing') return false;
+    positionTick = currentTick();
+    clearScheduler();
+    stopSources();
+    playback = null;
+    setState('paused');
+    notifyPosition();
     return true;
+  }
+
+  function seek(project, pattern, tick) {
+    if (!Number.isFinite(tick) || tick < 0 || tick > pattern.lengthTicks) {
+      throw new RangeError(`Seek tick di luar Pattern: ${tick}`);
+    }
+
+    const wasPlaying = state === 'playing';
+    positionTick = Math.round(tick);
+    if (wasPlaying) startPlayback(project, pattern, positionTick);
+    else notifyPosition();
+    return positionTick;
+  }
+
+  function setTempo(project, pattern) {
+    lastTempo = project.song.initial.tempo;
+    if (state === 'playing' && playback) {
+      const tick = currentTick();
+      positionTick = tick;
+      startPlayback(project, pattern, tick);
+    } else {
+      notifyPosition();
+    }
+    return lastTempo;
+  }
+
+  function setLoop(project, pattern, enabled) {
+    loopEnabled = Boolean(enabled);
+    if (state === 'playing' && playback) {
+      const tick = currentTick();
+      positionTick = tick;
+      startPlayback(project, pattern, tick);
+    } else {
+      notifyPosition();
+    }
+    return loopEnabled;
+  }
+
+  function setMetronome(project, pattern, enabled) {
+    metronomeEnabled = Boolean(enabled);
+    if (state === 'playing' && playback) {
+      const tick = currentTick();
+      positionTick = tick;
+      startPlayback(project, pattern, tick);
+    } else {
+      notifyPosition();
+    }
+    return metronomeEnabled;
   }
 
   function stopSources() {
@@ -156,7 +273,7 @@ export function createAudioEngine({ onStateChange = null } = {}) {
       try {
         source.stop();
       } catch {
-        // Source yang sudah selesai bisa menolak stop kedua; state tetap aman dibersihkan.
+        // Source yang sudah selesai boleh menolak stop kedua.
       }
     }
     activeSources.clear();
@@ -175,30 +292,53 @@ export function createAudioEngine({ onStateChange = null } = {}) {
     onStateChange?.(state);
   }
 
+  function notifyPosition() {
+    onPositionChange?.(currentTick());
+  }
+
   function stop() {
     clearScheduler();
     stopSources();
     playback = null;
+    positionTick = 0;
     if (context) setState('ready');
+    notifyPosition();
   }
 
   function getState() {
+    const sources = [...activeSources.values()];
     return {
       state,
       contextState: context?.state ?? 'none',
       sampleReady: Boolean(buffer),
-      activeVoices: activeSources.size,
-      loop: playback?.loop ?? false,
+      activeVoices: sources.filter((item) => item.kind === 'note').length,
+      activeClicks: sources.filter((item) => item.kind === 'metronome').length,
+      loop: loopEnabled,
+      metronome: metronomeEnabled,
       schedulerActive: schedulerTimer !== null,
       anchor: playback?.anchor ?? null,
       durationSeconds: playback?.durationSeconds ?? null,
+      scheduleRevision,
+      tempo: playback?.tempo ?? lastTempo,
+      positionTick: currentTick(),
       notesScheduled: playback?.notesScheduled ?? 0,
+      clicksScheduled: playback?.clicksScheduled ?? 0,
     };
   }
 
-  return { preload, preview, playPattern, stop, setLoop, getState };
+  return {
+    preload,
+    preview,
+    playPattern,
+    pause,
+    stop,
+    seek,
+    setTempo,
+    setLoop,
+    setMetronome,
+    getState,
+  };
 }
-
 
 function decodeBase64(value) {
   const binary = atob(value);
