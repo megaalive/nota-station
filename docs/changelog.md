@@ -5,6 +5,22 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S8 — Spike pitch AudioParam (PASS)
+
+- Spike §7.4 membuktikan **pitch slide, portamento, dan vibrato** dapat dijadwalkan
+  pada `AudioBufferSourceNode.playbackRate` tanpa AudioWorklet/WASM.
+- Pitch slide/portamento memakai rasio equal temperament + automation
+  `setValueAtTime` / `exponentialRampToValueAtTime`; vibrato memakai
+  `setValueCurveAtTime` dengan kurva rasio positif.
+- Implementasi ini tetap spike teknis: belum mengunci schema efek atau UI R3 dan belum
+  dipasang ke engine produksi.
+- Browser probe memakai `OfflineAudioContext` nyata dan berhasil merender output non-zero
+  untuk ketiga jenis automation pada Chromium + Firefox.
+- Gate final run **37234278990**: `npm ci` 0 vulnerability, unit **43/43 PASS**,
+  `npm run check` PASS, build **130.4 KiB PASS**, Playwright Chromium+Firefox
+  **114/114 PASS** (54,8 dtk).
+- Keputusan: efek pitch tetap feasible untuk R3; **tidak perlu dipindahkan ke R9**.
+
 ### S6 — Live-edit scheduler + freeze window 30 ms (PASS)
 
 - Edit note saat playback kini tidak me-restart transport. `pattern.enterNote`,
