@@ -2,6 +2,19 @@ import { PPQ } from '../core/project.js';
 
 export const SCHEDULE_AHEAD_SECONDS = 0.12;
 export const SCHEDULER_WAKE_MS = 25;
+export const LIVE_EDIT_FREEZE_SECONDS = 0.03;
+
+export function liveEditFreezeTime(nowAudioTime, freezeSeconds = LIVE_EDIT_FREEZE_SECONDS) {
+  if (!Number.isFinite(nowAudioTime) || !Number.isFinite(freezeSeconds) || freezeSeconds < 0) {
+    throw new TypeError('Freeze window live-edit harus angka finite >= 0.');
+  }
+  return nowAudioTime + freezeSeconds;
+}
+
+export function isLiveEditMutable(when, nowAudioTime, freezeSeconds = LIVE_EDIT_FREEZE_SECONDS) {
+  if (!Number.isFinite(when)) throw new TypeError('Waktu event live-edit harus finite.');
+  return when >= liveEditFreezeTime(nowAudioTime, freezeSeconds);
+}
 
 export function secondsPerTick(tempo, ppq = PPQ) {
   if (!Number.isFinite(tempo) || tempo <= 0) {

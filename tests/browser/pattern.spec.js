@@ -293,6 +293,92 @@ test.describe('Pattern R1 editing', () => {
     expect(await page.locator('.pattern-grid__row').count()).toBeLessThan(64);
   });
 
+  test('live edit add/delete saat loop berjalan membangun ulang masa depan tanpa re-anchor', async ({ page }) => {
+    const grid = page.locator('[data-action="pattern-grid"]');
+    await grid.focus();
+    await page.keyboard.press('Control+e');
+
+    await page.getByRole('button', { name: 'Putar' }).click();
+    await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain', { timeout: 5000 });
+
+    const before = await page.evaluate(() => window.tracker.getState().audio);
+    const context = await page.evaluate(() => {
+      const project = window.tracker.getProject();
+      return {
+        patternId: project.song.patterns[0].id,
+        trackId: project.song.tracks[0].id,
+      };
+    });
+
+    await page.evaluate(({ patternId, trackId }) => {
+      window.tracker.commands.execute('pattern.enterNote', {
+        patternId,
+        trackId,
+        row: 4,
+        pitch: 60,
+      });
+    }, context);
+
+    let audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.state).toBe('playing');
+    expect(audio.scheduleRevision).toBe(before.scheduleRevision);
+    expect(audio.liveEditRevision).toBe(before.liveEditRevision + 1);
+    expect(audio.liveEditFreezeSeconds).toBeCloseTo(0.03, 6);
+
+    await expect.poll(
+      () => page.evaluate(() => window.tracker.getState().audio.scheduledNoteSources),
+      { timeout: 1500, intervals: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20] },
+    ).toBe(1);
+
+    const revisionAfterAdd = audio.liveEditRevision;
+    await page.evaluate(({ patternId, trackId }) => {
+      window.tracker.commands.execute('pattern.deleteNote', {
+        patternId,
+        trackId,
+        row: 4,
+      });
+    }, context);
+
+    audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.state).toBe('playing');
+    expect(audio.scheduleRevision).toBe(before.scheduleRevision);
+    expect(audio.liveEditRevision).toBe(revisionAfterAdd + 1);
+    expect(audio.lastLiveEditCanceledNotes).toBeGreaterThanOrEqual(1);
+    expect(audio.scheduledNoteSources).toBe(0);
+    expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
+
+    await page.getByRole('button', { name: 'Berhenti' }).click();
+  });
+
+  test('Undo note saat playback memakai freeze-window live edit, bukan restart transport', async ({ page }) => {
+    const project = await page.evaluate(() => window.tracker.getProject());
+    const patternId = project.song.patterns[0].id;
+    const trackId = project.song.tracks[0].id;
+
+    await page.evaluate(({ patternId, trackId }) => {
+      window.tracker.commands.execute('pattern.enterNote', {
+        patternId,
+        trackId,
+        row: 8,
+        pitch: 64,
+      });
+    }, { patternId, trackId });
+
+    await page.getByRole('button', { name: 'Putar' }).click();
+    await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain', { timeout: 5000 });
+    const before = await page.evaluate(() => window.tracker.getState().audio);
+
+    await page.keyboard.press('Control+z');
+
+    const after = await page.evaluate(() => window.tracker.getState().audio);
+    expect(after.state).toBe('playing');
+    expect(after.scheduleRevision).toBe(before.scheduleRevision);
+    expect(after.liveEditRevision).toBe(before.liveEditRevision + 1);
+    expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
+
+    await page.getByRole('button', { name: 'Berhenti' }).click();
+  });
+
   test('Play memakai look-ahead scheduler, tempo project, dan loop Pattern', async ({ page }) => {
     const grid = page.locator('[data-action="pattern-grid"]');
     await grid.focus();
