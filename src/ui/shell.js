@@ -343,14 +343,18 @@ export function createShell({
     loopButton.classList.toggle('is-active', currentTransport.loopPattern);
     metronomeButton.setAttribute('aria-pressed', currentTransport.metronome ? 'true' : 'false');
     metronomeButton.classList.toggle('is-active', currentTransport.metronome);
-    tempoInput.value = String(currentTransport.tempo);
+    if (document.activeElement !== tempoInput) {
+      tempoInput.value = String(currentTransport.tempo);
+    }
     meterDisplay.textContent = `${currentTransport.meter.num}/${currentTransport.meter.den}`;
     seekInput.max = String(currentTransport.lengthTicks);
     seekInput.step = String(currentTransport.rowTicks);
-    seekInput.value = String(Math.max(0, Math.min(
-      currentTransport.lengthTicks,
-      Math.round(currentTransport.positionTick),
-    )));
+    if (document.activeElement !== seekInput) {
+      seekInput.value = String(Math.max(0, Math.min(
+        currentTransport.lengthTicks,
+        Math.round(currentTransport.positionTick),
+      )));
+    }
   }
 
   function render() {

@@ -174,7 +174,7 @@ function registerCommands() {
       requiresArgs: true,
       run: (args) => {
         requireCommandArgs('song.setTempo', args);
-        commitProject(setInitialTempo(project, args.tempo), 'song.setTempo');
+        commitProject(setInitialTempo(project, Number(args.tempo)), 'song.setTempo');
         audio.setTempo(project, activePattern(project));
         syncTransportUi();
         return { tempo: project.song.initial.tempo };
@@ -381,6 +381,7 @@ function mountShell(activeTab = 'pattern') {
   });
   shell.render();
   if (activeTab !== 'pattern') shell.selectTab(activeTab);
+  syncTransportUi();
 }
 
 function bindShortcuts() {
