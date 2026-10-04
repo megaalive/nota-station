@@ -174,16 +174,18 @@ test.describe('smoke build live', () => {
     await page.getByRole('button', { name: 'Putar' }).click();
     await expect(page.locator('[data-action="audio-status"]')).toContainText('bermain', { timeout: 5000 });
 
-    const revisionBefore = await page.evaluate(() => window.tracker.getState().audio.scheduleRevision);
+    let audio = await page.evaluate(() => window.tracker.getState().audio);
+    expect(audio.clicksScheduled).toBeGreaterThan(0);
+
+    const revisionBefore = audio.scheduleRevision;
     const tempo = page.locator('[data-action="tempo-input"]');
     await tempo.fill('180');
     await tempo.press('Tab');
 
-    let audio = await page.evaluate(() => window.tracker.getState().audio);
+    audio = await page.evaluate(() => window.tracker.getState().audio);
     expect(audio.state).toBe('playing');
     expect(audio.tempo).toBe(180);
     expect(audio.scheduleRevision).toBeGreaterThan(revisionBefore);
-    expect(audio.clicksScheduled).toBeGreaterThan(0);
 
     await page.getByRole('button', { name: 'Jeda' }).click();
     await expect(page.locator('[data-action="audio-status"]')).toContainText('jeda');
