@@ -20,8 +20,10 @@ export function createBlankProject({ idFactory = makeId, now = isoNow } = {}) {
   const tracks = Array.from({ length: DEFAULT_CHANNELS }, (_, index) => ({
     id: idFactory(`track-${index + 1}`),
     name: `Channel ${index + 1}`,
+    color: null,
     kind: 'instrument',
-    voiceMode: 'mono',
+    defaultInstrumentId: FACTORY_INSTRUMENT_ID,
+    polyphony: 'mono',
   }));
 
   const patternId = idFactory('pattern');
