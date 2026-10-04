@@ -36,6 +36,25 @@ test.describe('Pattern R1 editing', () => {
     await expect(page.locator('[data-action="pattern-mode"]')).toContainText('AUDISI');
     await expect(page.locator('[data-action="edit-mode"]')).toContainText('AUDISI');
     await expect(noteCell(page)).toHaveCSS('outline-style', 'dashed');
+    await expect(page.locator('.pattern-grid__corner--channel')).toHaveCSS('position', 'sticky');
+  });
+
+  test('cursor auto-scroll horizontal sampai channel terakhir', async ({ page }) => {
+    const grid = page.locator('[data-action="pattern-grid"]');
+    await grid.focus();
+
+    for (let i = 0; i < 23; i += 1) await page.keyboard.press('ArrowRight');
+
+    await expect(volumeCell(page, 0, 7)).toHaveAttribute('aria-selected', 'true');
+    expect(await grid.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+
+    const visible = await volumeCell(page, 0, 7).evaluate((cell) => {
+      const grid = cell.closest('[data-action="pattern-grid"]');
+      const cellRect = cell.getBoundingClientRect();
+      const gridRect = grid.getBoundingClientRect();
+      return cellRect.left >= gridRect.left && cellRect.right <= gridRect.right + 1;
+    });
+    expect(visible).toBe(true);
   });
 
   test('AUDISI memainkan tombol nada tanpa menulis project', async ({ page }) => {
