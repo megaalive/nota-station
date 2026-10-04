@@ -1,8 +1,8 @@
 // Shell layout §8.3: top bar, tab workspace, panel kiri, area kerja, panel kanan,
 // dock terlipat, dan status bar yang selalu tampil.
 //
-// Isi panel di R0 masih placeholder — yang dibangun di sini strukturnya, supaya
-// view berikutnya (Pattern, Piano Roll, dst.) tinggal mengisi slot yang sudah ada.
+// Shell ini berasal dari R0. Mulai R1, view seperti Pattern mengisi slot tengah
+// lewat renderView; view lain tetap mendapat empty state sampai milestone pemiliknya.
 
 import { el } from './dom.js';
 import { Tabs, Splitter, Button, Tooltip } from './kit.js';
