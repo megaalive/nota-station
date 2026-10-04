@@ -62,7 +62,7 @@ export function createBlankProject({ idFactory = makeId, now = isoNow } = {}) {
     samples: [
       {
         id: 'factory.basic',
-        path: './assets/factory/basic.wav',
+        factoryKey: 'basic',
         license: 'CC0-1.0',
       },
     ],
