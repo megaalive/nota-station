@@ -165,6 +165,47 @@
   color: var(--text-2);
 }
 
+.panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.panel__header .panel__title {
+  margin: 0;
+}
+
+.panel__toggle {
+  flex: 0 0 auto;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  font: inherit;
+  color: var(--text-1);
+  background: transparent;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-1);
+  cursor: pointer;
+}
+
+.panel.is-collapsed {
+  width: 42px !important;
+  flex: 0 0 42px !important;
+  padding-inline: 6px;
+  overflow: hidden;
+}
+
+.panel.is-collapsed .panel__title,
+.panel.is-collapsed .panel__content {
+  display: none;
+}
+
+.panel.is-collapsed .panel__header {
+  justify-content: center;
+}
+
 .panel__list {
   margin: 0;
   padding: 0;
