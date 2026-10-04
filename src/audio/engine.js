@@ -2,13 +2,15 @@
 // look-ahead scheduler di slice ini, jadi satu pattern kecil dijadwalkan dari satu anchor.
 
 import { PPQ } from '../core/project.js';
+import {
+  FACTORY_BASIC_ROOT_PITCH,
+  FACTORY_BASIC_WAV_BASE64,
+} from './factory-sample.js';
 
-const ROOT_PITCH = 60;
+const ROOT_PITCH = FACTORY_BASIC_ROOT_PITCH;
 const PREVIEW_SECONDS = 0.18;
 
-export function createAudioEngine({
-  sampleUrl = new URL('../../assets/factory/basic.wav', import.meta.url),
-} = {}) {
+export function createAudioEngine() {
   let context = null;
   let sampleBytesPromise = null;
   let buffer = null;
@@ -17,10 +19,9 @@ export function createAudioEngine({
 
   function preload() {
     if (!sampleBytesPromise) {
-      sampleBytesPromise = fetch(sampleUrl).then(async (response) => {
-        if (!response.ok) throw new Error(`Factory sample gagal dimuat: HTTP ${response.status}`);
-        return response.arrayBuffer();
-      });
+      // Sample kecil sengaja embedded di R1 supaya first sound tidak bergantung request
+      // tambahan. Factory pack lazy yang sebenarnya baru masuk R2.
+      sampleBytesPromise = Promise.resolve(decodeBase64(FACTORY_BASIC_WAV_BASE64));
     }
     return sampleBytesPromise;
   }
@@ -114,4 +115,12 @@ export function createAudioEngine({
   }
 
   return { preload, preview, playPattern, stop, getState };
+}
+
+
+function decodeBase64(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
 }
