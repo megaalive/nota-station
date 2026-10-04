@@ -285,7 +285,7 @@ export function Tabs({ tabs, activeId, onSelect, label }) {
  * gestur punya padanan keyboard. Panah kiri/kanan mengubah lebar 16 px per langkah,
  * Home/End ke batas.
  */
-export function Splitter({ container, initialSize = 240, min = 160, max = 520, storageKey = null, store = null, side = 'left' }) {
+export function Splitter({ container, initialSize = 240, min = 160, max = 520, storageKey = null, store = null, side = 'left', label }) {
   const saved = readSaved(storageKey, store);
   const size = Math.min(max, Math.max(min, saved ?? initialSize));
 
@@ -294,7 +294,7 @@ export function Splitter({ container, initialSize = 240, min = 160, max = 520, s
     role: 'separator',
     tabindex: '0',
     'aria-orientation': 'vertical',
-    'aria-label': 'Resize panel',
+    'aria-label': label,
     'aria-valuenow': String(Math.round(size)),
     'aria-valuemin': String(min),
     'aria-valuemax': String(max),
