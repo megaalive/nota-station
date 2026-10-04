@@ -84,6 +84,7 @@ export function createShell({ root, t, registry, palette, store, build }) {
     max: 420,
     storageKey: 'notastation.panel.left',
     store,
+    label: t('panel.resize', { panel: t('shell.leftPanel') }),
   });
   const rightSplit = Splitter({
     container: rightPanel,
@@ -92,6 +93,7 @@ export function createShell({ root, t, registry, palette, store, build }) {
     max: 480,
     storageKey: 'notastation.panel.right',
     store,
+    label: t('panel.resize', { panel: t('shell.rightPanel') }),
   });
 
   const workspace = el('main', {
