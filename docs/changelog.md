@@ -5,6 +5,26 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S2 — Editing Pattern + history transaksi (PASS)
+
+- Grid Pattern diperluas menjadi 8 channel × `NOTE | INST | VOL` × 64 row tanpa
+  membuang DOM windowing. Cursor bergerak per-field dan auto-scroll horizontal/vertikal;
+  gutter serta header tetap frozen, sementara scroll terjadi di grid, bukan halaman.
+- Mutasi note tetap melalui command layer. `Delete/Backspace` pada NOTE menjadi transaksi;
+  Undo/Redo memakai snapshot immutable dengan redo branch yang benar, dan no-op tidak
+  membuat history palsu.
+- Command yang membutuhkan konteks editor tetap tampil di Command Palette tetapi tidak
+  dieksekusi tanpa argumen sel/pitch.
+- Safety review menutup kecelakaan penting: saat INST/VOL masih read-only pada S2,
+  Delete/Backspace di field tersebut tidak boleh menghapus seluruh NoteEvent.
+- Gate final setelah koreksi safety: `npm ci` **0 vulnerability**, unit **28/28 PASS**,
+  `npm run check` PASS, build **97.1 KiB PASS**, Playwright Chromium+Firefox
+  **80/80 PASS** (32,6 dtk).
+- Publish `ac536262…` ke Pages berhasil dan live smoke R1-S2 **9/9 PASS**.
+- **Belum menutup R1**: editing nilai INST/VOL, transport tempo/loop/metronome/pause/seek,
+  JSON debug import/export, live-edit scheduler penuh, pitch-effect spike, template,
+  serta UAT/performance exit R1 tetap pekerjaan slice berikutnya.
+
 ### S1 — Vertical slice Pattern → NoteEvent → Web Audio (PASS)
 
 - Model minimum dibuat sesuai PLAN V2: PPQ 480, 8 `Track`, Pattern 64 row
