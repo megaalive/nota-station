@@ -3,6 +3,18 @@
 Format singkat: satu entri per slice/PR yang menutup bagian dari milestone.
 Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
+## Review arsitektur sebelum R1 — anchor event + mode Pattern
+
+- Aturan model dipersempit ke hal yang benar-benar wajib: **tidak ada absolute song tick**.
+  Event di-anchor ke Pattern atau OrderEntry/occurrence sesuai semantik.
+- `OrderEntry.overlays` bertipe dicadangkan untuk variasi occurrence seperti chord/tempo
+  yang tidak seharusnya memaksa clone seluruh pattern. Overlay belum menjadi scope R1.
+- Mode awal Pattern mengikuti workflow: Tracker/OpenMPT-like → EDIT; Songwriter/default
+  → AUDISI. `Ctrl+E` dan badge tetap menjadi perpindahan eksplisit.
+- `AGENTS.md` diselaraskan agar implementasi R1 tidak dipaksa kembali ke asumsi
+  "semua event pattern-lokal".
+
+
 ## R0 — Fondasi statis + UI shell
 
 ### Audit deployment setelah R0 — artifact branch (2026-10-04)
