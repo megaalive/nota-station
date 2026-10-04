@@ -121,6 +121,92 @@ test.describe('Pattern R1 editing', () => {
     await expect(noteCell(page, 0, 1)).toHaveAttribute('aria-selected', 'true');
   });
 
+  test('VOL memakai dua digit hex sebagai satu transaksi history', async ({ page }) => {
+    const grid = page.locator('[data-action="pattern-grid"]');
+    await grid.focus();
+    await page.keyboard.press('Control+e');
+    await page.keyboard.press('z');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+
+    await expect(volumeCell(page)).toHaveAttribute('aria-selected', 'true');
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(1);
+
+    await page.keyboard.press('5');
+    await expect(volumeCell(page)).toHaveText('5_');
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(1);
+
+    await page.keyboard.press('0');
+    await expect(volumeCell(page)).toHaveText('50');
+    expect(await page.evaluate(() => window.tracker.getProject().song.patterns[0].notes[0].velocity)).toBe(0x50);
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(2);
+
+    await page.keyboard.press('Control+z');
+    await expect(volumeCell(page)).toHaveText('64');
+    expect(await page.evaluate(() => window.tracker.getProject().song.patterns[0].notes[0].velocity)).toBe(100);
+
+    await page.keyboard.press('Control+y');
+    await expect(volumeCell(page)).toHaveText('50');
+  });
+
+  test('INST menerima dua digit, no-op untuk 01, dan menolak index yang belum ada', async ({ page }) => {
+    const grid = page.locator('[data-action="pattern-grid"]');
+    await grid.focus();
+    await page.keyboard.press('Control+e');
+    await page.keyboard.press('z');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowRight');
+
+    await expect(instrumentCell(page)).toHaveAttribute('aria-selected', 'true');
+
+    await page.keyboard.press('0');
+    await expect(instrumentCell(page)).toHaveText('0_');
+    await page.keyboard.press('1');
+
+    await expect(volumeCell(page)).toHaveAttribute('aria-selected', 'true');
+    await expect(instrumentCell(page)).toHaveText('01');
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(1);
+
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('0');
+    await page.keyboard.press('2');
+
+    await expect(page.locator('[data-action="pattern-hint"]')).toContainText('tidak tersedia');
+    await expect(instrumentCell(page)).toHaveText('01');
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(1);
+  });
+
+  test('INST/VOL pada row kosong meminta NOTE lebih dulu tanpa membuat history', async ({ page }) => {
+    const grid = page.locator('[data-action="pattern-grid"]');
+    await grid.focus();
+    await page.keyboard.press('Control+e');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('0');
+
+    await expect(page.locator('[data-action="pattern-hint"]')).toContainText('Isi NOTE lebih dulu');
+    await expect(instrumentCell(page)).toHaveText('··');
+    expect(await page.evaluate(() => window.tracker.getState().history.undoDepth)).toBe(0);
+  });
+
+  test('kontrol ringkas oktaf dan step memengaruhi note entry tanpa memindahkan fokus dari grid', async ({ page }) => {
+    const grid = page.locator('[data-action="pattern-grid"]');
+
+    await page.getByRole('button', { name: 'Naikkan oktaf' }).click();
+    await expect(page.locator('[data-action="pattern-octave"]')).toHaveText('Oktaf 5');
+
+    await page.getByRole('button', { name: 'Tambah step' }).click();
+    await expect(page.locator('[data-action="pattern-step"]')).toHaveText('Step 2');
+
+    await expect(grid).toBeFocused();
+    await page.keyboard.press('Control+e');
+    await page.keyboard.press('z');
+
+    const note = await page.evaluate(() => window.tracker.getProject().song.patterns[0].notes[0]);
+    expect(note.pitch).toBe(72);
+    await expect(noteCell(page, 2, 0)).toHaveAttribute('aria-selected', 'true');
+  });
+
   test('mengetik ulang sel mengganti pitch tanpa duplikat', async ({ page }) => {
     const grid = page.locator('[data-action="pattern-grid"]');
     await grid.focus();
