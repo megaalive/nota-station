@@ -5,6 +5,27 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S7 — JSON debug export/import (PASS)
+
+- Tambah format debug `.webtrack.json` untuk fixture/test dan round-trip proyek R1
+  tanpa sample binary. Ini **bukan** format portable final `.webtrack` ZIP milik R4.
+- Export memakai serialisasi deterministik `JSON.stringify(..., 2)` + newline akhir dan
+  nama file aman dari judul project.
+- Import bersifat **fail-closed**: parse + validasi selesai sebelum audio/history/project
+  disentuh. JSON rusak, schema asing, reference putus, duplicate cell/id, nilai note
+  invalid, `absoluteTick`, kedalaman >64, dan ukuran >10 MiB ditolak.
+- Import sukses menghentikan playback, mengganti project, dan mereset history sehingga
+  state hasil import menjadi baseline baru, bukan satu langkah Undo yang ambigu.
+- Command Palette dan hook agent memakai command yang sama: `io.exportDebugJson` dan
+  `io.importDebugJson`; UI mendukung download dan file picker.
+- Regression membuktikan export → reload → import mempertahankan note row + tempo,
+  invalid import tidak mengubah project aktif, dan download memakai ekstensi
+  `.webtrack.json`.
+- Gate final run **37234663403**: `npm ci` 0 vulnerability, unit **43/43 PASS**,
+  `npm run check` PASS, build **136.6 KiB PASS**, Playwright Chromium+Firefox
+  **118/118 PASS** (54,2 dtk).
+- **Belum menutup R1**: template/welcome, final UAT/performa, dan publish closure R1.
+
 ### S8 — Spike pitch AudioParam (PASS)
 
 - Spike §7.4 membuktikan **pitch slide, portamento, dan vibrato** dapat dijadwalkan

@@ -262,7 +262,7 @@ test.describe('Command Palette §8.14', () => {
 
   test('perintah nonaktif tampil dengan alasan, dan Enter tidak menutup palette', async ({ page }) => {
     await page.keyboard.press('Control+k');
-    await page.locator('[data-action="palette-input"]').fill('export');
+    await page.locator('[data-action="palette-input"]').fill('io.exportWav');
     const row = page.locator('[data-action="palette-item"][data-entity="io.exportWav"]');
     await expect(row).toBeVisible();
     await expect(row).toHaveClass(/is-disabled/);
