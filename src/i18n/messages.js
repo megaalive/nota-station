@@ -57,6 +57,7 @@ const messages = {
     'right.placeholder': 'Pilih sesuatu untuk melihat propertinya.',
     'view.placeholder': '{tab} belum tersedia di milestone ini.',
     'pattern.gridLabel': 'Editor Pattern',
+    'pattern.enterNote': 'Tulis nada',
     'pattern.hintAudition': 'Z mengaudisi C · Ctrl+E untuk EDIT',
     'pattern.hintEdit': 'Ketik Z untuk C · nada ditulis lalu kursor maju',
 
@@ -120,6 +121,7 @@ const messages = {
     'right.placeholder': 'Select something to see its properties.',
     'view.placeholder': '{tab} is not available in this milestone yet.',
     'pattern.gridLabel': 'Pattern editor',
+    'pattern.enterNote': 'Enter note',
     'pattern.hintAudition': 'Z auditions C · Ctrl+E for EDIT',
     'pattern.hintEdit': 'Press Z for C · note is written then cursor advances',
 
