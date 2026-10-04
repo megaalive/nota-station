@@ -38,8 +38,8 @@ test('key hilang di locale aktif fallback ke default, lalu ke key itu sendiri', 
 });
 
 test('interpolasi mengisi placeholder; placeholder tanpa nilai dibiarkan utuh', () => {
-  assert.equal(translate('id', 'view.placeholder', { tab: 'Pattern' }), 'Pattern masih kosong di R0. Isi workspace menyusul.');
-  assert.equal(translate('id', 'view.placeholder', { tab: 'Guitar' }), 'Guitar masih kosong di R0. Isi workspace menyusul.');
+  assert.equal(translate('id', 'view.placeholder', { tab: 'Pattern' }), 'Pattern belum tersedia di milestone ini.');
+  assert.equal(translate('id', 'view.placeholder', { tab: 'Guitar' }), 'Guitar belum tersedia di milestone ini.');
   assert.equal(translate('id', 'position.barBeat', {}), 'Bar {bar} · 00:00.0');
 });
 
@@ -53,8 +53,10 @@ test('setiap locale punya key yang sama — kalau tidak, ada teks yang akan hila
     'shell.buildUnknown', 'panel.collapse', 'panel.expand', 'panel.resize', 'topbar.transport',
     'transport.play', 'transport.stop', 'transport.loopPattern',
     'transport.tempoPlaceholder', 'status.edit', 'status.audisi', 'status.octave', 'status.step',
-    'status.audio', 'status.idle', 'status.notSaved', 'position.barBeat', 'left.placeholder',
-    'right.placeholder', 'view.placeholder', 'dock.toggle', 'dock.keyboard', 'dock.problems',
+    'status.audio', 'status.idle', 'status.audioLocked', 'status.audioReady', 'status.audioPlaying',
+    'status.audioError', 'status.notSaved', 'position.barBeat', 'position.row', 'left.placeholder',
+    'right.placeholder', 'view.placeholder', 'pattern.gridLabel', 'pattern.enterNote',
+    'pattern.hintAudition', 'pattern.hintEdit', 'dock.toggle', 'dock.keyboard', 'dock.problems',
     'cmd.palette', 'palette.placeholder', 'palette.close', 'palette.noResults',
   ];
   const missingInEn = probe.filter((key) => translate('en', key) === key);
