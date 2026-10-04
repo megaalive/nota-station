@@ -35,6 +35,24 @@ test.describe('shell layout §8.3', () => {
     await expect(page.locator('[data-action="build-id"]')).toHaveText(sha.slice(0, 7));
   });
 
+  test('toolbar memakai ikon ringkas tanpa kehilangan nama aksesibel', async ({ page }) => {
+    const topbar = page.locator('[data-action="topbar"]');
+    const play = topbar.getByRole('button', { name: 'Putar' });
+    const stop = topbar.getByRole('button', { name: 'Berhenti' });
+    const palette = topbar.getByRole('button', { name: 'Palet perintah' });
+
+    await expect(play).toHaveClass(/btn--icon-only/);
+    await expect(stop).toHaveClass(/btn--icon-only/);
+    await expect(palette).toHaveClass(/btn--icon-only/);
+    await expect(play).toHaveText('▶');
+    await expect(stop).toHaveText('■');
+    await expect(palette).toHaveText('⌕');
+
+    await palette.focus();
+    const describedBy = await palette.getAttribute('aria-describedby');
+    await expect(page.locator(`#${describedBy}`)).toContainText('Ctrl+K');
+  });
+
   test('tab berganti hanya lewat aksi eksplisit (klik atau Alt+digit)', async ({ page }) => {
     await page.locator('[data-action="workspace-tab"][data-entity="sound"]').click();
     await expect(page.locator('[data-action="workspace-view"]')).toHaveAttribute('data-entity', 'sound');
