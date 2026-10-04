@@ -5,6 +5,26 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S3 — Field editing + input ergonomics (PASS)
+
+- `VOL` sekarang editable sebagai dua digit hex `00–7F`. Nibble pertama hanya
+  preview UI (`5_`); transaksi project/history baru dibuat setelah digit kedua sehingga
+  satu perubahan volume = satu Undo.
+- `INST` memakai jalur input dua digit yang sama dan divalidasi terhadap daftar instrument.
+  R1 masih punya satu instrument, jadi `01` adalah no-op yang benar dan index lain ditolak;
+  tidak dibuat preset palsu hanya untuk mendemokan kolom.
+- Model menambah `updateNoteAtCell` immutable dengan kode galat stabil untuk note,
+  instrument, dan velocity invalid. Mutasi UI tetap melalui command `pattern.updateNote`.
+- INST/VOL pada row kosong meminta NOTE lebih dulu; input setengah jadi dibuang saat
+  cursor/mode/history berubah. Delete pada INST/VOL tetap tidak menghapus seluruh NoteEvent.
+- Toolbar Pattern mendapat stepper ringkas `−/+` untuk oktaf dan step dengan accessible
+  name + tooltip; tombol mengembalikan fokus ke grid. Step mendukung 0–16.
+- Gate final: `npm ci` **0 vulnerability**, unit **30/30 PASS**, `npm run check` PASS,
+  build **105.3 KiB PASS**, Playwright Chromium+Firefox **88/88 PASS** (35,8 dtk).
+- **Belum menutup R1**: transport tempo/loop/metronome/pause/seek, JSON debug
+  import/export, live-edit scheduler penuh, pitch-effect spike, template, serta
+  UAT/performance exit R1 tetap slice berikutnya.
+
 ### S2 — Editing Pattern + history transaksi (PASS)
 
 - Grid Pattern diperluas menjadi 8 channel × `NOTE | INST | VOL` × 64 row tanpa
