@@ -154,6 +154,62 @@ export function enterNote(
   };
 }
 
+export function updateNoteAtCell(
+  project,
+  { patternId, trackId, row, instrumentId, velocity },
+  { now = isoNow } = {},
+) {
+  const patternIndex = project.song.patterns.findIndex((item) => item.id === patternId);
+  if (patternIndex < 0) throw projectError('E_PROJECT_PATTERN_MISSING', `Pattern tidak ditemukan: ${patternId}`);
+
+  const pattern = project.song.patterns[patternIndex];
+  if (!project.song.tracks.some((track) => track.id === trackId)) {
+    throw projectError('E_PROJECT_TRACK_MISSING', `Track tidak ditemukan: ${trackId}`);
+  }
+  if (!Number.isInteger(row) || row < 0 || row >= pattern.lengthTicks / pattern.rowTicks) {
+    throw projectError('E_PROJECT_ROW_RANGE', `Row di luar pattern: ${row}`);
+  }
+
+  const startTickLocal = row * pattern.rowTicks;
+  const noteIndex = pattern.notes.findIndex(
+    (note) => note.trackId === trackId && note.startTickLocal === startTickLocal,
+  );
+  if (noteIndex < 0) {
+    throw projectError('E_PROJECT_NOTE_MISSING', `Note tidak ditemukan pada row ${row}.`);
+  }
+
+  const note = pattern.notes[noteIndex];
+  const nextInstrumentId = instrumentId === undefined ? note.instrumentId : instrumentId;
+  const nextVelocity = velocity === undefined ? note.velocity : velocity;
+
+  if (!project.instruments.some((item) => item.id === nextInstrumentId)) {
+    throw projectError('E_PROJECT_INSTRUMENT_MISSING', `Instrument tidak ditemukan: ${nextInstrumentId}`);
+  }
+  if (!Number.isInteger(nextVelocity) || nextVelocity < 0 || nextVelocity > 127) {
+    throw projectError('E_PROJECT_VELOCITY_RANGE', `Velocity di luar MIDI 0..127: ${nextVelocity}`);
+  }
+  if (nextInstrumentId === note.instrumentId && nextVelocity === note.velocity) return project;
+
+  const notes = [...pattern.notes];
+  notes[noteIndex] = {
+    ...note,
+    instrumentId: nextInstrumentId,
+    velocity: nextVelocity,
+  };
+
+  const patterns = [...project.song.patterns];
+  patterns[patternIndex] = { ...pattern, notes };
+
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      patterns,
+    },
+  };
+}
+
 export function deleteNote(
   project,
   { patternId, trackId, row },

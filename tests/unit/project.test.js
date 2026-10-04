@@ -10,6 +10,7 @@ import {
   deleteNote,
   enterNote,
   noteAtCell,
+  updateNoteAtCell,
 } from '../../src/core/project.js';
 
 function fixture() {
@@ -116,6 +117,60 @@ test('deleteNote pada sel kosong adalah no-op supaya tidak membuat history palsu
     row: 9,
   });
   assert.equal(next, project);
+});
+
+test('updateNoteAtCell mengubah velocity secara immutable dan no-op bila nilai sama', () => {
+  let project = fixture();
+  const pattern = activePattern(project);
+  const trackId = project.song.tracks[0].id;
+  project = enterNote(project, { patternId: pattern.id, trackId, row: 2, pitch: 60 });
+  const before = project;
+
+  const next = updateNoteAtCell(
+    project,
+    { patternId: pattern.id, trackId, row: 2, velocity: 80 },
+    { now: () => '2026-10-04T00:03:00.000Z' },
+  );
+
+  assert.equal(noteAtCell(before, { patternId: pattern.id, trackId, row: 2 }).velocity, 100);
+  assert.equal(noteAtCell(next, { patternId: pattern.id, trackId, row: 2 }).velocity, 80);
+  assert.notEqual(next, before);
+
+  const same = updateNoteAtCell(next, { patternId: pattern.id, trackId, row: 2, velocity: 80 });
+  assert.equal(same, next);
+});
+
+test('updateNoteAtCell menerima instrument valid dan menolak note/instrument/velocity invalid', () => {
+  let project = fixture();
+  const pattern = activePattern(project);
+  const trackId = project.song.tracks[0].id;
+  project = enterNote(project, { patternId: pattern.id, trackId, row: 4, pitch: 60 });
+
+  const sameInstrument = updateNoteAtCell(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 4,
+    instrumentId: 'factory.basic',
+  });
+  assert.equal(sameInstrument, project);
+
+  assert.throws(
+    () => updateNoteAtCell(project, { patternId: pattern.id, trackId, row: 5, velocity: 80 }),
+    (error) => error.code === 'E_PROJECT_NOTE_MISSING',
+  );
+  assert.throws(
+    () => updateNoteAtCell(project, {
+      patternId: pattern.id,
+      trackId,
+      row: 4,
+      instrumentId: 'instrument-hilang',
+    }),
+    (error) => error.code === 'E_PROJECT_INSTRUMENT_MISSING',
+  );
+  assert.throws(
+    () => updateNoteAtCell(project, { patternId: pattern.id, trackId, row: 4, velocity: 128 }),
+    (error) => error.code === 'E_PROJECT_VELOCITY_RANGE',
+  );
 });
 
 test('row, pitch, velocity, dan instrument invalid gagal dengan kode stabil', () => {

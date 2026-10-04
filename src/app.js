@@ -4,7 +4,13 @@
 import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
 import { commandError, createCommandRegistry } from './core/commands.js';
 import { createHistory } from './core/history.js';
-import { activePattern, createBlankProject, deleteNote, enterNote } from './core/project.js';
+import {
+  activePattern,
+  createBlankProject,
+  deleteNote,
+  enterNote,
+  updateNoteAtCell,
+} from './core/project.js';
 import { createAudioEngine } from './audio/engine.js';
 import { createPalette } from './ui/palette.js';
 import { createPatternView } from './ui/pattern.js';
@@ -136,6 +142,21 @@ function registerCommands() {
         requireCommandArgs('pattern.deleteNote', args);
         const before = project;
         commitProject(deleteNote(project, args), 'pattern.deleteNote');
+        return {
+          changed: project !== before,
+          noteCount: activePattern(project).notes.length,
+        };
+      },
+    },
+    {
+      id: 'pattern.updateNote',
+      group: 'Pattern',
+      labelKey: 'pattern.updateNote',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.updateNote', args);
+        const before = project;
+        commitProject(updateNoteAtCell(project, args), 'pattern.updateNote');
         return {
           changed: project !== before,
           noteCount: activePattern(project).notes.length,

@@ -614,6 +614,28 @@
   color: var(--text-2);
 }
 
+.pattern-toolbar__stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 30px;
+  padding-inline: 2px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-1);
+  background: var(--surface-1);
+}
+
+.pattern-toolbar__stepper .pattern-toolbar__meta {
+  min-width: 58px;
+  text-align: center;
+}
+
+.pattern-toolbar__stepper .btn--icon-only {
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+}
+
 .pattern-toolbar__hint {
   margin-inline-start: auto;
   color: var(--text-2);
