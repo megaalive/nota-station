@@ -7,6 +7,7 @@
  * @property {string} group
  * @property {string} labelKey   // key i18n, bukan teks langsung
  * @property {string} [shortcut] // hanya untuk display; pemetaan key asli ada di §8.14
+ * @property {boolean} [requiresArgs] // tetap discoverable, tetapi palette tidak mengeksekusi tanpa konteks
  * @property {() => boolean} [isEnabled]
  * @property {() => string} [disabledReason]
  * @property {(args?: any) => any} run
@@ -26,6 +27,9 @@ export function createCommandRegistry(initialCommands = []) {
     }
     if (typeof def.run !== 'function') {
       throw commandError('E_CMD_INVALID', `Command "${def.id}" tidak punya run()`);
+    }
+    if (def.requiresArgs !== undefined && typeof def.requiresArgs !== 'boolean') {
+      throw commandError('E_CMD_INVALID', `Command "${def.id}" punya requiresArgs yang tidak valid`);
     }
     // labelKey wajib karena listCommands jadi sumber tunggal buat palette, menu,
     // sama overlay shortcut — command tanpa label nggak bisa ditemukan user.
@@ -55,6 +59,7 @@ export function createCommandRegistry(initialCommands = []) {
         group: def.group,
         labelKey: def.labelKey,
         shortcut: def.shortcut ?? null,
+        requiresArgs: def.requiresArgs ?? false,
         enabled,
         disabledReason: enabled ? null : (def.disabledReason?.() ?? null),
       };
