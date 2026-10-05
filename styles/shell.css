@@ -697,7 +697,7 @@
   position: sticky;
   top: 0;
   z-index: 4;
-  height: 52px;
+  height: 72px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border-1);
 }
@@ -707,7 +707,7 @@
 }
 
 .pattern-grid__header-row--channel {
-  height: 28px;
+  height: 48px;
   border-bottom: 1px solid var(--border-1);
 }
 
@@ -741,11 +741,70 @@
 }
 
 .pattern-grid__channel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 3px;
   overflow: hidden;
+  padding: 2px 4px;
   font-weight: 700;
-  text-overflow: ellipsis;
   white-space: nowrap;
   border-right-width: 2px;
+}
+
+.pattern-channel__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.05;
+}
+
+.pattern-channel__controls {
+  display: grid;
+  grid-template-columns: 20px 20px 1fr;
+  align-items: center;
+  gap: 3px;
+}
+
+.pattern-channel__toggle {
+  width: 20px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--border-1);
+  border-radius: 3px;
+  background: var(--surface-1);
+  color: var(--text-2);
+  font: 700 0.67rem/1 var(--font-ui);
+  cursor: pointer;
+}
+
+.pattern-channel__toggle[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px currentColor;
+  color: var(--text-1);
+}
+
+.pattern-grid__channel.is-inaudible:not(.is-solo) .pattern-channel__name {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+.pattern-channel__meter {
+  position: relative;
+  display: block;
+  height: 7px;
+  overflow: hidden;
+  border: 1px solid var(--border-1);
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+
+.pattern-channel__meter-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--text-1);
+  transition: width 45ms linear;
 }
 
 .pattern-grid__field-header {
@@ -773,6 +832,15 @@
   width: 100%;
   height: 28px;
   border-bottom: 1px solid var(--surface-3);
+}
+
+.pattern-grid__row.is-playhead {
+  box-shadow: inset 0 1px 0 var(--audition-1), inset 0 -1px 0 var(--audition-1);
+}
+
+.pattern-grid__row.is-playhead .pattern-grid__row-number {
+  font-weight: 800;
+  box-shadow: inset -3px 0 0 var(--audition-1);
 }
 
 .pattern-grid__row-number {

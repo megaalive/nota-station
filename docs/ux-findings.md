@@ -51,4 +51,13 @@ Persona minimum:
 - **Koreksi:** turunkan mix perkusi, naikkan bass/lead/harmony, dan panjangkan envelope tonal.
 - **Status:** koreksi otomatis PASS; **menunggu re-test pendengaran user pada build live baru**.
 
+### UAT ad-hoc — tidak ada meter/Mute/Solo dan Pattern tidak mengikuti playback
+
+- **Observasi:** user tidak dapat memastikan channel 6–8 bersuara karena tidak ada meter,
+  Mute, atau Solo; Pattern juga diam di posisi awal saat playback.
+- **Root cause:** engine belum memiliki bus per-track/observability dan Pattern view belum
+  mengonsumsi posisi transport untuk playhead/follow.
+- **Koreksi:** bus per-channel + RMS meter + Mute/Solo + playhead + auto-follow scroll.
+- **Status:** koreksi otomatis PASS; **menunggu re-test user pada build live baru**.
+
 Sesi uji tugas bermoderasi P1–P5 belum dijalankan.

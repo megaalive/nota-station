@@ -6,7 +6,7 @@ import { el } from './dom.js';
 import { Button, Tooltip } from './kit.js';
 
 const ROW_HEIGHT = 28;
-const HEADER_HEIGHT = 52;
+const HEADER_HEIGHT = 72;
 const ROW_NUMBER_WIDTH = 46;
 const NOTE_WIDTH = 64;
 const INST_WIDTH = 42;
@@ -47,6 +47,10 @@ export function createPatternView({
   let step = 1;
   let pendingHex = null;
   let feedback = null;
+  let playbackRow = null;
+  let playbackState = 'ready';
+  let latestTrackMeters = [];
+  const trackUi = new Map();
 
   const modeButton = Button({
     label: t(mode === 'edit' ? 'status.edit' : 'status.audisi'),
@@ -122,6 +126,7 @@ export function createPatternView({
     const { tracks } = projectInfo();
     header.textContent = '';
 
+    trackUi.clear();
     const channelRow = el('div', { class: 'pattern-grid__header-row pattern-grid__header-row--channel', role: 'row' });
     channelRow.style.gridTemplateColumns = `${ROW_NUMBER_WIDTH}px repeat(${tracks.length}, ${CHANNEL_WIDTH}px)`;
     channelRow.append(el('div', {
@@ -131,13 +136,57 @@ export function createPatternView({
     }));
 
     tracks.forEach((track, index) => {
-      channelRow.append(el('div', {
+      const label = el('span', {
+        class: 'pattern-channel__name',
+        text: `${index + 1} · ${track.name}`,
+      });
+      const mute = el('button', {
+        type: 'button',
+        class: 'pattern-channel__toggle',
+        'aria-label': t('pattern.muteTrack', { track: index + 1 }),
+        'aria-pressed': 'false',
+        dataset: { action: 'track-mute', trackId: track.id },
+        text: 'M',
+        on: {
+          click: (event) => {
+            event.stopPropagation();
+            registry.execute('audio.toggleTrackMute', { trackId: track.id });
+          },
+        },
+      });
+      const solo = el('button', {
+        type: 'button',
+        class: 'pattern-channel__toggle',
+        'aria-label': t('pattern.soloTrack', { track: index + 1 }),
+        'aria-pressed': 'false',
+        dataset: { action: 'track-solo', trackId: track.id },
+        text: 'S',
+        on: {
+          click: (event) => {
+            event.stopPropagation();
+            registry.execute('audio.toggleTrackSolo', { trackId: track.id });
+          },
+        },
+      });
+      const meterFill = el('span', { class: 'pattern-channel__meter-fill' });
+      const meter = el('span', {
+        class: 'pattern-channel__meter',
+        role: 'meter',
+        'aria-label': t('pattern.trackMeter', { track: index + 1 }),
+        'aria-valuemin': '0',
+        'aria-valuemax': '100',
+        'aria-valuenow': '0',
+        dataset: { action: 'track-meter', trackId: track.id, level: '0' },
+      }, [meterFill]);
+      const controls = el('span', { class: 'pattern-channel__controls' }, [mute, solo, meter]);
+      const channel = el('div', {
         class: 'pattern-grid__channel',
         role: 'columnheader',
         'aria-colindex': String(index * FIELDS.length + 1),
         'aria-colspan': String(FIELDS.length),
-        text: `${index + 1} · ${track.name}`,
-      }));
+      }, [label, controls]);
+      channelRow.append(channel);
+      trackUi.set(track.id, { channel, mute, solo, meter, meterFill });
     });
 
     const fieldRow = el('div', { class: 'pattern-grid__header-row pattern-grid__header-row--field', role: 'row' });
@@ -162,6 +211,28 @@ export function createPatternView({
     });
 
     header.append(channelRow, fieldRow);
+    applyTrackMeters();
+  }
+
+  function applyTrackMeters() {
+    const states = new Map(latestTrackMeters.map((item) => [item.trackId, item]));
+    for (const [trackId, ui] of trackUi) {
+      const state = states.get(trackId) ?? {
+        level: 0,
+        mute: false,
+        solo: false,
+        audible: true,
+      };
+      const level = Math.max(0, Math.min(1, Number(state.level) || 0));
+      ui.meterFill.style.width = `${Math.round(level * 100)}%`;
+      ui.meter.dataset.level = level.toFixed(3);
+      ui.meter.setAttribute('aria-valuenow', String(Math.round(level * 100)));
+      ui.mute.setAttribute('aria-pressed', state.mute ? 'true' : 'false');
+      ui.solo.setAttribute('aria-pressed', state.solo ? 'true' : 'false');
+      ui.channel.classList.toggle('is-muted', Boolean(state.mute));
+      ui.channel.classList.toggle('is-solo', Boolean(state.solo));
+      ui.channel.classList.toggle('is-inaudible', !state.audible);
+    }
   }
 
   function renderWindow() {
@@ -179,10 +250,13 @@ export function createPatternView({
 
     rowsLayer.textContent = '';
     for (let row = first; row < last; row += 1) {
+      const isPlayhead = row === playbackRow;
       const rowNode = el('div', {
-        class: 'pattern-grid__row',
+        class: `pattern-grid__row${isPlayhead ? ' is-playhead' : ''}`,
         role: 'row',
         'aria-rowindex': String(row + 1),
+        'aria-current': isPlayhead ? 'true' : null,
+        dataset: { row: String(row) },
       });
       rowNode.style.top = `${HEADER_HEIGHT + row * ROW_HEIGHT}px`;
       rowNode.style.gridTemplateColumns = rowTemplate(tracks);
@@ -229,6 +303,36 @@ export function createPatternView({
       });
       rowsLayer.append(rowNode);
     }
+  }
+
+  function ensurePlaybackVisible(row) {
+    if (playbackState !== 'playing') return;
+    const viewport = Math.max(ROW_HEIGHT, scroller.clientHeight - HEADER_HEIGHT);
+    const rowTop = HEADER_HEIGHT + row * ROW_HEIGHT;
+    const visibleTop = scroller.scrollTop + HEADER_HEIGHT;
+    const visibleBottom = scroller.scrollTop + scroller.clientHeight;
+    const margin = ROW_HEIGHT * 3;
+
+    if (rowTop < visibleTop + margin || rowTop + ROW_HEIGHT > visibleBottom - margin) {
+      const target = rowTop - HEADER_HEIGHT - Math.floor(viewport * 0.42);
+      scroller.scrollTop = Math.max(0, target);
+    }
+  }
+
+  function setPlaybackState(audioState) {
+    latestTrackMeters = Array.isArray(audioState?.trackMeters) ? audioState.trackMeters : [];
+    applyTrackMeters();
+
+    const { pattern, rowCount } = projectInfo();
+    const tick = Number(audioState?.positionTick) || 0;
+    const nextRow = Math.max(0, Math.min(rowCount - 1, Math.floor(tick / pattern.rowTicks)));
+    const nextState = audioState?.state ?? 'ready';
+    const changed = nextRow !== playbackRow || nextState !== playbackState;
+
+    playbackRow = nextRow;
+    playbackState = nextState;
+    if (nextState === 'playing') ensurePlaybackVisible(nextRow);
+    if (changed) renderWindow();
   }
 
   function ensureCursorVisible() {
@@ -541,6 +645,7 @@ export function createPatternView({
   return {
     focus: () => scroller.focus(),
     refresh,
+    setPlaybackState,
     getUiState: () => ({
       mode,
       octave,

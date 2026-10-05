@@ -27,6 +27,7 @@ export function scheduleDemoVoice(context, {
   velocity = 100,
   when,
   durationSeconds,
+  output = context.destination,
 }) {
   if (!isDemoInstrument(instrumentId)) {
     throw new RangeError(`Instrument demo tidak dikenal: ${instrumentId}`);
@@ -44,6 +45,7 @@ export function scheduleDemoVoice(context, {
         gain: 0.34 * level,
         pan: 0,
         frequency: { from: 118, to: 43 },
+        output,
       });
 
     case 'demo.snare':
@@ -55,6 +57,7 @@ export function scheduleDemoVoice(context, {
         filterType: 'bandpass',
         filterFrequency: 1850,
         q: 0.7,
+        output,
       });
 
     case 'demo.hat':
@@ -66,6 +69,7 @@ export function scheduleDemoVoice(context, {
         filterType: 'highpass',
         filterFrequency: 6800,
         q: 0.5,
+        output,
       });
 
     case 'demo.bass':
@@ -77,6 +81,7 @@ export function scheduleDemoVoice(context, {
         pan: -0.12,
         frequency: { from: hz, to: hz },
         lowpass: 980,
+        output,
       });
 
     case 'demo.arp':
@@ -88,6 +93,7 @@ export function scheduleDemoVoice(context, {
         pan: -0.46,
         frequency: { from: hz, to: hz },
         lowpass: 3000,
+        output,
       });
 
     case 'demo.lead':
@@ -99,6 +105,7 @@ export function scheduleDemoVoice(context, {
         pan: 0.30,
         frequency: { from: hz, to: hz },
         lowpass: 3300,
+        output,
       });
 
     case 'demo.harmony':
@@ -109,6 +116,7 @@ export function scheduleDemoVoice(context, {
         gain: 0.18 * level,
         pan: 0.58,
         frequency: { from: hz, to: hz },
+        output,
       });
 
     case 'demo.fill':
@@ -119,6 +127,7 @@ export function scheduleDemoVoice(context, {
         gain: 0.12 * level,
         pan: -0.20,
         frequency: { from: hz * 1.12, to: hz * 0.58 },
+        output,
       });
 
     default:
@@ -134,6 +143,7 @@ function oscillatorVoice(context, {
   pan,
   frequency,
   lowpass = null,
+  output,
 }) {
   const source = context.createOscillator();
   source.type = type;
@@ -157,7 +167,7 @@ function oscillatorVoice(context, {
   }
 
   input.connect(amp);
-  connectOutput(context, amp, pan);
+  connectOutput(context, amp, pan, output);
   source.start(when);
   source.stop(when + duration + 0.01);
   return source;
@@ -171,6 +181,7 @@ function noiseVoice(context, {
   filterType,
   filterFrequency,
   q,
+  output,
 }) {
   const source = context.createBufferSource();
   source.buffer = getNoiseBuffer(context);
@@ -186,21 +197,21 @@ function noiseVoice(context, {
 
   source.connect(filter);
   filter.connect(amp);
-  connectOutput(context, amp, pan);
+  connectOutput(context, amp, pan, output);
   source.start(when);
   source.stop(when + duration + 0.01);
   return source;
 }
 
-function connectOutput(context, node, pan) {
+function connectOutput(context, node, pan, output) {
   if (typeof context.createStereoPanner === 'function') {
     const panner = context.createStereoPanner();
     panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), context.currentTime);
     node.connect(panner);
-    panner.connect(context.destination);
+    panner.connect(output);
     return;
   }
-  node.connect(context.destination);
+  node.connect(output);
 }
 
 function getNoiseBuffer(context) {
