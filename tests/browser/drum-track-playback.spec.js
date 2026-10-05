@@ -113,8 +113,9 @@ test.describe('Drum Track voice lanes + choke R2-S9', () => {
     expect(state.notesScheduled).toBeGreaterThanOrEqual(4);
     expect(state.scheduledInstrumentIds).toContain('instrument.drum-kit-browser');
 
+    const trackId = await page.evaluate(() => window.__drumS9TrackId);
     const active = state.activeVoiceLanes
-      .filter((voice) => voice.trackId === await page.evaluate(() => window.__drumS9TrackId));
+      .filter((voice) => voice.trackId === trackId);
     expect(active.some((voice) => voice.voiceLane === 0 && voice.pitch === 36)).toBe(true);
     expect(active.some((voice) => voice.voiceLane === 1 && voice.pitch === 38)).toBe(true);
     expect(active.some((voice) => voice.voiceLane === 2 && voice.pitch === 42)).toBe(true);
