@@ -5,6 +5,16 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R2 — Sample + Instrument (ACTIVE)
 
+### R2-S3 — persistensi sample + dedup IndexedDB (CLOSED · PASS)
+
+- Ditambahkan sample store IndexedDB hash-addressed; key berasal dari SHA-256 sehingga dedup ditegakkan oleh storage, bukan hanya state Project.
+- `putIfAbsent` berjalan atomik pada readwrite transaction; concurrent import bytes identik menghasilkan tepat satu record.
+- Bytes sample dapat diambil kembali identik setelah page reload; tersedia lookup, delete, stats, clear, dan penutupan database.
+- Adapter S2 → S3 memverifikasi bytes masih cocok dengan SHA-256 hasil prepare sebelum persistence; perubahan bytes setelah prepare ditolak `E_WAV_HASH_MISMATCH`.
+- Error IndexedDB dipetakan ke code spesifik termasuk quota/version/blocked/unavailable.
+- Gate run **37282736463**: 0 vulnerability, unit **68/68 PASS**, check PASS, build **203.8 KiB PASS**, browser storage/import Chromium+Firefox **6/6 PASS**.
+- Berikutnya: **R2-S4 import transaction Project + sample decode/cache boundary**.
+
 ### R2-S2 — parser dan fondasi import WAV (CLOSED · PASS)
 
 - Ditambahkan parser RIFF/WAVE bounded/fail-closed dengan batas resmi §10.5: satu WAV ≤100 MiB, mono/stereo, sample rate ≤192 kHz.

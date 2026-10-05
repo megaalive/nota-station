@@ -179,6 +179,41 @@ export async function prepareWavImport(
   });
 }
 
+export async function persistPreparedWavImport(prepared, bytes, sampleStore) {
+  if (!prepared?.sample || typeof prepared.contentHash !== 'string') {
+    throw wavError('E_WAV_PREPARED', 'Candidate import WAV tidak valid.');
+  }
+  if (!sampleStore || typeof sampleStore.putIfAbsent !== 'function') {
+    throw wavError('E_WAV_SAMPLE_STORE', 'Sample store tidak valid.');
+  }
+
+  const sample = prepared.sample;
+  if (sample.storageRef?.kind !== 'indexeddb') {
+    throw wavError('E_WAV_STORAGE_REF', 'Sample import harus memakai storageRef IndexedDB.');
+  }
+  const expectedKey = prepared.contentHash.replace(/^sha256:/u, '');
+  if (sample.storageRef.key !== expectedKey) {
+    throw wavError('E_WAV_STORAGE_REF', 'storageRef.key tidak cocok dengan contentHash.');
+  }
+
+  const actualHash = `sha256:${await sha256Hex(bytes)}`;
+  if (actualHash !== prepared.contentHash) {
+    throw wavError('E_WAV_HASH_MISMATCH', 'Bytes WAV berubah setelah tahap prepare.');
+  }
+
+  const storage = await sampleStore.putIfAbsent({
+    key: sample.storageRef.key,
+    contentHash: prepared.contentHash,
+    bytes,
+    sourceFilename: sample.sourceFilename,
+  });
+
+  return Object.freeze({
+    ...prepared,
+    storage,
+  });
+}
+
 export async function sha256Hex(input) {
   const bytes = toBytes(input);
   const subtle = globalThis.crypto?.subtle;
