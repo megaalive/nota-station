@@ -22,7 +22,7 @@ test.describe('welcome + template R1-S9', () => {
       storedKeymap: localStorage.getItem('notastation.keymapPreset'),
     }));
     expect(state.project.title).toBe('Pop 4/4');
-    expect(state.app.project.noteCount).toBe(18);
+    expect(state.app.project.noteCount).toBe(26);
     expect(state.project.settings.keymapPreset).toBe('openmpt');
     expect(state.completed).toBe('1');
     expect(state.storedKeymap).toBe('openmpt');
@@ -52,7 +52,7 @@ test.describe('welcome + template R1-S9', () => {
       }));
 
     expect(result.templateId).toBe('pop-4-4');
-    expect(result.noteCount).toBe(18);
+    expect(result.noteCount).toBe(26);
     expect(await page.evaluate(() => window.tracker.getProject().title)).toBe('Pop 4/4');
     await expect(page.locator('[data-action="pattern-mode"]')).toHaveText('AUDISI');
   });
