@@ -87,7 +87,7 @@ export function createDemoProject(demoId, options = {}) {
   ];
   bassBars.forEach((pitches, bar) => {
     pitches.forEach((pitch, beat) => {
-      notes.push([bass.id, bar * 16 + beat * 4, pitch, beat === 0 ? 116 : 104]);
+      notes.push([bass.id, bar * 16 + beat * 4, pitch, beat === 0 ? 116 : 104, 4]);
     });
   });
 
@@ -103,28 +103,22 @@ export function createDemoProject(demoId, options = {}) {
     });
   });
 
-  // Counter-pulse harmony mengisi sela arpeggio tanpa membentuk chord simultan pada satu track.
-  const harmonyBars = [
-    [64, 67, 64, 67],
-    [60, 64, 60, 64],
-    [67, 72, 67, 72],
-    [62, 67, 62, 67],
-  ];
-  harmonyBars.forEach((pitches, bar) => {
-    pitches.forEach((pitch, beat) => {
-      notes.push([harmony.id, bar * 16 + beat * 4 + 2, pitch, 76]);
-    });
+  // Harmony menjadi nada tahan satu bar penuh. Ini sengaja memberi fixture
+  // sustain panjang (~2,07 dtk pada 116 BPM) untuk UAT scheduler/voice.
+  const harmonyBars = [64, 60, 67, 62];
+  harmonyBars.forEach((pitch, bar) => {
+    notes.push([harmony.id, bar * 16, pitch, 72, 16]);
   });
 
-  // Melodi utama dibuat lapang supaya motifnya tetap terbaca di atas pola ritmis.
+  // Lead berganti setiap setengah bar dengan sustain 8 row (~1,03 dtk).
   const melody = [
-    [0, 69, 118], [4, 72, 112], [8, 76, 122], [12, 72, 104],
-    [16, 69, 114], [20, 72, 108], [24, 74, 116], [28, 72, 102],
-    [32, 67, 110], [36, 72, 114], [40, 76, 120], [44, 74, 106],
-    [48, 71, 112], [52, 74, 118], [56, 72, 108], [60, 69, 124],
+    [0, 69, 116, 8], [8, 76, 120, 8],
+    [16, 69, 112, 8], [24, 74, 118, 8],
+    [32, 67, 110, 8], [40, 76, 120, 8],
+    [48, 71, 114, 8], [56, 69, 122, 8],
   ];
-  for (const [row, pitch, velocity] of melody) {
-    notes.push([lead.id, row, pitch, velocity]);
+  for (const [row, pitch, velocity, durationRows] of melody) {
+    notes.push([lead.id, row, pitch, velocity, durationRows]);
   }
 
   // Fill menjelang pergantian bar; bar terakhir lebih padat sebagai penanda loop kembali ke awal.
@@ -135,13 +129,14 @@ export function createDemoProject(demoId, options = {}) {
     notes.push([fill.id, row, pitch, velocity]);
   }
 
-  for (const [trackId, row, pitch, velocity] of notes) {
+  for (const [trackId, row, pitch, velocity, durationRows = 1] of notes) {
     project = enterNote(project, {
       patternId: pattern.id,
       trackId,
       row,
       pitch,
       velocity,
+      durationTicks: durationRows * pattern.rowTicks,
     }, options);
   }
 

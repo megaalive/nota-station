@@ -117,7 +117,7 @@ export function noteAtCell(project, { patternId, trackId, row }) {
 
 export function enterNote(
   project,
-  { patternId, trackId, row, pitch, velocity = 100, instrumentId = null },
+  { patternId, trackId, row, pitch, velocity = 100, instrumentId = null, durationTicks = null },
   { idFactory = makeId, now = isoNow } = {},
 ) {
   const patternIndex = project.song.patterns.findIndex((item) => item.id === patternId);
@@ -144,6 +144,18 @@ export function enterNote(
   }
 
   const startTickLocal = row * pattern.rowTicks;
+  const resolvedDurationTicks = durationTicks ?? pattern.rowTicks;
+  if (
+    !Number.isInteger(resolvedDurationTicks)
+    || resolvedDurationTicks <= 0
+    || startTickLocal + resolvedDurationTicks > pattern.lengthTicks
+  ) {
+    throw projectError(
+      'E_PROJECT_DURATION_RANGE',
+      `Duration note di luar Pattern: ${resolvedDurationTicks}`,
+    );
+  }
+
   const existing = pattern.notes.find(
     (note) => note.trackId === trackId && note.startTickLocal === startTickLocal,
   );
@@ -151,7 +163,7 @@ export function enterNote(
     id: existing?.id ?? idFactory('note'),
     trackId,
     startTickLocal,
-    durationTicks: pattern.rowTicks,
+    durationTicks: resolvedDurationTicks,
     pitch,
     instrumentId: resolvedInstrumentId,
     velocity,
