@@ -8,6 +8,7 @@ import {
   patternUsageCount,
 } from '../../src/core/arrangement.js';
 import { createBlankProject, enterNote } from '../../src/core/project.js';
+import { parseDebugProject, serializeDebugProject } from '../../src/io/debug-json.js';
 
 function ids() {
   let seq = 0;
@@ -155,6 +156,23 @@ test('makeOrderEntryUnique clone Pattern dan remap ID event lokal hanya untuk oc
     source,
     'Pattern sumber tidak dimutasi',
   );
+});
+
+test('hasil reuse + Jadikan unik tetap round-trip lewat debug JSON', () => {
+  const { project, idFactory, patternId } = fixture();
+  let arranged = insertOrderEntry(project, { patternId, index: 1 }, {
+    idFactory,
+    now: () => '2026-10-05T14:02:00.000Z',
+  });
+  arranged = makeOrderEntryUnique(arranged, {
+    orderEntryId: arranged.song.order[1].id,
+  }, {
+    idFactory,
+    now: () => '2026-10-05T14:03:00.000Z',
+  });
+
+  const restored = parseDebugProject(serializeDebugProject(arranged));
+  assert.deepEqual(restored, arranged);
 });
 
 test('makeOrderEntryUnique no-op bila Pattern memang hanya dipakai satu occurrence', () => {
