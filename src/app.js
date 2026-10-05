@@ -15,6 +15,7 @@ import {
   updateNoteAtCell,
 } from './core/project.js';
 import { createAudioEngine } from './audio/engine.js';
+import { openSampleStore } from './storage/sample-store.js';
 import {
   debugJsonFilename,
   parseDebugProject,
@@ -32,6 +33,7 @@ const THEMES = ['light', 'dark', 'high-contrast'];
 const KEYMAPS = ['songwriter', 'openmpt'];
 const WELCOME_COMPLETED_KEY = 'notastation.welcome.completed';
 const KEYMAP_STORAGE_KEY = 'notastation.keymapPreset';
+let sampleStorePromise = null;
 
 let theme = readInitialTheme();
 let buildInfo = null;
@@ -49,6 +51,15 @@ const transportState = {
 const audio = createAudioEngine({
   onStateChange: () => syncTransportUi(),
   onPositionChange: () => syncTransportUi(),
+  getSampleStore: () => {
+    if (!sampleStorePromise) {
+      sampleStorePromise = openSampleStore().catch((error) => {
+        sampleStorePromise = null;
+        throw error;
+      });
+    }
+    return sampleStorePromise;
+  },
 });
 audio.setTracks(project.song.tracks);
 

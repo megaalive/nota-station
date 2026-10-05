@@ -105,3 +105,19 @@ test('loader menolak sample IndexedDB yang hilang', async () => {
     (error) => error.code === 'E_SAMPLE_CACHE_MISSING',
   );
 });
+
+
+test('prime/peek memasukkan decoded buffer tanpa menaikkan counter decode', async () => {
+  const sample = { id: 'primed', contentHash: HASH };
+  const decoded = { marker: 'primed' };
+  const cache = createSampleBufferCache({
+    loadBytes: async () => { throw new Error('tidak boleh load'); },
+    decodeBytes: async () => { throw new Error('tidak boleh decode'); },
+  });
+
+  assert.equal(cache.prime(sample, decoded), decoded);
+  assert.equal(cache.peek(sample), decoded);
+  assert.equal(await cache.get(sample), decoded);
+  assert.equal(cache.getState().loadCount, 0);
+  assert.equal(cache.getState().decodeCount, 0);
+});
