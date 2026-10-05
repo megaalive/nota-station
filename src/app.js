@@ -810,6 +810,10 @@ function activeImportTrackId() {
     ?? null;
 }
 
+function transferHasFiles(dataTransfer) {
+  return Array.from(dataTransfer?.types ?? []).includes('Files');
+}
+
 function wavFilesFromTransfer(dataTransfer) {
   return [...(dataTransfer?.files ?? [])].filter((file) => (
     /\.wav$/iu.test(file.name)
@@ -836,7 +840,7 @@ function bindGlobalWavDrop() {
   }
 
   document.addEventListener('dragenter', (event) => {
-    if (!event.dataTransfer?.types?.includes('Files')) return;
+    if (!transferHasFiles(event.dataTransfer)) return;
     event.preventDefault();
     dragDepth += 1;
     updateOverlay();
@@ -844,19 +848,19 @@ function bindGlobalWavDrop() {
   });
 
   document.addEventListener('dragover', (event) => {
-    if (!event.dataTransfer?.types?.includes('Files')) return;
+    if (!transferHasFiles(event.dataTransfer)) return;
     event.preventDefault();
     if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
   });
 
   document.addEventListener('dragleave', (event) => {
-    if (!event.dataTransfer?.types?.includes('Files')) return;
+    if (!transferHasFiles(event.dataTransfer)) return;
     dragDepth = Math.max(0, dragDepth - 1);
     if (dragDepth === 0) overlay.hidden = true;
   });
 
   document.addEventListener('drop', async (event) => {
-    if (!event.dataTransfer?.types?.includes('Files')) return;
+    if (!transferHasFiles(event.dataTransfer)) return;
     event.preventDefault();
     dragDepth = 0;
     overlay.hidden = true;
