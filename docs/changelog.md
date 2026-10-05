@@ -3,6 +3,20 @@
 Format singkat: satu entri per slice/PR yang menutup bagian dari milestone.
 Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
+## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
+
+### R3-S1 — fondasi Order + reuse/clone Pattern (CLOSED · PASS)
+
+- Ditambahkan primitive arrangement murni: `insertOrderEntry()`, `moveOrderEntry()`, `patternUsageCount()`, dan `makeOrderEntryUnique()`.
+- Reuse menambah occurrence baru tanpa menduplikasi definisi Pattern. Reorder hanya mengubah `song.order[]`; isi note/effect/chord/tempo Pattern tetap identik.
+- **Jadikan unik** membuat definisi Pattern baru dan memberi ID baru pada note/effect/chord/tempo event lokal, lalu hanya occurrence target yang dipindahkan ke clone.
+- Sesuai §5.9, anchor lirik pada occurrence yang dijadikan unik ikut diremap dari note ID sumber ke note ID clone; anchor occurrence lain tetap menunjuk sumber.
+- Hasil reuse/clone lolos round-trip debug JSON/session tanpa schema bump; struktur `patterns[] + order[]` memang sudah menjadi kontrak V2.
+- Full gate awal membuka drift tes lama R2: **174 browser PASS / 10 FAIL**. Failure bukan runtime R3: tes lama masih menganggap reload selalu kosong setelah S11 dan Pop 4/4 masih 18 note sebelum S10.
+- Baseline test dikoreksi tanpa melemahkan acceptance: tes export/import menghapus snapshot hanya ketika memang mensimulasikan sesi baru; ekspektasi Pop disinkronkan ke **26 note**.
+- Gate final run **37316756386** pada HEAD `81c97ff…`: 0 vulnerability, unit **102/102 PASS**, check PASS, build **368,4 KiB PASS**, full browser Chromium+Firefox **184/184 PASS**.
+- Berikutnya: **R3-S2 Song workspace — Song Map + Order List sebagai dua proyeksi dari data Order yang sama, keyboard-first**.
+
 ## R2 — Sample + Instrument (IMPLEMENTATION COMPLETE · MANUAL UX UAT PENDING)
 
 ### R2-S11 — reload custom sample + exit closure (CLOSED · PASS)
