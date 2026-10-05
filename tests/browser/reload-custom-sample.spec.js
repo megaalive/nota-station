@@ -80,7 +80,7 @@ test.describe('R2-S11 reload custom sample', () => {
       const next = window.tracker.getProject();
       return {
         projectId: next.id,
-        trackId,
+        trackId: track.id,
         instrumentId,
         sampleId: next.instruments.find((item) => item.id === instrumentId).zones[0].sampleId,
         session: window.tracker.getState().session,
