@@ -423,8 +423,9 @@ function registerCommands() {
         const trackId = String(args.trackId ?? '');
         const instrumentId = String(args.instrumentId ?? '');
         const nextProject = setTrackDefaultInstrument(project, { trackId, instrumentId });
+        const changed = nextProject !== project;
         commitProject(nextProject, 'track.setDefaultInstrument');
-        return { trackId, instrumentId, changed: nextProject !== project };
+        return { trackId, instrumentId, changed };
       },
     },
     {
