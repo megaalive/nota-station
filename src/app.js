@@ -18,7 +18,10 @@ import { createAudioEngine } from './audio/engine.js';
 import {
   createProjectSampleBytesLoader,
 } from './audio/sample-buffer-cache.js';
-import { updateSingleSampleInstrument } from './core/sound-edit.js';
+import {
+  setTrackDefaultInstrument,
+  updateSingleSampleInstrument,
+} from './core/sound-edit.js';
 import { applyPreparedWavImport } from './core/sample-import.js';
 import {
   prepareWavImport,
@@ -31,6 +34,7 @@ import {
   parseDebugProject,
   serializeDebugProject,
 } from './io/debug-json.js';
+import { Toast } from './ui/kit.js';
 import { createPalette } from './ui/palette.js';
 import { createPatternView } from './ui/pattern.js';
 import { createSoundView } from './ui/sound.js';
@@ -410,6 +414,20 @@ function registerCommands() {
       run: () => cycleTheme(),
     },
     {
+      id: 'track.setDefaultInstrument',
+      group: 'Sound',
+      labelKey: 'sound.setTrackInstrument',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('track.setDefaultInstrument', args);
+        const trackId = String(args.trackId ?? '');
+        const instrumentId = String(args.instrumentId ?? '');
+        const nextProject = setTrackDefaultInstrument(project, { trackId, instrumentId });
+        commitProject(nextProject, 'track.setDefaultInstrument');
+        return { trackId, instrumentId, changed: nextProject !== project };
+      },
+    },
+    {
       id: 'sound.updateInstrument',
       group: 'Sound',
       labelKey: 'sound.apply',
@@ -723,6 +741,12 @@ function auditionPitch(pitch) {
     .catch(() => shell?.setAudioStatus('error'));
 }
 
+function auditionInstrument(instrumentId) {
+  void audio.previewInstrument(project, instrumentId, 60, 100)
+    .then(() => shell?.setAudioStatus('ready'))
+    .catch(() => shell?.setAudioStatus('error'));
+}
+
 function renderWorkspace(tab, root) {
   patternView = null;
   soundView = null;
@@ -734,6 +758,7 @@ function renderWorkspace(tab, root) {
       getProject: () => project,
       registry,
       onAudition: auditionPitch,
+      onInstrumentAudition: auditionInstrument,
       onStatus: (status) => shell?.setPatternStatus(status),
       initialMode: project.settings.keymapPreset === 'openmpt' ? 'edit' : 'audition',
     });
@@ -775,6 +800,102 @@ function mountShell(activeTab = 'pattern') {
   shell.render();
   if (activeTab !== 'pattern') shell.selectTab(activeTab);
   syncTransportUi();
+}
+
+function activeImportTrackId() {
+  return patternView?.getActiveTrackId()
+    ?? soundView?.getSelectedTrackId()
+    ?? project.song.tracks[0]?.id
+    ?? null;
+}
+
+function wavFilesFromTransfer(dataTransfer) {
+  return [...(dataTransfer?.files ?? [])].filter((file) => (
+    /\.wav$/iu.test(file.name)
+    || ['audio/wav', 'audio/x-wav', 'audio/wave'].includes(file.type)
+  ));
+}
+
+function bindGlobalWavDrop() {
+  const overlay = document.createElement('div');
+  overlay.className = 'wav-drop-overlay';
+  overlay.dataset.action = 'wav-drop-overlay';
+  overlay.hidden = true;
+  overlay.setAttribute('role', 'status');
+  document.body.append(overlay);
+
+  let dragDepth = 0;
+
+  function updateOverlay() {
+    const trackId = activeImportTrackId();
+    const track = project.song.tracks.find((item) => item.id === trackId);
+    overlay.textContent = i18n.t('sound.dropOverlay', {
+      track: track?.name ?? i18n.t('sound.targetTrack'),
+    });
+  }
+
+  document.addEventListener('dragenter', (event) => {
+    if (!event.dataTransfer?.types?.includes('Files')) return;
+    event.preventDefault();
+    dragDepth += 1;
+    updateOverlay();
+    overlay.hidden = false;
+  });
+
+  document.addEventListener('dragover', (event) => {
+    if (!event.dataTransfer?.types?.includes('Files')) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+  });
+
+  document.addEventListener('dragleave', (event) => {
+    if (!event.dataTransfer?.types?.includes('Files')) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) overlay.hidden = true;
+  });
+
+  document.addEventListener('drop', async (event) => {
+    if (!event.dataTransfer?.types?.includes('Files')) return;
+    event.preventDefault();
+    dragDepth = 0;
+    overlay.hidden = true;
+
+    const files = wavFilesFromTransfer(event.dataTransfer);
+    if (files.length !== 1) {
+      Toast({ message: i18n.t('sound.dropSingleWav') });
+      return;
+    }
+
+    const trackId = activeImportTrackId();
+    const track = project.song.tracks.find((item) => item.id === trackId);
+    if (!track) {
+      Toast({ message: i18n.t('sound.dropFailed', { code: 'E_TRACK_NOT_FOUND' }) });
+      return;
+    }
+
+    try {
+      const file = files[0];
+      const result = await registry.execute('io.importWav', {
+        sourceFilename: file.name,
+        bytes: await file.arrayBuffer(),
+        trackId,
+      });
+      Toast({
+        message: i18n.t('sound.dropImported', {
+          name: result.instrumentName,
+          track: result.trackName,
+        }),
+        actionLabel: i18n.t('history.undo'),
+        onAction: () => undoSoundEdit('io.importWav'),
+      });
+    } catch (error) {
+      Toast({
+        message: i18n.t('sound.dropFailed', {
+          code: error?.code ?? 'E_WAV_IMPORT',
+        }),
+      });
+    }
+  });
 }
 
 function bindShortcuts() {
@@ -854,6 +975,7 @@ async function boot() {
   mountShell();
   syncHtmlLang();
   bindShortcuts();
+  bindGlobalWavDrop();
   void audio.preload();
 
   // Hook agent: satu-satunya jalan keluar state/aksi (§9). Nggak ada AudioContext
