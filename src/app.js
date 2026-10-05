@@ -12,6 +12,7 @@ import {
   createBlankProject,
   deleteNote,
   deleteVoiceNote,
+  deleteVoiceRow,
   enterNote,
   enterVoiceNote,
   setInitialTempo,
@@ -363,6 +364,21 @@ function registerCommands() {
         requireCommandArgs('pattern.deleteVoiceNote', args);
         const before = project;
         commitPatternProject(deleteVoiceNote(project, args), 'pattern.deleteVoiceNote');
+        return {
+          changed: project !== before,
+          noteCount: activePattern(project).notes.length,
+        };
+      },
+    },
+    {
+      id: 'pattern.clearVoiceRow',
+      group: 'Pattern',
+      labelKey: 'pattern.clearDrumRow',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.clearVoiceRow', args);
+        const before = project;
+        commitPatternProject(deleteVoiceRow(project, args), 'pattern.clearVoiceRow');
         return {
           changed: project !== before,
           noteCount: activePattern(project).notes.length,
@@ -778,11 +794,13 @@ function auditionPitch(pitch) {
     .catch(() => shell?.setAudioStatus('error'));
 }
 
-function auditionInstrument(instrumentId) {
+function auditionInstrument(instrumentId, pitchOverride = null) {
   const instrument = project.instruments.find((item) => item.id === instrumentId);
-  const pitch = isDrumKitInstrument(instrument)
-    ? instrument.zones[0]?.keyLow ?? 36
-    : 60;
+  const pitch = Number.isInteger(pitchOverride)
+    ? pitchOverride
+    : isDrumKitInstrument(instrument)
+      ? instrument.zones[0]?.keyLow ?? 36
+      : 60;
   void audio.previewInstrument(project, instrumentId, pitch, 100)
     .then(() => shell?.setAudioStatus('ready'))
     .catch(() => shell?.setAudioStatus('error'));
