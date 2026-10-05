@@ -5,6 +5,25 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### UAT correction — observability channel + follow Pattern (PASS)
+
+- Re-test pendengaran menunjukkan channel 6–8 sulit dibuktikan karena UI belum punya
+  **meter, Mute, Solo**, dan Pattern tidak mengikuti playback.
+- Audio engine kini punya bus per channel. Setiap bus memiliki gain + `AnalyserNode`,
+  sehingga Mute/Solo bekerja pada audio yang sudah terjadwal dan meter membaca RMS
+  output pasca M/S.
+- Header Pattern menampilkan tombol **M/S** dan meter untuk semua 8 channel.
+  Solo membuat channel lain benar-benar inaudible; Mute bekerja independen dari Solo.
+- Pattern kini menampilkan row playhead dan auto-scroll mengikuti `positionTick` transport.
+  Follow memakai clock audio yang sama dengan scheduler, bukan timer UI baru.
+- Gate runtime run **37255524367**: 0 vulnerability, unit **52/52 PASS**,
+  check/build PASS (**174.4 KiB**), browser audio/pattern Chromium+Firefox
+  **46/46 PASS**. Chromium membuktikan meter RMS channel 6–8 benar-benar bergerak;
+  Firefox headless tetap membuktikan M/S dan follow-scroll.
+- Dua commit test setelah gate hanya menstabilkan assertion timing/headless; runtime
+  tidak berubah dari head yang sudah PASS.
+- Status UAT: **FIX DEPLOY PENDING / perlu user re-test channel 6–8 dan follow scroll**.
+
 ### UAT correction — balance tonal demo stabilitas (PASS)
 
 - Re-test pendengaran setelah pemisahan timbre menemukan masalah kedua: perkusi sudah

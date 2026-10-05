@@ -54,6 +54,17 @@ secara pendengaran tanpa memperluas instrument/sample system R1. Project normal 
 **Mix v3:** perkusi telah diturunkan dan bass/lead/harmony diperkuat serta diperpanjang.
 Tujuan re-test berikutnya adalah memastikan bagian tonal jelas terdengar, bukan hanya perkusi.
 
+## Observability channel
+
+Saat memakai lagu stabilitas:
+- setiap channel memiliki **meter RMS**;
+- tombol **M** = Mute;
+- tombol **S** = Solo;
+- channel 6, 7, dan 8 dapat di-Solo satu per satu untuk memastikan masing-masing benar-benar bersuara;
+- row playhead harus bergerak dan Pattern harus auto-scroll mengikuti playback.
+
+Gunakan ini sebelum uji 2 menit agar masalah routing/mix dapat dibedakan dari masalah scheduler.
+
 ## Performa
 
 Target R1:
