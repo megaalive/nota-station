@@ -53,6 +53,23 @@ export function createSampleBufferCache({
     }
   }
 
+  function prime(sample, buffer) {
+    const hash = validateSampleIdentity(sample);
+    if (!buffer) {
+      throw cacheError('E_SAMPLE_CACHE_DECODE', `Decoded buffer tidak valid: ${sample.id}`);
+    }
+    decoded.set(hash, buffer);
+    pending.delete(hash);
+    return buffer;
+  }
+
+  function peek(sampleOrHash) {
+    const hash = typeof sampleOrHash === 'string'
+      ? normalizeHash(sampleOrHash)
+      : validateSampleIdentity(sampleOrHash);
+    return decoded.get(hash) ?? null;
+  }
+
   function evict(sampleOrHash) {
     const hash = typeof sampleOrHash === 'string'
       ? normalizeHash(sampleOrHash)
@@ -81,6 +98,8 @@ export function createSampleBufferCache({
 
   return Object.freeze({
     get,
+    prime,
+    peek,
     evict,
     clear,
     getState,

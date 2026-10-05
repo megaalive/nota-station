@@ -7,6 +7,15 @@ import {
 } from './factory-sample.js';
 import { isDemoInstrument, scheduleDemoVoice } from './demo-voices.js';
 import {
+  createProjectSampleBytesLoader,
+  createSampleBufferCache,
+} from './sample-buffer-cache.js';
+import {
+  resolveSamplerVoice,
+  voiceProfileKey,
+} from './instrument-resolver.js';
+import { createFactoryBasicSample } from '../core/sound-model.js';
+import {
   LIVE_EDIT_FREEZE_SECONDS,
   SCHEDULE_AHEAD_SECONDS,
   SCHEDULER_WAKE_MS,
@@ -21,10 +30,18 @@ import {
 const ROOT_PITCH = FACTORY_BASIC_ROOT_PITCH;
 const PREVIEW_SECONDS = 0.18;
 
-export function createAudioEngine({ onStateChange = null, onPositionChange = null } = {}) {
+export function createAudioEngine({
+  onStateChange = null,
+  onPositionChange = null,
+  getSampleStore = null,
+} = {}) {
   let context = null;
   let sampleBytesPromise = null;
   let buffer = null;
+  let sampleStore = null;
+  let indexedDbLoader = null;
+  let sampleCache = null;
+  let lastPreparedVoiceProfiles = 0;
   let state = 'locked';
   let schedulerTimer = null;
   let playback = null;
@@ -56,8 +73,81 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
       const bytes = await preload();
       buffer = await context.decodeAudioData(bytes.slice(0));
     }
+    ensureSampleCache();
     if (state === 'locked') setState('ready');
     return context;
+  }
+
+  function ensureSampleCache() {
+    if (sampleCache) return sampleCache;
+
+    const factoryLoader = createProjectSampleBytesLoader();
+    sampleCache = createSampleBufferCache({
+      loadBytes: async (sample) => {
+        if (sample.storageRef?.kind !== 'indexeddb') return factoryLoader(sample);
+        if (!sampleStore) {
+          if (typeof getSampleStore !== 'function') {
+            throw audioError(
+              'E_AUDIO_SAMPLE_STORE',
+              'Sample kustom membutuhkan provider IndexedDB.',
+            );
+          }
+          sampleStore = await getSampleStore();
+          indexedDbLoader = createProjectSampleBytesLoader({ sampleStore });
+        }
+        return indexedDbLoader(sample);
+      },
+      decodeBytes: (bytes) => context.decodeAudioData(bytes.slice(0)),
+    });
+
+    if (buffer) sampleCache.prime(createFactoryBasicSample(), buffer);
+    return sampleCache;
+  }
+
+  async function prepareVoiceProfiles(project, pattern) {
+    const cache = ensureSampleCache();
+    const tracks = new Map(project.song.tracks.map((track) => [track.id, track]));
+    const requests = new Map();
+
+    for (const note of pattern.notes) {
+      const instrumentId = note.instrumentId
+        ?? tracks.get(note.trackId)?.defaultInstrumentId
+        ?? null;
+      if (!instrumentId || isDemoInstrument(instrumentId)) continue;
+
+      const key = voiceProfileKey(instrumentId, note.pitch);
+      if (requests.has(key)) continue;
+      requests.set(key, resolveSamplerVoice(project, { instrumentId, pitch: note.pitch }));
+    }
+
+    const profiles = new Map();
+    await Promise.all([...requests.entries()].map(async ([key, resolved]) => {
+      const decodedBuffer = await cache.get(resolved.sample);
+      profiles.set(key, Object.freeze({ ...resolved, buffer: decodedBuffer }));
+    }));
+    lastPreparedVoiceProfiles = profiles.size;
+    return profiles;
+  }
+
+  function extendVoiceProfilesFromLoaded(project, pattern, profiles) {
+    if (!sampleCache) return false;
+    const tracks = new Map(project.song.tracks.map((track) => [track.id, track]));
+
+    for (const note of pattern.notes) {
+      const instrumentId = note.instrumentId
+        ?? tracks.get(note.trackId)?.defaultInstrumentId
+        ?? null;
+      if (!instrumentId || isDemoInstrument(instrumentId)) continue;
+
+      const key = voiceProfileKey(instrumentId, note.pitch);
+      if (profiles.has(key)) continue;
+      const resolved = resolveSamplerVoice(project, { instrumentId, pitch: note.pitch });
+      const decodedBuffer = sampleCache.peek(resolved.sample);
+      if (!decodedBuffer) return false;
+      profiles.set(key, Object.freeze({ ...resolved, buffer: decodedBuffer }));
+    }
+    lastPreparedVoiceProfiles = profiles.size;
+    return true;
   }
 
   function requestResume() {
@@ -188,6 +278,7 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     cycle = null,
     instrumentId = null,
     trackId = null,
+    voiceProfile = null,
   }) {
     const trackBus = trackId ? ensureTrackBus(trackId) : null;
     const output = trackBus?.input ?? context.destination;
@@ -205,6 +296,23 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
       return;
     }
 
+    if (voiceProfile) {
+      scheduleSamplerVoice({
+        voiceProfile,
+        velocity,
+        when,
+        durationSeconds,
+        output,
+        kind,
+        noteId,
+        cycle,
+        instrumentId,
+        trackId,
+      });
+      return;
+    }
+
+    // Preview R1 tanpa instrument eksplisit tetap memakai factory sample.
     const source = context.createBufferSource();
     const gain = context.createGain();
     source.buffer = buffer;
@@ -219,6 +327,71 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     trackSource(source, when, kind, { noteId, cycle, instrumentId, trackId, velocity });
     source.start(when);
     source.stop(when + Math.max(0.04, durationSeconds));
+  }
+
+  function scheduleSamplerVoice({
+    voiceProfile,
+    velocity,
+    when,
+    durationSeconds,
+    output,
+    kind,
+    noteId,
+    cycle,
+    instrumentId,
+    trackId,
+  }) {
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    source.buffer = voiceProfile.buffer;
+    source.playbackRate.setValueAtTime(voiceProfile.playbackRate, when);
+
+    if (voiceProfile.loop.enabled) {
+      source.loop = true;
+      source.loopStart = voiceProfile.loop.startSeconds;
+      source.loopEnd = voiceProfile.loop.endSeconds;
+    }
+
+    const peak = Math.max(
+      0.0001,
+      Math.min(1, velocity / 127) * Math.max(0, voiceProfile.gain) * 0.75,
+    );
+    const envelope = voiceProfile.envelope;
+    const noteOff = when + Math.max(0.01, durationSeconds);
+    const attackEnd = Math.min(noteOff, when + Math.max(0, envelope.attackSeconds));
+    const decayEnd = Math.min(noteOff, attackEnd + Math.max(0, envelope.decaySeconds));
+    const sustain = Math.max(0.0001, peak * Math.max(0, Math.min(1, envelope.sustainLevel)));
+    const releaseEnd = noteOff + Math.max(0.005, envelope.releaseSeconds);
+
+    gain.gain.setValueAtTime(envelope.attackSeconds > 0 ? 0.0001 : peak, when);
+    if (attackEnd > when) gain.gain.linearRampToValueAtTime(peak, attackEnd);
+    if (decayEnd > attackEnd) gain.gain.linearRampToValueAtTime(sustain, decayEnd);
+    if (noteOff > decayEnd) gain.gain.setValueAtTime(sustain, noteOff);
+    gain.gain.exponentialRampToValueAtTime(0.0001, releaseEnd);
+
+    source.connect(gain);
+    if (typeof context.createStereoPanner === 'function') {
+      const panner = context.createStereoPanner();
+      panner.pan.setValueAtTime(
+        Math.max(-1, Math.min(1, voiceProfile.pan)),
+        when,
+      );
+      gain.connect(panner);
+      panner.connect(output);
+    } else {
+      gain.connect(output);
+    }
+
+    trackSource(source, when, kind, {
+      noteId,
+      cycle,
+      instrumentId,
+      trackId,
+      velocity,
+      sampleId: voiceProfile.sampleId,
+    });
+    source.start(when);
+    source.stop(releaseEnd + 0.01);
   }
 
   function scheduleClick({ when, accent }) {
@@ -265,7 +438,8 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     });
   }
 
-  function startPlayback(project, pattern, startTick) {
+  function startPlayback(project, pattern, startTick, voiceProfiles = null) {
+    const preparedProfiles = voiceProfiles ?? playback?.voiceProfiles ?? new Map();
     clearScheduler();
     stopSources();
     setTracks(project.song.tracks);
@@ -277,8 +451,10 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     const anchor = context.currentTime + 0.05;
 
     playback = {
+      project,
       pattern,
       tempo,
+      voiceProfiles: preparedProfiles,
       anchor,
       startTick: normalizedTick,
       loop: loopEnabled,
@@ -316,11 +492,12 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     await ensureReady();
     if (state === 'playing') return getState();
 
+    const voiceProfiles = await prepareVoiceProfiles(project, pattern);
     loopEnabled = Boolean(loop);
     metronomeEnabled = Boolean(metronome);
     let nextTick = startTick ?? positionTick;
     if (nextTick >= pattern.lengthTicks && !loopEnabled) nextTick = 0;
-    startPlayback(project, pattern, nextTick);
+    startPlayback(project, pattern, nextTick, voiceProfiles);
     return getState();
   }
 
@@ -330,7 +507,23 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     const now = context.currentTime;
     const horizon = now + SCHEDULE_AHEAD_SECONDS;
 
+    const trackDefaults = new Map(
+      playback.project.song.tracks.map((track) => [track.id, track.defaultInstrumentId]),
+    );
+
     for (const event of playback.noteCursor.drainUntil(playback.noteAnchor, horizon)) {
+      const instrumentId = event.instrumentId ?? trackDefaults.get(event.trackId) ?? null;
+      const voiceProfile = instrumentId && !isDemoInstrument(instrumentId)
+        ? playback.voiceProfiles.get(voiceProfileKey(instrumentId, event.pitch)) ?? null
+        : null;
+
+      if (instrumentId && !isDemoInstrument(instrumentId) && !voiceProfile) {
+        throw audioError(
+          'E_AUDIO_PROFILE_MISSING',
+          `Voice profile belum siap: ${instrumentId} pitch ${event.pitch}`,
+        );
+      }
+
       scheduleVoice({
         pitch: event.pitch,
         velocity: event.velocity,
@@ -338,10 +531,11 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
         durationSeconds: event.durationSeconds,
         noteId: event.id,
         cycle: event.cycle,
-        instrumentId: event.instrumentId,
+        instrumentId,
         trackId: event.trackId,
+        voiceProfile,
       });
-      if (event.instrumentId) playback.instrumentIdsScheduled.add(event.instrumentId);
+      if (instrumentId) playback.instrumentIdsScheduled.add(instrumentId);
       playback.notesScheduled += 1;
     }
 
@@ -370,6 +564,10 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
 
   function reschedulePattern(project, pattern) {
     if (!context || !playback || state !== 'playing') {
+      return { changed: false, canceledNotes: 0, freezeTick: null };
+    }
+
+    if (!extendVoiceProfilesFromLoaded(project, pattern, playback.voiceProfiles)) {
       return { changed: false, canceledNotes: 0, freezeTick: null };
     }
 
@@ -541,6 +739,10 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
         ? [...playback.instrumentIdsScheduled].sort()
         : [],
       trackMeters: trackMeterState(),
+      sampleCacheDecoded: sampleCache?.getState().decoded ?? 0,
+      sampleDecodeCount: sampleCache?.getState().decodeCount ?? 0,
+      sampleLoadCount: sampleCache?.getState().loadCount ?? 0,
+      preparedVoiceProfiles: playback?.voiceProfiles.size ?? lastPreparedVoiceProfiles,
     };
   }
 
@@ -561,6 +763,13 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     reschedulePattern,
     getState,
   };
+}
+
+function audioError(code, message) {
+  const error = new Error(message);
+  error.name = 'AudioEngineError';
+  error.code = code;
+  return error;
 }
 
 function decodeBase64(value) {
