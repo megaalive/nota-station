@@ -5,6 +5,18 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S2 — Song Map + Order List (CLOSED · PASS)
+
+- Tab **Song** kini menampilkan Song Map dan Order List sebagai dua proyeksi dari `song.order[]` yang sama; mengganti view tidak membuat salinan state lain.
+- Songwriter membuka **Song Map** secara default, sedangkan preset OpenMPT-like membuka **Order List**, sesuai dua pintu masuk §8.2 tanpa membuat model data berbeda.
+- Occurrence dapat dipilih lewat klik/panah. `Ctrl+D` menambah occurrence reuse, `Ctrl+Shift+D` menjalankan **Jadikan unik**, dan `Alt+Arrow` memindahkan posisi; tersedia tombol mouse dengan aksi yang sama.
+- Reuse/reorder/unique seluruhnya melalui command layer dan satu transaksi history; Undo untuk **Jadikan unik** mengembalikan definisi Pattern shared tanpa langkah tambahan.
+- Lencana `⛓ ×N` membuat pattern shared terlihat langsung. Tombol **Jadikan unik** nonaktif bila Pattern hanya dipakai satu tempat.
+- Gate terarah run **37318431492** pada HEAD `6c21c01…`: 0 vulnerability, unit **102/102 PASS**, check PASS, build **383,6 KiB PASS**, Song+shell Chromium/Firefox **58/58 PASS**.
+- Gate final run **37318735675** pada HEAD `9631365…`: 0 vulnerability, unit **102/102 PASS**, check PASS, build **383,6 KiB PASS**, full browser Chromium+Firefox **192/192 PASS**.
+- Section editor penuh, drag Song Map, dan peringatan edit pertama Pattern shared tetap slice lanjutan; S2 sengaja hanya menutup dua proyeksi Order + operasi dasar yang stabil.
+- Berikutnya: **R3-S3 Section + shared-pattern guard** — Section nyata pada Song Map, tambah/assign section, dan guard non-modal saat mengedit Pattern yang dipakai >1 tempat.
+
 ### R3-S1 — fondasi Order + reuse/clone Pattern (CLOSED · PASS)
 
 - Ditambahkan primitive arrangement murni: `insertOrderEntry()`, `moveOrderEntry()`, `patternUsageCount()`, dan `makeOrderEntryUnique()`.
