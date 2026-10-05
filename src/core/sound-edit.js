@@ -87,6 +87,30 @@ export function updateSingleSampleInstrument(
   };
 }
 
+export function setTrackDefaultInstrument(project, { trackId, instrumentId }) {
+  if (!project || typeof project !== 'object') {
+    throw editError('E_SOUND_EDIT_PROJECT', 'Project tidak valid.');
+  }
+  if (!project.instruments?.some((item) => item.id === instrumentId)) {
+    throw editError('E_SOUND_EDIT_INSTRUMENT', `Instrument tidak ditemukan: ${instrumentId}`);
+  }
+  const track = project.song?.tracks?.find((item) => item.id === trackId);
+  if (!track) {
+    throw editError('E_SOUND_EDIT_TRACK', `Track tidak ditemukan: ${trackId}`);
+  }
+  if (track.defaultInstrumentId === instrumentId) return project;
+
+  return {
+    ...project,
+    song: {
+      ...project.song,
+      tracks: project.song.tracks.map((item) => (
+        item.id === trackId ? { ...item, defaultInstrumentId: instrumentId } : item
+      )),
+    },
+  };
+}
+
 function editError(code, message) {
   const error = new Error(message);
   error.name = 'SoundEditError';
