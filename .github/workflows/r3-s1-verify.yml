@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - r3/s1-order-pattern-core
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
