@@ -5,6 +5,18 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R2 — Sample + Instrument (ACTIVE)
 
+### R2-S5 — custom sample playback melalui model Instrument (CLOSED · PASS)
+
+- Audio engine kini resolve Instrument → Zone → Sample secara data-driven; tuning, gain, pan, ADSR, dan loop dibaca dari model R2.
+- Sample kustom dari IndexedDB dipreload/decode sebelum transport mulai, sehingga scheduler tetap sinkron dan tidak melakukan await di schedule window.
+- Decoded buffer menggunakan cache contentHash S4; Stop→Play kedua tidak decode ulang.
+- Factory preview R1 tetap kompatibel, sementara playback note sampler memakai voice profile kanonik.
+- Live edit dapat memperluas profile untuk pitch baru bila sample sudah ada di cache; instrument baru yang belum dipreload tidak dipaksakan saat playback.
+- App menyediakan Sample Store secara lazy hanya ketika sample IndexedDB benar-benar dibutuhkan.
+- Gate awal merah karena tombol probe tertutup welcome dialog; runtime belum dieksekusi. Test harness dikoreksi memakai `gotoApp()`.
+- Gate final run **37284888566**: 0 vulnerability, unit **78/78 PASS**, check PASS, build **222.4 KiB PASS**, browser custom playback/audio/import Chromium+Firefox **10/10 PASS**.
+- Berikutnya: **R2-S6 Sound workspace + Import WAV UI**.
+
 ### R2-S4 — import transaction + decode cache boundary (CLOSED · PASS)
 
 - Ditambahkan commit Project murni setelah persistence sukses: Sample/Instrument masuk secara atomik dan track tujuan menunjuk instrument baru.
