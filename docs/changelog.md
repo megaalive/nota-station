@@ -5,6 +5,16 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R2 — Sample + Instrument (ACTIVE)
 
+### R2-S2 — parser dan fondasi import WAV (CLOSED · PASS)
+
+- Ditambahkan parser RIFF/WAVE bounded/fail-closed dengan batas resmi §10.5: satu WAV ≤100 MiB, mono/stereo, sample rate ≤192 kHz.
+- Format baseline yang didukung: PCM integer 8/16/24/32-bit, IEEE float32, serta WAVE_FORMAT_EXTENSIBLE untuk PCM/float modern.
+- Parser menangani unknown chunk + padding, memvalidasi fmt/data, blockAlign, byteRate, frameCount, dan memberi error code `E_WAV_*` spesifik untuk input malformed/unsupported.
+- Fondasi import menghitung SHA-256, membentuk candidate Sample + Instrument tanpa memutasi Project, dan melakukan dedup candidate berdasarkan content hash.
+- Ditambahkan fuzz malformed WAV deterministik dan browser regression untuk parse + SHA-256 + candidate import pada Chromium/Firefox.
+- Gate run **37273674544**: 0 vulnerability, unit **66/66 PASS**, check PASS, build **194.3 KiB PASS**, browser WAV import **2/2 PASS**.
+- Berikutnya: **R2-S3 persistensi sample + dedup IndexedDB**.
+
 ### R2-S1 — model Sample + Instrument kanonik (CLOSED · PASS)
 
 - Ditambahkan kontrak kanonik `Sample` dan `Instrument` sesuai §6: metadata WAV, SHA-256, root note, fine tune, gain, loop, storageRef, sampler zones, ADSR, default pan, dan choke group.
