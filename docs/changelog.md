@@ -5,6 +5,16 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### UAT correction — sustain note nyata pada demo stabilitas (PASS)
+
+- Re-test UAT menemukan semua instrument memang bersuara, tetapi hampir seluruh note masih pendek satu row sehingga belum ada beban sustain yang representatif.
+- `enterNote()` kini boleh menerima `durationTicks` eksplisit dengan validasi ketat; default tetap satu row sehingga perilaku editor R1 lama tidak berubah.
+- Fixture **Malam Kota** kini memakai duration musikal nyata: Bass **4 row**, Lead **8 row (~1,03 dtk)**, Harmony **16 row / satu bar (~2,07 dtk)**. Arpeggio dan perkusi tetap pendek sebagai kontras.
+- Voice tonal demo memakai envelope attack/hold/release; sustain tidak lagi sekadar decay pendek.
+- Track mono Bass/Lead/Harmony tidak overlap dengan note berikutnya; duration tetap pattern-local dan tidak memperkenalkan `absoluteTick`.
+- Gate run **37257507901**: 0 vulnerability, unit **53/53 PASS**, check/build PASS (**175.3 KiB**), browser sustain/demo Chromium+Firefox **10/10 PASS**.
+- Status UAT: **FIX DEPLOY PENDING / perlu user re-test sustain melalui Solo channel 7**.
+
 ### UAT correction — observability channel + follow Pattern (PASS)
 
 - Re-test pendengaran menunjukkan channel 6–8 sulit dibuktikan karena UI belum punya

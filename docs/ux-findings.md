@@ -60,4 +60,11 @@ Persona minimum:
 - **Koreksi:** bus per-channel + RMS meter + Mute/Solo + playhead + auto-follow scroll.
 - **Status:** koreksi otomatis PASS; **menunggu re-test user pada build live baru**.
 
+### UAT ad-hoc — semua note terdengar pendek, tidak ada sustain
+
+- **Observasi:** setelah semua channel dapat dipastikan bersuara, user mencatat seluruh instrument masih berupa note pendek dan tidak ada sustain yang jelas.
+- **Root cause:** `enterNote()` selalu menulis `durationTicks = rowTicks`; voice tonal demo juga masih membatasi envelope maksimum sekitar 0,4 detik.
+- **Koreksi:** dukungan duration eksplisit yang backward-compatible + Bass 4 row, Lead 8 row, Harmony 16 row, dengan envelope hold/release.
+- **Status:** koreksi otomatis PASS; **menunggu re-test pendengaran user pada build live baru**.
+
 Sesi uji tugas bermoderasi P1–P5 belum dijalankan.

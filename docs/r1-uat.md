@@ -54,6 +54,22 @@ secara pendengaran tanpa memperluas instrument/sample system R1. Project normal 
 **Mix v3:** perkusi telah diturunkan dan bass/lead/harmony diperkuat serta diperpanjang.
 Tujuan re-test berikutnya adalah memastikan bagian tonal jelas terdengar, bukan hanya perkusi.
 
+## Sustain note
+
+Fixture stability sekarang sengaja mempunyai note pendek dan panjang:
+
+- Bass: **4 row** per note.
+- Lead: **8 row** per note, sekitar **1,03 detik** pada 116 BPM.
+- Harmony (channel 7): **16 row / satu bar**, sekitar **2,07 detik**.
+- Arpeggio/perkusi: tetap pendek untuk pembanding transient.
+
+Cara verifikasi pendengaran:
+1. Play demo.
+2. Solo **channel 7 · Harmony**.
+3. Dengarkan apakah satu nada benar-benar bertahan hampir satu bar, bukan sekadar bunyi pendek.
+4. Ulangi channel 6 · Lead; tiap nada harus terasa bertahan sekitar setengah bar.
+5. Perhatikan meter: selama sustain, meter harus tetap bergerak di antara note-on.
+
 ## Observability channel
 
 Saat memakai lagu stabilitas:

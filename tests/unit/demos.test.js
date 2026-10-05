@@ -38,6 +38,23 @@ test('stability demo adalah loop musikal 4 bar dengan delapan channel aktif', ()
   );
   assert.equal(new Set(pattern.notes.map((note) => note.instrumentId)).size, 8);
   assert.ok(pattern.notes.length >= 120);
+
+  const byInstrument = (id) => pattern.notes.filter((note) => note.instrumentId === id);
+  assert.ok(byInstrument('demo.bass').every((note) => note.durationTicks === pattern.rowTicks * 4));
+  assert.ok(byInstrument('demo.lead').every((note) => note.durationTicks === pattern.rowTicks * 8));
+  assert.ok(byInstrument('demo.harmony').every((note) => note.durationTicks === pattern.rowTicks * 16));
+  assert.ok(byInstrument('demo.arp').every((note) => note.durationTicks === pattern.rowTicks));
+
+  for (const instrumentId of ['demo.bass', 'demo.lead', 'demo.harmony']) {
+    const sustained = byInstrument(instrumentId).sort((a, b) => a.startTickLocal - b.startTickLocal);
+    for (let i = 1; i < sustained.length; i += 1) {
+      assert.ok(
+        sustained[i - 1].startTickLocal + sustained[i - 1].durationTicks
+          <= sustained[i].startTickLocal,
+        `${instrumentId} tidak boleh overlap dalam track mono`,
+      );
+    }
+  }
   assert.ok(pattern.notes.every((note) => !Object.hasOwn(note, 'absoluteTick')));
 
   const cells = new Set(pattern.notes.map((note) => `${note.trackId}|${note.startTickLocal}`));

@@ -92,6 +92,45 @@ test('enterNote menulis NoteEvent pattern-local dengan durationTicks kanonik', (
   assert.equal(project.song.patterns[0].notes.length, 0, 'input tidak dimutasi');
 });
 
+test('enterNote menerima durationTicks eksplisit tanpa mengubah default satu row', () => {
+  const project = fixture();
+  const pattern = activePattern(project);
+  const trackId = project.song.tracks[0].id;
+
+  const sustained = enterNote(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 8,
+    pitch: 60,
+    durationTicks: pattern.rowTicks * 8,
+  });
+  assert.equal(
+    noteAtCell(sustained, { patternId: pattern.id, trackId, row: 8 }).durationTicks,
+    pattern.rowTicks * 8,
+  );
+
+  assert.throws(
+    () => enterNote(project, {
+      patternId: pattern.id,
+      trackId,
+      row: 63,
+      pitch: 60,
+      durationTicks: pattern.rowTicks * 2,
+    }),
+    (error) => error.code === 'E_PROJECT_DURATION_RANGE',
+  );
+  assert.throws(
+    () => enterNote(project, {
+      patternId: pattern.id,
+      trackId,
+      row: 0,
+      pitch: 60,
+      durationTicks: 0,
+    }),
+    (error) => error.code === 'E_PROJECT_DURATION_RANGE',
+  );
+});
+
 test('mengetik ulang sel yang sama mengganti pitch tanpa membuat note duplikat', () => {
   let project = fixture();
   const pattern = activePattern(project);

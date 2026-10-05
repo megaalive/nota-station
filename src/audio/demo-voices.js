@@ -76,8 +76,9 @@ export function scheduleDemoVoice(context, {
       return oscillatorVoice(context, {
         type: 'triangle',
         when,
-        duration: Math.max(0.34, Math.min(0.46, durationSeconds * 3.2)),
+        duration: Math.max(0.20, durationSeconds * 0.96),
         gain: 0.40 * level,
+        sustainLevel: 0.72,
         pan: -0.12,
         frequency: { from: hz, to: hz },
         lowpass: 980,
@@ -100,8 +101,9 @@ export function scheduleDemoVoice(context, {
       return oscillatorVoice(context, {
         type: 'sawtooth',
         when,
-        duration: Math.max(0.34, Math.min(0.46, durationSeconds * 3.2)),
+        duration: Math.max(0.24, durationSeconds * 0.97),
         gain: 0.30 * level,
+        sustainLevel: 0.68,
         pan: 0.30,
         frequency: { from: hz, to: hz },
         lowpass: 3300,
@@ -112,8 +114,9 @@ export function scheduleDemoVoice(context, {
       return oscillatorVoice(context, {
         type: 'sine',
         when,
-        duration: Math.max(0.28, Math.min(0.40, durationSeconds * 2.8)),
+        duration: Math.max(0.30, durationSeconds * 0.985),
         gain: 0.18 * level,
+        sustainLevel: 0.82,
         pan: 0.58,
         frequency: { from: hz, to: hz },
         output,
@@ -143,6 +146,7 @@ function oscillatorVoice(context, {
   pan,
   frequency,
   lowpass = null,
+  sustainLevel = null,
   output,
 }) {
   const source = context.createOscillator();
@@ -153,8 +157,21 @@ function oscillatorVoice(context, {
   }
 
   const amp = context.createGain();
-  amp.gain.setValueAtTime(Math.max(0.0001, gain), when);
-  amp.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+  if (sustainLevel === null) {
+    amp.gain.setValueAtTime(Math.max(0.0001, gain), when);
+    amp.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+  } else {
+    const attack = Math.min(0.02, duration * 0.15);
+    const release = Math.min(0.12, duration * 0.22);
+    const releaseAt = Math.max(when + attack, when + duration - release);
+    const held = Math.max(0.0001, gain * sustainLevel);
+
+    amp.gain.setValueAtTime(0.0001, when);
+    amp.gain.linearRampToValueAtTime(Math.max(0.0001, gain), when + attack);
+    amp.gain.linearRampToValueAtTime(held, Math.min(releaseAt, when + attack + 0.08));
+    amp.gain.setValueAtTime(held, releaseAt);
+    amp.gain.exponentialRampToValueAtTime(0.0001, when + duration);
+  }
 
   let input = source;
   if (lowpass) {
