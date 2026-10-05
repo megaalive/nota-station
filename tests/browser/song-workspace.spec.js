@@ -52,7 +52,6 @@ test.describe('Song workspace R3-S2', () => {
     expect(state.order[0].patternId).toBe(state.order[1].patternId);
     expect(state.history.undoLabel).toBe('song.reuseOrderEntry');
 
-    const selected = entries(page).filter({ has: page.locator('[data-action="song-entry-body"]') }).nth(1);
     await expect(entries(page).nth(1)).toHaveAttribute('aria-current', 'true');
     await entries(page).nth(1).press('Control+Shift+d');
 
