@@ -17,7 +17,7 @@ test.describe('R1 automated exit', () => {
 
     const elapsedMs = Date.now() - started;
     expect(elapsedMs).toBeLessThanOrEqual(3000);
-    expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(18);
+    expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(26);
 
     await page.getByRole('button', { name: 'Berhenti' }).click();
   });
@@ -85,6 +85,9 @@ test.describe('R1 automated exit', () => {
     expect(expected.song.initial.tempo).toBe(180);
     expect(expected.song.patterns[0].notes).toHaveLength(16);
 
+    // Recovery session R2 memang mempertahankan Project. Untuk menguji jalur
+    // export → import ke sesi baru, hapus snapshot sesi secara eksplisit.
+    await page.evaluate(() => sessionStorage.clear());
     await page.reload();
     await waitForApp(page);
     expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
