@@ -39,6 +39,27 @@ Target R1:
 
 Catat mesin/browser referensi dan cara ukur; jangan memakai angka CI sebagai pengganti uji audio real-time manusia.
 
+## Bukti otomatis
+
+Bukti ini membantu closure teknis tetapi **tidak menggantikan UAT manual** di bawah.
+
+- Full gate final: GitHub Actions run **37246931905**, runtime/test head `803e90f`.
+- Unit: **50/50 PASS**; check PASS; build **151.1 KiB**.
+- Browser desktop: Chromium + Firefox **142/142 PASS**.
+- T1 mesin: **572 ms Chromium** dan **918 ms Firefox** dari load sampai playback siap
+  pada skenario first-run Pop 4/4 (budget mesin ≤3 detik).
+- Loop 100×: PASS pada unit scheduler deterministik, tanpa drift progresif.
+- 32 voice aktif: PASS pada R1-S10 di Chromium + Firefox.
+- App runtime tanpa sample pack: **154.657 byte (~151 KiB)**, di bawah budget 1,5 MiB.
+- Uji otomatis exit membuktikan 16 note, playback, tempo live, Stop, edit note + Undo,
+  JSON export/reload/import, dan playback ulang.
+
 ## Hasil
 
-Belum dijalankan.
+**Implementasi otomatis: PASS. Manual UAT: BELUM DIJALANKAN.**
+
+Yang tetap wajib dilakukan pada build Pages yang sama:
+- T1 manual ≤60 detik dan uji tugas UX 5 peserta sesuai §8.20.
+- Uji audio real-time 2 menit pada mesin referensi dengan target 0 underrun.
+- Konfirmasi hasil bunyi secara manusia setelah export/reload/import.
+
