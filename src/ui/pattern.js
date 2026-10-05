@@ -2,6 +2,7 @@
 // View tidak pernah menulis project langsung; semua mutasi lewat command registry.
 
 import { activePattern, noteAtCell, notesAtCell } from '../core/project.js';
+import { isDrumKitInstrument } from '../core/sound-model.js';
 import { el } from './dom.js';
 import { Button, Tooltip } from './kit.js';
 
@@ -196,7 +197,7 @@ export function createPatternView({
         dataset: { action: 'track-meter', trackId: track.id, level: '0' },
       }, [meterFill]);
       const instrumentChoices = track.kind === 'drum'
-        ? project.instruments.filter((instrument) => instrument.drumKit === true)
+        ? project.instruments.filter((instrument) => isDrumKitInstrument(instrument))
         : project.instruments;
       const instrumentSelect = el('select', {
         class: 'pattern-channel__instrument',
