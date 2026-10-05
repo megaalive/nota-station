@@ -5,6 +5,17 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R2 — Sample + Instrument (ACTIVE)
 
+### R2-S9 — Drum Track voice lane + choke group (CLOSED · PASS)
+
+- Satu top-level Drum Track kini dapat menyimpan beberapa `NoteEvent` pada tick yang sama melalui `voiceLane` 0..31; track biasa tetap mono dan kompatibel dengan data lama.
+- Ditambahkan `configureDrumTrack()`, `enterVoiceNote()`, dan `notesAtCell()`; operasi Pattern lama tetap bekerja pada lane 0.
+- Drum Kit memakai satu Instrument sampler multi-zone. Setiap zone dapat memiliki `chokeGroup` sendiri sehingga closed/open hi-hat berbagi choke tanpa memotong kick/snare.
+- Scheduler membawa dan mengurutkan `voiceLane` secara deterministik. Debug JSON mempertahankan lane, menolak duplicate (track,tick,lane), lane invalid, dan lane nonzero pada track mono.
+- Audio engine menjalankan choke terhadap voice aktif/scheduled dengan group sama dan mengekspos observability `chokeStops`, `lastChokeGroup`, serta `activeVoiceLanes`.
+- Gate awal: Chromium PASS tetapi Firefox headless tidak menggerakkan audio clock cukup cepat sehingga closed-hat belum masuk look-ahead. Harness dibuat deterministik pada 300 BPM agar row berikutnya masuk batch scheduler awal; runtime tidak diubah.
+- Gate final run **37305793396** pada HEAD `3b8228a…`: 0 vulnerability, unit **88/88 PASS**, check PASS, build **272.9 KiB PASS**, browser Drum Track/choke + regresi Chromium+Firefox **4/4 PASS**.
+- Berikutnya: **R2-S10 Drum Track user-facing + factory drum kit**.
+
 ### R2-S8 — global WAV drop + picker Instrument channel (CLOSED · PASS)
 
 - Pattern header kini memiliki picker Instrument per channel. ArrowUp/ArrowDown mengganti default Instrument secara transaksional dan langsung mengaudisi pilihan.
