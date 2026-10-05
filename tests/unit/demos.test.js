@@ -2,7 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { activePattern } from '../../src/core/project.js';
-import { createDemoProject, STABILITY_DEMO_ID } from '../../src/core/demos.js';
+import {
+  createDemoProject,
+  STABILITY_DEMO_ID,
+  STABILITY_DEMO_INSTRUMENTS,
+} from '../../src/core/demos.js';
 
 function opts() {
   let seq = 0;
@@ -28,6 +32,11 @@ test('stability demo adalah loop musikal 4 bar dengan delapan channel aktif', ()
 
   const activeTracks = new Set(pattern.notes.map((note) => note.trackId));
   assert.equal(activeTracks.size, 8);
+  assert.deepEqual(
+    project.song.tracks.map((track) => track.defaultInstrumentId),
+    STABILITY_DEMO_INSTRUMENTS.map((instrument) => instrument.id),
+  );
+  assert.equal(new Set(pattern.notes.map((note) => note.instrumentId)).size, 8);
   assert.ok(pattern.notes.length >= 120);
   assert.ok(pattern.notes.every((note) => !Object.hasOwn(note, 'absoluteTick')));
 

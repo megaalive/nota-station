@@ -32,4 +32,14 @@ Persona minimum:
 
 ## Temuan
 
-Belum ada sesi uji yang dicatat.
+### UAT ad-hoc — demo stabilitas terdengar seperti satu instrumen
+
+- **Observasi:** saat `?demo=stability` didengarkan, delapan channel tidak dapat dibedakan;
+  secara subjektif hanya terdengar satu instrumen.
+- **Root cause:** seluruh note demo masih menggunakan `factory.basic`; nama channel berbeda
+  tidak berarti timbre berbeda.
+- **Koreksi:** instrument `demo.*` kini memiliki delapan voice synth UAT berbeda dan
+  scheduler meneruskan `instrumentId` sampai engine.
+- **Status:** koreksi otomatis PASS; **menunggu re-test pendengaran user pada build live baru**.
+
+Sesi uji tugas bermoderasi P1–P5 belum dijalankan.

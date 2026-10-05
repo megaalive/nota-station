@@ -5,6 +5,25 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### UAT correction — timbre demo benar-benar terpisah (PASS)
+
+- UAT manual menemukan cacat pada fixture **Malam Kota**: delapan channel diberi label
+  Kick/Snare/Hi-Hat/Bass/Arpeggio/Lead/Harmony/Fill, tetapi semuanya masih memakai
+  `factory.basic`, sehingga secara pendengaran terdengar seperti satu instrumen.
+- Scheduler kini meneruskan `trackId` + `instrumentId` ke engine. Project normal R1 tetap
+  memakai jalur sample `factory.basic`; hanya instrument `demo.*` yang memakai voice UAT.
+- Delapan timbre demo sekarang benar-benar berbeda: kick sine pitch-drop, snare noise
+  band-pass, hi-hat noise high-pass, triangle bass, square arpeggio, saw lead,
+  sine harmony, dan pitch-drop tom/fill. Stereo pan ringan membantu pemisahan.
+- Observability `scheduledInstrumentIds` membuktikan scheduler dispatch instrument yang
+  benar. Chromium dengan AudioContext `running` harus mencapai semua 8 instrument;
+  Firefox headless yang menahan context `suspended` diverifikasi pada horizon awalnya.
+- Full suite sebelum koreksi assertion menghasilkan **147/148 PASS**; satu-satunya failure
+  adalah asumsi Firefox headless harus menggerakkan audio clock. Delta gate final run
+  **37253227646**: 0 vulnerability, unit **52/52 PASS**, check/build PASS
+  (**163.6 KiB**), browser audio/demo Chromium+Firefox **42/42 PASS**.
+- Status pendengaran: **FIX DEPLOY PENDING / perlu user re-test**.
+
 ### UAT fixture — Malam Kota Stability Loop (PASS)
 
 - Ditambahkan demo langsung `?demo=stability` tanpa memperluas daftar template R1.

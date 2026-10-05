@@ -5,6 +5,17 @@ import { activePattern, createBlankProject, enterNote } from './project.js';
 
 export const STABILITY_DEMO_ID = 'stability';
 
+export const STABILITY_DEMO_INSTRUMENTS = Object.freeze([
+  { id: 'demo.kick', name: 'Kick Synth', sampleId: 'factory.basic', rootPitch: 36 },
+  { id: 'demo.snare', name: 'Snare Noise', sampleId: 'factory.basic', rootPitch: 50 },
+  { id: 'demo.hat', name: 'Hi-Hat Noise', sampleId: 'factory.basic', rootPitch: 84 },
+  { id: 'demo.bass', name: 'Triangle Bass', sampleId: 'factory.basic', rootPitch: 45 },
+  { id: 'demo.arp', name: 'Square Arpeggio', sampleId: 'factory.basic', rootPitch: 60 },
+  { id: 'demo.lead', name: 'Saw Lead', sampleId: 'factory.basic', rootPitch: 69 },
+  { id: 'demo.harmony', name: 'Sine Harmony', sampleId: 'factory.basic', rootPitch: 64 },
+  { id: 'demo.fill', name: 'Pitch Tom Fill', sampleId: 'factory.basic', rootPitch: 55 },
+]);
+
 export function createDemoProject(demoId, options = {}) {
   if (demoId !== STABILITY_DEMO_ID) {
     const error = new Error(`Demo tidak dikenal: ${demoId}`);
@@ -41,8 +52,13 @@ export function createDemoProject(demoId, options = {}) {
       tracks: project.song.tracks.map((track, index) => ({
         ...track,
         name: names[index],
+        defaultInstrumentId: STABILITY_DEMO_INSTRUMENTS[index].id,
       })),
     },
+    instruments: [
+      ...project.instruments,
+      ...STABILITY_DEMO_INSTRUMENTS,
+    ],
   };
 
   const notes = [];

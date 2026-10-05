@@ -37,7 +37,7 @@ Gunakan build Pages yang sama dengan UAT:
 - Tempo/key: **116 BPM · A minor**
 - Panjang: **4 bar / 64 row**, loop sekitar **8,28 detik**
 - Beban: **8 channel aktif · 151 note**
-- Jalur audio: factory sample R1 yang sama dengan Pattern biasa
+- Jalur audio: scheduler R1 yang sama, tetapi 8 instrument `demo.*` memakai timbre synth UAT yang terpisah
 
 Prosedur uji 2 menit:
 1. Buka URL demo.
@@ -47,8 +47,9 @@ Prosedur uji 2 menit:
 5. Catat bila terdengar crackle, gap, note hilang, tempo tersendat, atau loop boundary terasa putus.
 6. Setelah 2 menit, Stop lalu Play lagi dan pastikan mulai dari awal dengan normal.
 
-Catatan: warna drum masih synth/tracker-like karena R1 baru memiliki satu factory sample.
-Yang diuji di sini adalah kestabilan scheduler/voice/playback, bukan kualitas drum final R2.
+Catatan: fixture UAT sengaja memakai voice synth ringan agar setiap channel dapat dibedakan
+secara pendengaran tanpa memperluas instrument/sample system R1. Project normal tetap memakai
+`factory.basic`; kualitas instrument final tetap pekerjaan R2.
 
 ## Performa
 

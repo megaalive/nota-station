@@ -5,6 +5,7 @@ import {
   FACTORY_BASIC_ROOT_PITCH,
   FACTORY_BASIC_WAV_BASE64,
 } from './factory-sample.js';
+import { isDemoInstrument, scheduleDemoVoice } from './demo-voices.js';
 import {
   LIVE_EDIT_FREEZE_SECONDS,
   SCHEDULE_AHEAD_SECONDS,
@@ -80,7 +81,20 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     kind = 'note',
     noteId = null,
     cycle = null,
+    instrumentId = null,
   }) {
+    if (isDemoInstrument(instrumentId)) {
+      const source = scheduleDemoVoice(context, {
+        instrumentId,
+        pitch,
+        velocity,
+        when,
+        durationSeconds,
+      });
+      trackSource(source, when, kind, { noteId, cycle, instrumentId });
+      return;
+    }
+
     const source = context.createBufferSource();
     const gain = context.createGain();
     source.buffer = buffer;
@@ -92,7 +106,7 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
 
     source.connect(gain);
     gain.connect(context.destination);
-    trackSource(source, when, kind, { noteId, cycle });
+    trackSource(source, when, kind, { noteId, cycle, instrumentId });
     source.start(when);
     source.stop(when + Math.max(0.04, durationSeconds));
   }
@@ -172,6 +186,7 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
       revision: ++scheduleRevision,
       notesScheduled: 0,
       clicksScheduled: 0,
+      instrumentIdsScheduled: new Set(),
     };
 
     positionTick = normalizedTick;
@@ -211,7 +226,9 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
         durationSeconds: event.durationSeconds,
         noteId: event.id,
         cycle: event.cycle,
+        instrumentId: event.instrumentId,
       });
+      if (event.instrumentId) playback.instrumentIdsScheduled.add(event.instrumentId);
       playback.notesScheduled += 1;
     }
 
@@ -407,6 +424,9 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
       positionTick: currentTick(),
       notesScheduled: playback?.notesScheduled ?? 0,
       clicksScheduled: playback?.clicksScheduled ?? 0,
+      scheduledInstrumentIds: playback
+        ? [...playback.instrumentIdsScheduled].sort()
+        : [],
     };
   }
 
