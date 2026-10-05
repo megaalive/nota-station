@@ -258,9 +258,12 @@ export function validateInstrumentModel(instrument, sampleIds) {
 }
 
 export function isDrumKitInstrument(instrument) {
-  return instrument?.type === 'sampler'
-    && instrument.drumKit === true
-    && Array.isArray(instrument.zones);
+  if (instrument?.type !== 'sampler' || !Array.isArray(instrument.zones)) return false;
+  if (instrument.drumKit === true) return true;
+  // Kompatibilitas project S9: sebelum marker drumKit ada, kit sudah berbentuk
+  // multi-zone dengan setiap zone memetakan tepat satu MIDI note.
+  return instrument.zones.length >= 2
+    && instrument.zones.every((zone) => zone.keyLow === zone.keyHigh);
 }
 
 function isCanonicalSample(sample) {
