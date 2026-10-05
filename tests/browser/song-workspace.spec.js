@@ -32,6 +32,20 @@ test.describe('Song workspace R3-S2', () => {
     expect(order).toEqual(map);
   });
 
+  test('preset OpenMPT-like membuka Order List sebagai pintu awal Song', async ({ page }) => {
+    await page.evaluate(() => {
+      window.tracker.commands.execute('project.loadTemplate', {
+        templateId: 'blank',
+        locale: 'id',
+        keymap: 'openmpt',
+      });
+    });
+
+    await expect(page.locator('[data-action="song-view-order"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[data-action="song-order-list"]')).toBeVisible();
+    await expect(entries(page)).toHaveCount(1);
+  });
+
   test('Ctrl+D reuse lalu Ctrl+Shift+D membuat occurrence target unik', async ({ page }) => {
     const first = entries(page).first();
     await first.click();
