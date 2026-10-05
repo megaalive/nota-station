@@ -1,13 +1,12 @@
 import { test, expect } from '@playwright/test';
 
-import { waitForApp } from './helpers.js';
+import { gotoApp } from './helpers.js';
 
 test.describe('custom sample playback R2-S5', () => {
   test('IndexedDB WAV dimainkan lewat Instrument/Zone dan tidak didecode ulang', async ({ page }) => {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto('./');
-    await waitForApp(page);
+    await gotoApp(page);
 
     await page.evaluate(async () => {
       const { openSampleStore, deleteSampleDatabase } = await import('./src/storage/sample-store.js');
