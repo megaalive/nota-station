@@ -41,7 +41,7 @@ export function scheduleDemoVoice(context, {
         type: 'sine',
         when,
         duration: 0.14,
-        gain: 0.78 * level,
+        gain: 0.34 * level,
         pan: 0,
         frequency: { from: 118, to: 43 },
       });
@@ -50,7 +50,7 @@ export function scheduleDemoVoice(context, {
       return noiseVoice(context, {
         when,
         duration: 0.11,
-        gain: 0.30 * level,
+        gain: 0.16 * level,
         pan: 0.12,
         filterType: 'bandpass',
         filterFrequency: 1850,
@@ -61,7 +61,7 @@ export function scheduleDemoVoice(context, {
       return noiseVoice(context, {
         when,
         duration: 0.045,
-        gain: 0.16 * level,
+        gain: 0.065 * level,
         pan: -0.58,
         filterType: 'highpass',
         filterFrequency: 6800,
@@ -72,42 +72,42 @@ export function scheduleDemoVoice(context, {
       return oscillatorVoice(context, {
         type: 'triangle',
         when,
-        duration: Math.max(0.10, Math.min(0.22, durationSeconds * 1.35)),
-        gain: 0.30 * level,
-        pan: -0.08,
+        duration: Math.max(0.34, Math.min(0.46, durationSeconds * 3.2)),
+        gain: 0.40 * level,
+        pan: -0.12,
         frequency: { from: hz, to: hz },
-        lowpass: 720,
+        lowpass: 980,
       });
 
     case 'demo.arp':
       return oscillatorVoice(context, {
         type: 'square',
         when,
-        duration: Math.max(0.07, Math.min(0.11, durationSeconds)),
-        gain: 0.105 * level,
-        pan: -0.42,
+        duration: Math.max(0.15, Math.min(0.21, durationSeconds * 1.7)),
+        gain: 0.16 * level,
+        pan: -0.46,
         frequency: { from: hz, to: hz },
-        lowpass: 2600,
+        lowpass: 3000,
       });
 
     case 'demo.lead':
       return oscillatorVoice(context, {
         type: 'sawtooth',
         when,
-        duration: Math.max(0.11, Math.min(0.18, durationSeconds * 1.3)),
-        gain: 0.145 * level,
-        pan: 0.26,
+        duration: Math.max(0.34, Math.min(0.46, durationSeconds * 3.2)),
+        gain: 0.30 * level,
+        pan: 0.30,
         frequency: { from: hz, to: hz },
-        lowpass: 2100,
+        lowpass: 3300,
       });
 
     case 'demo.harmony':
       return oscillatorVoice(context, {
         type: 'sine',
         when,
-        duration: Math.max(0.10, Math.min(0.18, durationSeconds * 1.25)),
-        gain: 0.11 * level,
-        pan: 0.56,
+        duration: Math.max(0.28, Math.min(0.40, durationSeconds * 2.8)),
+        gain: 0.18 * level,
+        pan: 0.58,
         frequency: { from: hz, to: hz },
       });
 
@@ -116,7 +116,7 @@ export function scheduleDemoVoice(context, {
         type: 'sine',
         when,
         duration: 0.13,
-        gain: 0.24 * level,
+        gain: 0.12 * level,
         pan: -0.20,
         frequency: { from: hz * 1.12, to: hz * 0.58 },
       });

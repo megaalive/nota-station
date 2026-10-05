@@ -51,6 +51,9 @@ Catatan: fixture UAT sengaja memakai voice synth ringan agar setiap channel dapa
 secara pendengaran tanpa memperluas instrument/sample system R1. Project normal tetap memakai
 `factory.basic`; kualitas instrument final tetap pekerjaan R2.
 
+**Mix v3:** perkusi telah diturunkan dan bass/lead/harmony diperkuat serta diperpanjang.
+Tujuan re-test berikutnya adalah memastikan bagian tonal jelas terdengar, bukan hanya perkusi.
+
 ## Performa
 
 Target R1:

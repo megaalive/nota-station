@@ -5,6 +5,20 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### UAT correction — balance tonal demo stabilitas (PASS)
+
+- Re-test pendengaran setelah pemisahan timbre menemukan masalah kedua: perkusi sudah
+  berbeda, tetapi **bass/arp/lead/harmony tertutup oleh kick/snare/hat** sehingga secara
+  subjektif yang terdengar hampir hanya perkusi.
+- Mix fixture dikoreksi tanpa mengubah engine project normal: gain kick/snare/hat/fill
+  diturunkan, bass/lead/harmony dinaikkan, low-pass tonal dilonggarkan, dan envelope
+  instrumen tonal diperpanjang agar tidak terdengar seperti klik bernada.
+- Velocity pattern juga diseimbangkan: perkusi turun; bass, arpeggio, harmony, dan lead naik.
+- Gate final run **37254342676**: 0 vulnerability, unit **52/52 PASS**,
+  check/build PASS (**163.6 KiB**), browser demo/audio Chromium+Firefox **8/8 PASS**;
+  demo berjalan >2 loop pada kedua browser.
+- Status pendengaran: **FIX DEPLOY PENDING / perlu user re-test**.
+
 ### UAT correction — timbre demo benar-benar terpisah (PASS)
 
 - UAT manual menemukan cacat pada fixture **Malam Kota**: delapan channel diberi label
