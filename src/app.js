@@ -621,6 +621,14 @@ function commitPatternProject(nextProject, label) {
   return project;
 }
 
+function undoImportedWav() {
+  if (history.getState().undoLabel !== 'io.importWav') {
+    return { changed: false, reason: 'history-moved' };
+  }
+  restoreHistory('undo');
+  return { changed: true };
+}
+
 function restoreHistory(direction) {
   const nextProject = direction === 'undo' ? history.undo() : history.redo();
   if (!nextProject) return history.getState();
@@ -695,7 +703,7 @@ function renderWorkspace(tab, root) {
       t: (key, vars) => i18n.t(key, vars),
       getProject: () => project,
       onImportWav: (args) => registry.execute('io.importWav', args),
-      onUndo: () => registry.execute('history.undo'),
+      onUndo: undoImportedWav,
     });
     return true;
   }
