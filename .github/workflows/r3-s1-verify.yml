@@ -1,0 +1,32 @@
+name: R3 S1 Verification
+
+on:
+  push:
+    branches:
+      - r3/s1-order-pattern-core
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium firefox
+      - name: Browser regression gate
+        env:
+          CI: "1"
+          PW_PROJECTS: chromium,firefox
+          PW_REPORTER: list
+        run: npm run test:browser
