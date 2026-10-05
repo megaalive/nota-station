@@ -66,3 +66,36 @@ test('parser membatasi ukuran dan nama export aman', () => {
   project.title = ' Lagu / Demo : 01 ';
   assert.equal(debugJsonFilename(project), 'Lagu-Demo-01.webtrack.json');
 });
+
+
+test('parser menormalisasi sound model R1 lama ke kontrak R2', () => {
+  const project = fixture();
+  project.samples = [{ id: 'factory.basic', factoryKey: 'basic', license: 'CC0-1.0' }];
+  project.instruments = [{
+    id: 'factory.basic',
+    name: 'Basic',
+    sampleId: 'factory.basic',
+    rootPitch: 60,
+  }];
+
+  const restored = parseDebugProject(JSON.stringify(project));
+  assert.equal(restored.samples[0].storageRef.kind, 'factory');
+  assert.equal(restored.instruments[0].type, 'sampler');
+  assert.equal(restored.instruments[0].zones[0].sampleId, 'factory.basic');
+});
+
+test('parser menolak default instrument track dan sample zone yang tidak ada', () => {
+  const brokenTrack = fixture();
+  brokenTrack.song.tracks[0].defaultInstrumentId = 'missing';
+  assert.throws(
+    () => parseDebugProject(JSON.stringify(brokenTrack)),
+    (error) => error.code === 'E_DEBUG_JSON_INSTRUMENT_REF',
+  );
+
+  const brokenZone = fixture();
+  brokenZone.instruments[0].zones[0].sampleId = 'missing';
+  assert.throws(
+    () => parseDebugProject(JSON.stringify(brokenZone)),
+    (error) => error.code === 'E_DEBUG_JSON_SAMPLE_REF',
+  );
+});

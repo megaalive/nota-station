@@ -2,18 +2,19 @@
 // Bukan template R1: daftar template tetap Kosong + Pop 4/4 sesuai roadmap.
 
 import { activePattern, createBlankProject, enterNote } from './project.js';
+import { createSamplerInstrument } from './sound-model.js';
 
 export const STABILITY_DEMO_ID = 'stability';
 
 export const STABILITY_DEMO_INSTRUMENTS = Object.freeze([
-  { id: 'demo.kick', name: 'Kick Synth', sampleId: 'factory.basic', rootPitch: 36 },
-  { id: 'demo.snare', name: 'Snare Noise', sampleId: 'factory.basic', rootPitch: 50 },
-  { id: 'demo.hat', name: 'Hi-Hat Noise', sampleId: 'factory.basic', rootPitch: 84 },
-  { id: 'demo.bass', name: 'Triangle Bass', sampleId: 'factory.basic', rootPitch: 45 },
-  { id: 'demo.arp', name: 'Square Arpeggio', sampleId: 'factory.basic', rootPitch: 60 },
-  { id: 'demo.lead', name: 'Saw Lead', sampleId: 'factory.basic', rootPitch: 69 },
-  { id: 'demo.harmony', name: 'Sine Harmony', sampleId: 'factory.basic', rootPitch: 64 },
-  { id: 'demo.fill', name: 'Pitch Tom Fill', sampleId: 'factory.basic', rootPitch: 55 },
+  createSamplerInstrument({ id: 'demo.kick', name: 'Kick Synth', sampleId: 'factory.basic', rootNote: 36 }),
+  createSamplerInstrument({ id: 'demo.snare', name: 'Snare Noise', sampleId: 'factory.basic', rootNote: 50 }),
+  createSamplerInstrument({ id: 'demo.hat', name: 'Hi-Hat Noise', sampleId: 'factory.basic', rootNote: 84 }),
+  createSamplerInstrument({ id: 'demo.bass', name: 'Triangle Bass', sampleId: 'factory.basic', rootNote: 45 }),
+  createSamplerInstrument({ id: 'demo.arp', name: 'Square Arpeggio', sampleId: 'factory.basic', rootNote: 60 }),
+  createSamplerInstrument({ id: 'demo.lead', name: 'Saw Lead', sampleId: 'factory.basic', rootNote: 69 }),
+  createSamplerInstrument({ id: 'demo.harmony', name: 'Sine Harmony', sampleId: 'factory.basic', rootNote: 64 }),
+  createSamplerInstrument({ id: 'demo.fill', name: 'Pitch Tom Fill', sampleId: 'factory.basic', rootNote: 55 }),
 ]);
 
 export function createDemoProject(demoId, options = {}) {

@@ -3,6 +3,18 @@
 Format singkat: satu entri per slice/PR yang menutup bagian dari milestone.
 Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
+## R2 — Sample + Instrument (ACTIVE)
+
+### R2-S1 — model Sample + Instrument kanonik (CLOSED · PASS)
+
+- Ditambahkan kontrak kanonik `Sample` dan `Instrument` sesuai §6: metadata WAV, SHA-256, root note, fine tune, gain, loop, storageRef, sampler zones, ADSR, default pan, dan choke group.
+- Factory sample R1 kini memiliki metadata WAV nyata: mono, 11.025 Hz, 1.543 frame, SHA-256 `78a8007e…`.
+- Nilai gain/pan/envelope menjadi data instrument, bukan konstanta UI/fixture.
+- Debug JSON R1 lama tetap dapat dibuka melalui normalisasi bentuk legacy `{sampleId, rootPitch}` ke model R2.
+- Validator mengunci Track → Instrument dan Instrument Zone → Sample reference.
+- Gate run **37272287512**: 0 vulnerability, unit **59/59 PASS**, check PASS, build **184.5 KiB PASS**, Playwright Chromium+Firefox **154/154 PASS**.
+- Berikutnya: **R2-S2 WAV parser/import foundation**.
+
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
 ### UAT correction — rebalance sustain vs percussion (PASS)
