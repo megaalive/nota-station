@@ -1,3 +1,9 @@
+import {
+  normalizeLegacySoundModel,
+  validateInstrumentModel,
+  validateSampleModel,
+} from '../core/sound-model.js';
+
 // JSON debug R1. Ini bukan format portable final .webtrack ZIP (R4);
 // tujuannya fixture/test dan round-trip proyek tanpa sample binary.
 
@@ -24,6 +30,7 @@ export function parseDebugProject(text) {
     throw debugJsonError('E_DEBUG_JSON_PARSE', 'JSON debug tidak valid.');
   }
 
+  project = normalizeLegacySoundModel(project);
   validateDebugProject(project);
   return project;
 }
@@ -63,8 +70,35 @@ export function validateDebugProject(project) {
   assertArray(project.samples, 'project.samples', 1);
 
   const trackIds = uniqueIds(project.song.tracks, 'track');
+  const sampleIds = uniqueIds(project.samples, 'sample');
   const instrumentIds = uniqueIds(project.instruments, 'instrument');
   const patternIds = uniqueIds(project.song.patterns, 'pattern');
+
+  for (const sample of project.samples) {
+    try {
+      validateSampleModel(sample);
+    } catch (error) {
+      throw debugJsonError('E_DEBUG_JSON_SAMPLE', error.message);
+    }
+  }
+  for (const instrument of project.instruments) {
+    try {
+      validateInstrumentModel(instrument, sampleIds);
+    } catch (error) {
+      const code = error.code === 'E_SOUND_SAMPLE_REF'
+        ? 'E_DEBUG_JSON_SAMPLE_REF'
+        : 'E_DEBUG_JSON_INSTRUMENT';
+      throw debugJsonError(code, error.message);
+    }
+  }
+  for (const track of project.song.tracks) {
+    if (!instrumentIds.has(track.defaultInstrumentId)) {
+      throw debugJsonError(
+        'E_DEBUG_JSON_INSTRUMENT_REF',
+        `Default instrument track tidak ada: ${track.defaultInstrumentId}`,
+      );
+    }
+  }
   uniqueIds(project.song.order, 'order');
 
   for (const pattern of project.song.patterns) {

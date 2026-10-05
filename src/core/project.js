@@ -1,3 +1,9 @@
+import {
+  FACTORY_BASIC_INSTRUMENT_ID,
+  createFactoryBasicInstrument,
+  createFactoryBasicSample,
+} from './sound-model.js';
+
 // Model kanonik minimum R1 (§5). Note tetap pattern-local; absolute song tick
 // hanya boleh muncul sebagai hasil proyeksi playback, bukan disimpan di project.
 
@@ -5,7 +11,7 @@ export const PPQ = 480;
 export const DEFAULT_CHANNELS = 8;
 export const DEFAULT_ROWS = 64;
 export const DEFAULT_ROW_TICKS = PPQ / 4; // LPB 4 = 1/16.
-export const FACTORY_INSTRUMENT_ID = 'factory.basic';
+export const FACTORY_INSTRUMENT_ID = FACTORY_BASIC_INSTRUMENT_ID;
 
 function makeId(prefix) {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -53,21 +59,8 @@ export function createBlankProject({ idFactory = makeId, now = isoNow } = {}) {
       order: [{ id: idFactory('order'), patternId, sectionId: null, keyOverride: null }],
       lyrics: [],
     },
-    instruments: [
-      {
-        id: FACTORY_INSTRUMENT_ID,
-        name: 'Basic',
-        sampleId: 'factory.basic',
-        rootPitch: 60,
-      },
-    ],
-    samples: [
-      {
-        id: 'factory.basic',
-        factoryKey: 'basic',
-        license: 'CC0-1.0',
-      },
-    ],
+    instruments: [createFactoryBasicInstrument()],
+    samples: [createFactoryBasicSample()],
     settings: {
       tuning: 440,
       keymapPreset: 'songwriter',
