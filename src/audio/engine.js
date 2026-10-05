@@ -38,6 +38,8 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
   let lastLiveEditCanceledNotes = 0;
   let lastLiveEditFreezeTick = null;
   const activeSources = new Map();
+  const trackMix = new Map();
+  const trackBuses = new Map();
 
   function preload() {
     if (!sampleBytesPromise) {
@@ -73,6 +75,109 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     source.onended = () => activeSources.delete(source);
   }
 
+  function ensureTrackMix(trackId) {
+    if (!trackId) return { mute: false, solo: false };
+    if (!trackMix.has(trackId)) trackMix.set(trackId, { mute: false, solo: false });
+    return trackMix.get(trackId);
+  }
+
+  function ensureTrackBus(trackId) {
+    if (!trackId || !context) return null;
+    ensureTrackMix(trackId);
+    let bus = trackBuses.get(trackId);
+    if (bus) return bus;
+
+    const input = context.createGain();
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 64;
+    analyser.smoothingTimeConstant = 0.55;
+    input.connect(analyser);
+    analyser.connect(context.destination);
+
+    bus = {
+      input,
+      analyser,
+      samples: new Float32Array(analyser.fftSize),
+    };
+    trackBuses.set(trackId, bus);
+    syncTrackGains();
+    return bus;
+  }
+
+  function setTracks(tracks) {
+    const ids = new Set((tracks ?? []).map((track) => track.id));
+
+    for (const trackId of [...trackMix.keys()]) {
+      if (!ids.has(trackId)) trackMix.delete(trackId);
+    }
+    for (const [trackId, bus] of [...trackBuses]) {
+      if (ids.has(trackId)) continue;
+      try {
+        bus.input.disconnect();
+        bus.analyser.disconnect();
+      } catch {
+        // Node yang sudah putus aman diabaikan saat ganti project.
+      }
+      trackBuses.delete(trackId);
+    }
+    for (const trackId of ids) ensureTrackMix(trackId);
+    syncTrackGains();
+  }
+
+  function trackAudible(trackId) {
+    const mix = ensureTrackMix(trackId);
+    const anySolo = [...trackMix.values()].some((item) => item.solo);
+    return !mix.mute && (!anySolo || mix.solo);
+  }
+
+  function syncTrackGains() {
+    if (!context) return;
+    const now = context.currentTime;
+    for (const [trackId, bus] of trackBuses) {
+      const target = trackAudible(trackId) ? 1 : 0;
+      const gain = bus.input.gain;
+      gain.cancelScheduledValues(now);
+      gain.setTargetAtTime(target, now, 0.005);
+    }
+  }
+
+  function toggleTrackMute(trackId) {
+    const mix = ensureTrackMix(trackId);
+    mix.mute = !mix.mute;
+    syncTrackGains();
+    return { trackId, mute: mix.mute, solo: mix.solo, audible: trackAudible(trackId) };
+  }
+
+  function toggleTrackSolo(trackId) {
+    const mix = ensureTrackMix(trackId);
+    mix.solo = !mix.solo;
+    syncTrackGains();
+    return { trackId, mute: mix.mute, solo: mix.solo, audible: trackAudible(trackId) };
+  }
+
+  function readTrackLevel(trackId) {
+    const bus = trackBuses.get(trackId);
+    if (!bus || !context || context.state !== 'running') return 0;
+    bus.analyser.getFloatTimeDomainData(bus.samples);
+    let sum = 0;
+    for (const sample of bus.samples) sum += sample * sample;
+    const rms = Math.sqrt(sum / bus.samples.length);
+    return Math.max(0, Math.min(1, rms * 3.5));
+  }
+
+  function trackMeterState() {
+    return [...trackMix.keys()].map((trackId) => {
+      const mix = ensureTrackMix(trackId);
+      return {
+        trackId,
+        mute: mix.mute,
+        solo: mix.solo,
+        audible: trackAudible(trackId),
+        level: readTrackLevel(trackId),
+      };
+    });
+  }
+
   function scheduleVoice({
     pitch,
     velocity = 100,
@@ -82,7 +187,11 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     noteId = null,
     cycle = null,
     instrumentId = null,
+    trackId = null,
   }) {
+    const trackBus = trackId ? ensureTrackBus(trackId) : null;
+    const output = trackBus?.input ?? context.destination;
+
     if (isDemoInstrument(instrumentId)) {
       const source = scheduleDemoVoice(context, {
         instrumentId,
@@ -90,8 +199,9 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
         velocity,
         when,
         durationSeconds,
+        output,
       });
-      trackSource(source, when, kind, { noteId, cycle, instrumentId });
+      trackSource(source, when, kind, { noteId, cycle, instrumentId, trackId, velocity });
       return;
     }
 
@@ -105,8 +215,8 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     gain.gain.exponentialRampToValueAtTime(0.0001, when + Math.max(0.03, durationSeconds));
 
     source.connect(gain);
-    gain.connect(context.destination);
-    trackSource(source, when, kind, { noteId, cycle, instrumentId });
+    gain.connect(output);
+    trackSource(source, when, kind, { noteId, cycle, instrumentId, trackId, velocity });
     source.start(when);
     source.stop(when + Math.max(0.04, durationSeconds));
   }
@@ -158,6 +268,8 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
   function startPlayback(project, pattern, startTick) {
     clearScheduler();
     stopSources();
+    setTracks(project.song.tracks);
+    for (const track of project.song.tracks) ensureTrackBus(track.id);
 
     const tempo = project.song.initial.tempo;
     lastTempo = tempo;
@@ -227,6 +339,7 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
         noteId: event.id,
         cycle: event.cycle,
         instrumentId: event.instrumentId,
+        trackId: event.trackId,
       });
       if (event.instrumentId) playback.instrumentIdsScheduled.add(event.instrumentId);
       playback.notesScheduled += 1;
@@ -427,6 +540,7 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
       scheduledInstrumentIds: playback
         ? [...playback.instrumentIdsScheduled].sort()
         : [],
+      trackMeters: trackMeterState(),
     };
   }
 
@@ -441,6 +555,9 @@ export function createAudioEngine({ onStateChange = null, onPositionChange = nul
     setTempo,
     setLoop,
     setMetronome,
+    setTracks,
+    toggleTrackMute,
+    toggleTrackSolo,
     reschedulePattern,
     getState,
   };
