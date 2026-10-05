@@ -105,6 +105,28 @@ test('makeOrderEntryUnique clone Pattern dan remap ID event lokal hanya untuk oc
     now: () => '2026-10-05T14:02:00.000Z',
   });
   const targetOrderId = arranged.song.order[1].id;
+  const sourceNoteId = arranged.song.patterns[0].notes[0].id;
+  arranged = {
+    ...arranged,
+    song: {
+      ...arranged.song,
+      lyrics: [{
+        id: 'lyrics-r3',
+        label: 'Verse 2',
+        rawText: 'la',
+        syllables: [{
+          id: 'syllable-r3',
+          text: 'la',
+          joinNext: false,
+          phraseBreakAfter: true,
+          anchors: [
+            { orderEntryId: arranged.song.order[0].id, noteId: sourceNoteId },
+            { orderEntryId: targetOrderId, noteId: sourceNoteId },
+          ],
+        }],
+      }],
+    },
+  };
 
   const next = makeOrderEntryUnique(arranged, {
     orderEntryId: targetOrderId,
@@ -156,6 +178,17 @@ test('makeOrderEntryUnique clone Pattern dan remap ID event lokal hanya untuk oc
     source,
     'Pattern sumber tidak dimutasi',
   );
+
+  const anchors = next.song.lyrics[0].syllables[0].anchors;
+  assert.deepEqual(anchors[0], {
+    orderEntryId: arranged.song.order[0].id,
+    noteId: sourceNoteId,
+  });
+  assert.deepEqual(anchors[1], {
+    orderEntryId: targetOrderId,
+    noteId: clone.notes[0].id,
+  });
+  assert.notEqual(anchors[1].noteId, sourceNoteId);
 });
 
 test('hasil reuse + Jadikan unik tetap round-trip lewat debug JSON', () => {
