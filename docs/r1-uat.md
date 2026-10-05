@@ -28,6 +28,28 @@ Jangan tandai PASS sebelum langkah benar-benar dijalankan pada build live yang s
 - [ ] Import JSON debug.
 - [ ] Row, tempo, note, dan hasil bunyi sama secara semantik setelah import.
 
+## Lagu uji stabilitas
+
+Gunakan build Pages yang sama dengan UAT:
+
+- URL: `https://megaalive.github.io/nota-station/?demo=stability`
+- Judul: **Malam Kota — Stability Loop**
+- Tempo/key: **116 BPM · A minor**
+- Panjang: **4 bar / 64 row**, loop sekitar **8,28 detik**
+- Beban: **8 channel aktif · 151 note**
+- Jalur audio: factory sample R1 yang sama dengan Pattern biasa
+
+Prosedur uji 2 menit:
+1. Buka URL demo.
+2. Klik **Aktifkan audio** atau langsung **Play**.
+3. Pastikan **Loop Pattern** tetap aktif.
+4. Dengarkan minimal 2 menit tanpa mengubah tempo.
+5. Catat bila terdengar crackle, gap, note hilang, tempo tersendat, atau loop boundary terasa putus.
+6. Setelah 2 menit, Stop lalu Play lagi dan pastikan mulai dari awal dengan normal.
+
+Catatan: warna drum masih synth/tracker-like karena R1 baru memiliki satu factory sample.
+Yang diuji di sini adalah kestabilan scheduler/voice/playback, bukan kualitas drum final R2.
+
 ## Performa
 
 Target R1:

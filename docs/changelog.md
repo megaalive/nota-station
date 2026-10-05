@@ -5,6 +5,21 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### UAT fixture — Malam Kota Stability Loop (PASS)
+
+- Ditambahkan demo langsung `?demo=stability` tanpa memperluas daftar template R1.
+- Lagu uji **Malam Kota — Stability Loop**: 116 BPM, A minor, 4 bar, 8 channel,
+  dan **151 note**. Progression Am → F → C → G dengan pulse kick/snare/hi-hat,
+  bass root/fifth, arpeggio, lead, harmony, dan fill.
+- Query demo melewati welcome tetapi tidak menulis status first-run ke localStorage,
+  sehingga fixture dapat dipakai berulang tanpa mengotori onboarding normal.
+- Regression playback membiarkan demo berjalan **18 detik (>2 putaran)** pada
+  Chromium dan Firefox; scheduler tetap aktif, loop tetap aktif, schedule revision
+  tidak berubah, dan tidak ada page error.
+- Gate run **37251979274**: `npm ci` 0 vulnerability, unit **52/52 PASS**,
+  `npm run check` PASS, build **156.1 KiB PASS**, Playwright Chromium+Firefox
+  **146/146 PASS** (1,4 mnt).
+
 ### S12 — Automated exit R1 (PASS)
 
 - Ditambahkan skenario browser end-to-end yang mengikuti jalur exit R1: first-run
