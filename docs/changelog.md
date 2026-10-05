@@ -5,6 +5,16 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R2 — Sample + Instrument (ACTIVE)
 
+### R2-S8 — global WAV drop + picker Instrument channel (CLOSED · PASS)
+
+- Pattern header kini memiliki picker Instrument per channel. ArrowUp/ArrowDown mengganti default Instrument secara transaksional dan langsung mengaudisi pilihan.
+- Audio engine mendapat `previewInstrument()` data-driven, termasuk sample IndexedDB melalui cache yang sama dengan playback.
+- Global drag-drop menerima tepat satu WAV dan memasangnya ke track aktif secara deterministik: track di bawah kursor Pattern, pilihan Track tujuan di Sound, atau fallback track pertama.
+- Drop tidak memindahkan workspace otomatis; hasil terlihat lewat Toast + Undo.
+- Default Instrument track menjadi transaksi core immutable dan dapat di-Undo/Redo.
+- Gate run **37296194679** pada HEAD `220658d…`: 0 vulnerability, unit **84/84 PASS**, check PASS, build **264.3 KiB PASS**, browser drop/picker/Pattern/Sound/playback Chromium+Firefox **48/48 PASS**.
+- Berikutnya: **R2-S9 Drum Track mapping + choke group + minimal polyphonic voice-lane**.
+
 ### R2-S7 — editor Sample/Instrument + waveform (CLOSED · PASS)
 
 - Sound workspace kini memiliki pemilihan Instrument, mode **Sederhana/Lanjutan**, waveform preview, dan editor root note, fine tune, volume, pan, loop, ADSR, serta loop frame.
