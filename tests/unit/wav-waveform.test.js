@@ -1,3 +1,4 @@
+import { FACTORY_BASIC_WAV_BASE64 } from '../../src/audio/factory-sample.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -78,4 +79,14 @@ test('waveform bin count bounded dan input invalid ditolak', () => {
     () => summarizeWavWaveform('bukan bytes'),
     (error) => error.code === 'E_WAVEFORM_TYPE',
   );
+});
+
+
+test('factory WAV internal selalu RIFF-valid dan dapat diringkas', () => {
+  const bytes = Buffer.from(FACTORY_BASIC_WAV_BASE64, 'base64');
+  const summary = summarizeWavWaveform(bytes, { bins: 128 });
+  assert.equal(summary.frameCount, 1543);
+  assert.equal(summary.sampleRate, 11025);
+  assert.equal(summary.channels, 1);
+  assert.equal(summary.bins, 128);
 });
