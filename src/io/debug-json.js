@@ -70,6 +70,7 @@ export function validateDebugProject(project) {
   assertArray(project.samples, 'project.samples', 1);
 
   const trackIds = uniqueIds(project.song.tracks, 'track');
+  const tracksById = new Map(project.song.tracks.map((track) => [track.id, track]));
   const sampleIds = uniqueIds(project.samples, 'sample');
   const instrumentIds = uniqueIds(project.instruments, 'instrument');
   const patternIds = uniqueIds(project.song.patterns, 'pattern');
@@ -92,6 +93,21 @@ export function validateDebugProject(project) {
     }
   }
   for (const track of project.song.tracks) {
+    if (!['instrument', 'drum'].includes(track.kind)) {
+      throw debugJsonError('E_DEBUG_JSON_TRACK_KIND', `Track kind tidak valid: ${track.kind}`);
+    }
+    if (!['mono', 'poly'].includes(track.polyphony)) {
+      throw debugJsonError(
+        'E_DEBUG_JSON_TRACK_POLYPHONY',
+        `Track polyphony tidak valid: ${track.polyphony}`,
+      );
+    }
+    if (track.kind === 'drum' && track.polyphony !== 'poly') {
+      throw debugJsonError(
+        'E_DEBUG_JSON_TRACK_POLYPHONY',
+        'Drum Track harus polyphonic.',
+      );
+    }
     if (!instrumentIds.has(track.defaultInstrumentId)) {
       throw debugJsonError(
         'E_DEBUG_JSON_INSTRUMENT_REF',
@@ -119,7 +135,18 @@ export function validateDebugProject(project) {
       if (noteIds.has(note.id)) throw debugJsonError('E_DEBUG_JSON_DUPLICATE_ID', `ID note duplikat: ${note.id}`);
       noteIds.add(note.id);
       if (!trackIds.has(note.trackId)) throw debugJsonError('E_DEBUG_JSON_TRACK_REF', `Track note tidak ada: ${note.trackId}`);
+      const track = tracksById.get(note.trackId);
       if (!instrumentIds.has(note.instrumentId)) throw debugJsonError('E_DEBUG_JSON_INSTRUMENT_REF', `Instrument note tidak ada: ${note.instrumentId}`);
+      const voiceLane = note.voiceLane === undefined ? 0 : note.voiceLane;
+      if (!Number.isInteger(voiceLane) || voiceLane < 0 || voiceLane > 31) {
+        throw debugJsonError('E_DEBUG_JSON_VOICE_LANE', 'voiceLane note harus integer 0..31.');
+      }
+      if (track.polyphony !== 'poly' && voiceLane !== 0) {
+        throw debugJsonError(
+          'E_DEBUG_JSON_VOICE_LANE',
+          'Track mono tidak boleh memiliki voiceLane nonzero.',
+        );
+      }
       if (!Number.isInteger(note.startTickLocal) || note.startTickLocal < 0 || note.startTickLocal >= pattern.lengthTicks) {
         throw debugJsonError('E_DEBUG_JSON_NOTE_TICK', 'startTickLocal note di luar Pattern.');
       }
@@ -132,8 +159,13 @@ export function validateDebugProject(project) {
       if (!Number.isInteger(note.velocity) || note.velocity < 0 || note.velocity > 127) {
         throw debugJsonError('E_DEBUG_JSON_NOTE_VELOCITY', 'Velocity note harus 0..127.');
       }
-      const cell = `${note.trackId}|${note.startTickLocal}`;
-      if (cells.has(cell)) throw debugJsonError('E_DEBUG_JSON_DUPLICATE_CELL', `Dua note menempati sel yang sama: ${cell}`);
+      const cell = `${note.trackId}|${note.startTickLocal}|${voiceLane}`;
+      if (cells.has(cell)) {
+        throw debugJsonError(
+          'E_DEBUG_JSON_DUPLICATE_CELL',
+          `Dua note menempati voice lane yang sama: ${cell}`,
+        );
+      }
       cells.add(cell);
     }
   }

@@ -77,6 +77,39 @@ export function createSamplerInstrument({
   };
 }
 
+export function createDrumKitInstrument({
+  id,
+  name,
+  zones,
+  ampEnvelope = DEFAULT_AMP_ENVELOPE,
+  defaultPan = 0,
+}) {
+  if (!Array.isArray(zones) || zones.length === 0) {
+    throw soundError('E_SOUND_ZONES', 'Drum kit harus memiliki minimal satu zone.');
+  }
+
+  return {
+    id,
+    name,
+    type: 'sampler',
+    zones: zones.map((zone) => {
+      const note = zone.note;
+      return {
+        sampleId: zone.sampleId,
+        keyLow: note,
+        keyHigh: note,
+        rootNote: zone.rootNote ?? note,
+        tuneCents: zone.tuneCents ?? 0,
+        gain: zone.gain ?? 1,
+        chokeGroup: zone.chokeGroup ?? null,
+      };
+    }),
+    ampEnvelope: { ...ampEnvelope },
+    defaultPan,
+    chokeGroup: null,
+  };
+}
+
 export function normalizeLegacySoundModel(project) {
   if (!project || typeof project !== 'object') return project;
 
@@ -180,6 +213,13 @@ export function validateInstrumentModel(instrument, sampleIds) {
     requireIntegerRange(zone.rootNote, 0, 127, 'instrument.zone.rootNote');
     requireFiniteRange(zone.tuneCents, -1200, 1200, 'instrument.zone.tuneCents');
     requireFiniteRange(zone.gain, 0, 4, 'instrument.zone.gain');
+    if (
+      Object.hasOwn(zone, 'chokeGroup')
+      && zone.chokeGroup !== null
+      && typeof zone.chokeGroup !== 'string'
+    ) {
+      throw soundError('E_SOUND_CHOKE_GROUP', 'zone.chokeGroup harus null atau string.');
+    }
   }
 
   requireObject(instrument.ampEnvelope, 'instrument.ampEnvelope');

@@ -42,6 +42,8 @@ export function createAudioEngine({
   let indexedDbLoader = null;
   let sampleCache = null;
   let lastPreparedVoiceProfiles = 0;
+  let chokeStops = 0;
+  let lastChokeGroup = null;
   let state = 'locked';
   let schedulerTimer = null;
   let playback = null;
@@ -165,6 +167,31 @@ export function createAudioEngine({
     source.onended = () => activeSources.delete(source);
   }
 
+  function chokeActiveGroup(chokeGroup, when) {
+    if (!chokeGroup) return 0;
+
+    let stopped = 0;
+    for (const [source, scheduled] of [...activeSources]) {
+      if (scheduled.chokeGroup !== chokeGroup) continue;
+      if (!['note', 'preview'].includes(scheduled.kind)) continue;
+      if (scheduled.when > when) continue;
+
+      try {
+        source.stop(Math.max(when, context.currentTime));
+      } catch {
+        // Source dapat selesai tepat sebelum choke dijadwalkan.
+      }
+      activeSources.delete(source);
+      stopped += 1;
+    }
+
+    if (stopped > 0) {
+      chokeStops += stopped;
+      lastChokeGroup = chokeGroup;
+    }
+    return stopped;
+  }
+
   function ensureTrackMix(trackId) {
     if (!trackId) return { mute: false, solo: false };
     if (!trackMix.has(trackId)) trackMix.set(trackId, { mute: false, solo: false });
@@ -279,6 +306,7 @@ export function createAudioEngine({
     instrumentId = null,
     trackId = null,
     voiceProfile = null,
+    voiceLane = 0,
   }) {
     const trackBus = trackId ? ensureTrackBus(trackId) : null;
     const output = trackBus?.input ?? context.destination;
@@ -292,7 +320,15 @@ export function createAudioEngine({
         durationSeconds,
         output,
       });
-      trackSource(source, when, kind, { noteId, cycle, instrumentId, trackId, velocity });
+      trackSource(source, when, kind, {
+        noteId,
+        cycle,
+        instrumentId,
+        trackId,
+        velocity,
+        voiceLane,
+        pitch,
+      });
       return;
     }
 
@@ -308,6 +344,8 @@ export function createAudioEngine({
         cycle,
         instrumentId,
         trackId,
+        voiceLane,
+        pitch,
       });
       return;
     }
@@ -324,7 +362,15 @@ export function createAudioEngine({
 
     source.connect(gain);
     gain.connect(output);
-    trackSource(source, when, kind, { noteId, cycle, instrumentId, trackId, velocity });
+    trackSource(source, when, kind, {
+      noteId,
+      cycle,
+      instrumentId,
+      trackId,
+      velocity,
+      voiceLane,
+      pitch,
+    });
     source.start(when);
     source.stop(when + Math.max(0.04, durationSeconds));
   }
@@ -340,9 +386,12 @@ export function createAudioEngine({
     cycle,
     instrumentId,
     trackId,
+    voiceLane,
+    pitch,
   }) {
     const source = context.createBufferSource();
     const gain = context.createGain();
+    chokeActiveGroup(voiceProfile.chokeGroup, when);
     source.buffer = voiceProfile.buffer;
     source.playbackRate.setValueAtTime(voiceProfile.playbackRate, when);
 
@@ -389,6 +438,9 @@ export function createAudioEngine({
       trackId,
       velocity,
       sampleId: voiceProfile.sampleId,
+      voiceLane,
+      pitch,
+      chokeGroup: voiceProfile.chokeGroup,
     });
     source.start(when);
     source.stop(releaseEnd + 0.01);
@@ -557,6 +609,7 @@ export function createAudioEngine({
         instrumentId,
         trackId: event.trackId,
         voiceProfile,
+        voiceLane: event.voiceLane,
       });
       if (instrumentId) playback.instrumentIdsScheduled.add(instrumentId);
       playback.notesScheduled += 1;
@@ -766,6 +819,16 @@ export function createAudioEngine({
       sampleDecodeCount: sampleCache?.getState().decodeCount ?? 0,
       sampleLoadCount: sampleCache?.getState().loadCount ?? 0,
       preparedVoiceProfiles: playback?.voiceProfiles.size ?? lastPreparedVoiceProfiles,
+      chokeStops,
+      lastChokeGroup,
+      activeVoiceLanes: sources
+        .filter((item) => item.kind === 'note')
+        .map((item) => ({
+          trackId: item.trackId ?? null,
+          voiceLane: Number.isInteger(item.voiceLane) ? item.voiceLane : 0,
+          pitch: item.pitch ?? null,
+          chokeGroup: item.chokeGroup ?? null,
+        })),
     };
   }
 
