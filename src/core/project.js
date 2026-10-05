@@ -134,6 +134,17 @@ export function configureDrumTrack(
     throw projectError('E_PROJECT_INSTRUMENT_MISSING', `Instrument tidak ditemukan: ${instrumentId}`);
   }
   if (
+    track.kind !== 'drum'
+    && project.song.patterns.some((pattern) => (
+      pattern.notes.some((note) => note.trackId === trackId)
+    ))
+  ) {
+    throw projectError(
+      'E_PROJECT_DRUM_TRACK_NOT_EMPTY',
+      'Track berisi note harus dikosongkan sebelum diubah menjadi Drum Track.',
+    );
+  }
+  if (
     track.kind === 'drum'
     && track.polyphony === 'poly'
     && track.defaultInstrumentId === instrumentId
