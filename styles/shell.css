@@ -697,7 +697,7 @@
   position: sticky;
   top: 0;
   z-index: 4;
-  height: 72px;
+  height: 92px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border-1);
 }
@@ -707,7 +707,7 @@
 }
 
 .pattern-grid__header-row--channel {
-  height: 48px;
+  height: 68px;
   border-bottom: 1px solid var(--border-1);
 }
 
@@ -758,6 +758,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.05;
+}
+
+.pattern-channel__instrument {
+  width: 100%;
+  min-width: 0;
+  height: 18px;
+  padding: 0 2px;
+  overflow: hidden;
+  border: 1px solid var(--border-1);
+  border-radius: 3px;
+  background: var(--surface-1);
+  color: var(--text-1);
+  font: 0.67rem/1 var(--font-ui);
+  text-overflow: ellipsis;
 }
 
 .pattern-channel__controls {
@@ -1189,4 +1203,27 @@
   .sound-editor__fields {
     grid-template-columns: 1fr;
   }
+}
+
+
+/* ------------------------------------------------------- R2 global WAV drop */
+.wav-drop-overlay {
+  position: fixed;
+  inset: 12px;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  border: 2px dashed currentColor;
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+}
+
+.wav-drop-overlay[hidden] {
+  display: none;
 }
