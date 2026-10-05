@@ -94,6 +94,7 @@ const messages = {
     'history.nothingRedo': 'Belum ada edit untuk di-redo.',
 
     'project.loadTemplate': 'Muat template proyek',
+    'project.loadDemo': 'Muat demo',
     'welcome.title': 'Selamat datang di NotaStation',
     'welcome.lead': 'Pilih cara mulai. Pop 4/4 sudah berisi pola sederhana agar Anda bisa langsung menekan Play.',
     'welcome.language': 'Bahasa',
@@ -208,6 +209,7 @@ const messages = {
     'history.nothingRedo': 'There is no edit to redo yet.',
 
     'project.loadTemplate': 'Load project template',
+    'project.loadDemo': 'Load demo',
     'welcome.title': 'Welcome to NotaStation',
     'welcome.lead': 'Choose how to start. Pop 4/4 already contains a simple pattern so you can press Play immediately.',
     'welcome.language': 'Language',

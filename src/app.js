@@ -5,6 +5,7 @@ import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
 import { commandError, createCommandRegistry } from './core/commands.js';
 import { createHistory } from './core/history.js';
 import { createTemplateProject } from './core/templates.js';
+import { createDemoProject, STABILITY_DEMO_ID } from './core/demos.js';
 import {
   activePattern,
   createBlankProject,
@@ -223,6 +224,19 @@ function registerCommands() {
       },
     },
     {
+      id: 'project.loadDemo',
+      group: 'Project',
+      labelKey: 'project.loadDemo',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('project.loadDemo', args);
+        return loadDemoProject(args.demoId, {
+          locale: args.locale ?? i18n.getLocale(),
+          keymap: args.keymap ?? readInitialKeymap(),
+        });
+      },
+    },
+    {
       id: 'song.setTempo',
       group: 'Song',
       labelKey: 'transport.tempo',
@@ -400,6 +414,34 @@ function loadTemplateProject(templateId, {
     noteCount: activePattern(project).notes.length,
     keymap: project.settings.keymapPreset,
   };
+}
+
+function loadDemoProject(demoId, {
+  locale = i18n.getLocale(),
+  keymap = readInitialKeymap(),
+} = {}) {
+  const nextProject = applyProjectPreferences(createDemoProject(demoId), { locale, keymap });
+  replaceProject(nextProject, 'status.notSaved');
+  return {
+    demoId,
+    projectId: project.id,
+    title: project.title,
+    noteCount: activePattern(project).notes.length,
+    keymap: project.settings.keymapPreset,
+  };
+}
+
+function loadDemoFromQuery() {
+  const demoId = new URL(window.location.href).searchParams.get('demo');
+  if (!demoId) return false;
+  if (demoId !== STABILITY_DEMO_ID) return false;
+
+  registry.execute('project.loadDemo', {
+    demoId,
+    locale: i18n.getLocale(),
+    keymap: readInitialKeymap(),
+  });
+  return true;
 }
 
 function replaceProject(nextProject, statusKey) {
@@ -674,7 +716,7 @@ async function boot() {
     i18n,
   };
 
-  openWelcomeIfNeeded();
+  if (!loadDemoFromQuery()) openWelcomeIfNeeded();
 }
 
 boot().catch((err) => {
