@@ -40,6 +40,7 @@ export function resolveSamplerVoice(project, { instrumentId, pitch }) {
   const playbackRate = 2 ** (semitones / 12);
   const gain = Number(sample.gain ?? 1) * Number(zone.gain ?? 1);
   const pan = Number(instrument.defaultPan ?? 0);
+  const chokeGroup = zone.chokeGroup ?? instrument.chokeGroup ?? null;
   const envelope = instrument.ampEnvelope ?? {
     attackSeconds: 0,
     decaySeconds: 0,
@@ -63,6 +64,7 @@ export function resolveSamplerVoice(project, { instrumentId, pitch }) {
     playbackRate,
     gain,
     pan,
+    chokeGroup,
     envelope: Object.freeze({ ...envelope }),
     loop: Object.freeze(loop),
   });
