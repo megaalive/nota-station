@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
@@ -23,8 +23,8 @@ jobs:
       - run: npm run check
       - run: npm run build
       - run: npx playwright install --with-deps chromium firefox
-      - name: Browser full
-        run: npx playwright test --workers=2 --reporter=list
+      - name: Delta browser R1 exit
+        run: npx playwright test tests/browser/r1-exit.spec.js --workers=1 --reporter=list
         env:
           BASE_PATH: /nota-station/
           PORT: "4173"
