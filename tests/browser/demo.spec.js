@@ -36,6 +36,10 @@ test.describe('stability demo', () => {
     const before = await page.evaluate(() => window.tracker.getState().audio);
     expect(before.schedulerActive).toBe(true);
     expect(before.loop).toBe(true);
+    await expect.poll(
+      () => page.evaluate(() => window.tracker.getState().audio.scheduledInstrumentIds.length),
+      { timeout: 3000 },
+    ).toBe(8);
 
     await page.waitForTimeout(18_000);
 

@@ -33,6 +33,8 @@ export function patternEventTemplates(pattern, tempo, ppq = PPQ) {
     .sort((a, b) => a.startTickLocal - b.startTickLocal || a.trackId.localeCompare(b.trackId))
     .map((note) => ({
       id: note.id,
+      trackId: note.trackId,
+      instrumentId: note.instrumentId,
       pitch: note.pitch,
       velocity: note.velocity,
       startTickLocal: note.startTickLocal,
