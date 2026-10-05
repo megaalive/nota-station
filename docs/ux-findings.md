@@ -42,4 +42,13 @@ Persona minimum:
   scheduler meneruskan `instrumentId` sampai engine.
 - **Status:** koreksi otomatis PASS; **menunggu re-test pendengaran user pada build live baru**.
 
+### UAT ad-hoc — perkusi dominan, bagian tonal nyaris tidak terdengar
+
+- **Observasi:** setelah timbre dipisahkan, user menyatakan hasil "lebih baik" tetapi yang
+  terdengar hampir hanya perkusi.
+- **Root cause:** gain kick jauh lebih tinggi daripada lead/arp/harmony, sementara envelope
+  note tonal terlalu pendek untuk terbaca sebagai bass/melodi.
+- **Koreksi:** turunkan mix perkusi, naikkan bass/lead/harmony, dan panjangkan envelope tonal.
+- **Status:** koreksi otomatis PASS; **menunggu re-test pendengaran user pada build live baru**.
+
 Sesi uji tugas bermoderasi P1–P5 belum dijalankan.
