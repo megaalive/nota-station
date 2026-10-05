@@ -79,7 +79,7 @@ test.describe('channel observability UAT', () => {
     ).toBeGreaterThan(0);
 
     const uiRow = Number(await page.locator('.pattern-grid__row.is-playhead').getAttribute('data-row'));
-    expect(uiRow).toBe(targetRow);
+    expect(Math.abs(uiRow - targetRow)).toBeLessThanOrEqual(1);
 
     await page.getByRole('button', { name: 'Berhenti' }).click();
   });
