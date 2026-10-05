@@ -8,7 +8,6 @@ export function createSongView({
   getProject,
   registry,
   getFocusedOrderEntryId = null,
-  onFocusOrderEntry = null,
   initialMode = 'map',
 }) {
   let mode = initialMode === 'order' ? 'order' : 'map';
@@ -187,7 +186,7 @@ export function createSongView({
 
   function selectEntry(orderEntryId) {
     selectedOrderId = orderEntryId;
-    onFocusOrderEntry?.(orderEntryId);
+    registry.execute('focus.setOrderEntry', { orderEntryId });
     refresh();
     focusSelected();
   }
@@ -196,7 +195,7 @@ export function createSongView({
     if (!selectedOrderId) return;
     const result = registry.execute('song.reuseOrderEntry', { orderEntryId: selectedOrderId });
     selectedOrderId = result.orderEntryId;
-    onFocusOrderEntry?.(selectedOrderId);
+    registry.execute('focus.setOrderEntry', { orderEntryId: selectedOrderId });
     refresh();
     focusSelected();
   }
