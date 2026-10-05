@@ -6,7 +6,8 @@ import { summarizeWavWaveform } from '../../src/io/wav-waveform.js';
 function makeWav({ bits = 16, format = 1, values = [-1, -0.5, 0, 0.5, 0.999] } = {}) {
   const bytesPerSample = bits / 8;
   const dataBytes = values.length * bytesPerSample;
-  const bytes = new Uint8Array(44 + dataBytes);
+  const paddingBytes = dataBytes & 1;
+  const bytes = new Uint8Array(44 + dataBytes + paddingBytes);
   const view = new DataView(bytes.buffer);
   write(bytes, 0, 'RIFF');
   view.setUint32(4, bytes.length - 8, true);
