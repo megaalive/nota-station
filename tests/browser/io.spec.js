@@ -18,6 +18,9 @@ test.describe('JSON debug R1-S7', () => {
     expect(exported.filename.endsWith('.webtrack.json')).toBe(true);
     expect(JSON.parse(exported.text).song.initial.tempo).toBe(144);
 
+    // S11 memulihkan Project saat reload. Tes import ini sengaja mensimulasikan
+    // sesi baru supaya jalur export → import tetap diuji secara terpisah.
+    await page.evaluate(() => sessionStorage.clear());
     await page.reload();
     await gotoApp(page);
     expect(await page.evaluate(() => window.tracker.getState().project.noteCount)).toBe(0);
