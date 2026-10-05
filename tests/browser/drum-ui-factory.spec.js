@@ -98,7 +98,7 @@ test.describe('factory Drum Kit + Pattern lanes R2-S10', () => {
   test('memilih Factory Drum Kit dari picker mengubah track biasa menjadi Drum Track', async ({ page }) => {
     await gotoApp(page);
 
-    // Blank project belum membawa pack; gunakan Pop lalu pilih channel Bass yang masih biasa.
+    // Blank project belum membawa pack; gunakan Pop lalu pilih channel ke-4 yang masih kosong.
     await page.evaluate(() => {
       window.tracker.commands.execute('project.loadTemplate', {
         templateId: 'pop-4-4',
@@ -107,13 +107,13 @@ test.describe('factory Drum Kit + Pattern lanes R2-S10', () => {
       });
     });
 
-    const bassPicker = page.locator('[data-action="track-instrument"]').nth(1);
-    await bassPicker.selectOption('factory.drum-kit');
+    const emptyPicker = page.locator('[data-action="track-instrument"]').nth(3);
+    await emptyPicker.selectOption('factory.drum-kit');
 
-    const track = await page.evaluate(() => window.tracker.getProject().song.tracks[1]);
+    const track = await page.evaluate(() => window.tracker.getProject().song.tracks[3]);
     expect(track.kind).toBe('drum');
     expect(track.polyphony).toBe('poly');
     expect(track.defaultInstrumentId).toBe('factory.drum-kit');
-    await expect(page.locator('.pattern-channel__name').nth(1)).toContainText('DRUM');
+    await expect(page.locator('.pattern-channel__name').nth(3)).toContainText('DRUM');
   });
 });
