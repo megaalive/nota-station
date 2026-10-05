@@ -14,6 +14,7 @@ test.describe('Drum Track voice lanes + choke R2-S9', () => {
         configureDrumTrack,
         createBlankProject,
         enterVoiceNote,
+        setInitialTempo,
       } = await import('./src/core/project.js');
       const {
         createDrumKitInstrument,
@@ -55,6 +56,9 @@ test.describe('Drum Track voice lanes + choke R2-S9', () => {
         samples: [...project.samples, drumSample],
         instruments: [...project.instruments, kit],
       };
+      // 300 BPM membuat row berikutnya masuk look-ahead awal. Ini menguji choke
+      // tanpa bergantung pada apakah AudioContext headless Firefox menggerakkan clock.
+      project = setInitialTempo(project, 300);
 
       const trackId = project.song.tracks[0].id;
       const patternId = project.song.patterns[0].id;
