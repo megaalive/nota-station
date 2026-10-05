@@ -8,9 +8,12 @@ import { createTemplateProject } from './core/templates.js';
 import { createDemoProject, STABILITY_DEMO_ID } from './core/demos.js';
 import {
   activePattern,
+  configureDrumTrack,
   createBlankProject,
   deleteNote,
+  deleteVoiceNote,
   enterNote,
+  enterVoiceNote,
   setInitialTempo,
   updateNoteAtCell,
 } from './core/project.js';
@@ -22,6 +25,7 @@ import {
   setTrackDefaultInstrument,
   updateSingleSampleInstrument,
 } from './core/sound-edit.js';
+import { isDrumKitInstrument } from './core/sound-model.js';
 import { applyPreparedWavImport } from './core/sample-import.js';
 import {
   prepareWavImport,
@@ -340,6 +344,32 @@ function registerCommands() {
       },
     },
     {
+      id: 'pattern.enterVoiceNote',
+      group: 'Pattern',
+      labelKey: 'pattern.enterDrumHit',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.enterVoiceNote', args);
+        commitPatternProject(enterVoiceNote(project, args), 'pattern.enterVoiceNote');
+        return { noteCount: activePattern(project).notes.length };
+      },
+    },
+    {
+      id: 'pattern.deleteVoiceNote',
+      group: 'Pattern',
+      labelKey: 'pattern.deleteDrumHit',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.deleteVoiceNote', args);
+        const before = project;
+        commitPatternProject(deleteVoiceNote(project, args), 'pattern.deleteVoiceNote');
+        return {
+          changed: project !== before,
+          noteCount: activePattern(project).notes.length,
+        };
+      },
+    },
+    {
       id: 'pattern.deleteNote',
       group: 'Pattern',
       labelKey: 'pattern.deleteNote',
@@ -422,7 +452,13 @@ function registerCommands() {
         requireCommandArgs('track.setDefaultInstrument', args);
         const trackId = String(args.trackId ?? '');
         const instrumentId = String(args.instrumentId ?? '');
-        const nextProject = setTrackDefaultInstrument(project, { trackId, instrumentId });
+        const instrument = project.instruments.find((item) => item.id === instrumentId);
+        if (!instrument) {
+          throw commandError('E_SOUND_EDIT_INSTRUMENT', `Instrument tidak dikenal: ${instrumentId}`);
+        }
+        const nextProject = isDrumKitInstrument(instrument)
+          ? configureDrumTrack(project, { trackId, instrumentId })
+          : setTrackDefaultInstrument(project, { trackId, instrumentId });
         const changed = nextProject !== project;
         commitProject(nextProject, 'track.setDefaultInstrument');
         return { trackId, instrumentId, changed };
@@ -743,7 +779,11 @@ function auditionPitch(pitch) {
 }
 
 function auditionInstrument(instrumentId) {
-  void audio.previewInstrument(project, instrumentId, 60, 100)
+  const instrument = project.instruments.find((item) => item.id === instrumentId);
+  const pitch = isDrumKitInstrument(instrument)
+    ? instrument.zones[0]?.keyLow ?? 36
+    : 60;
+  void audio.previewInstrument(project, instrumentId, pitch, 100)
     .then(() => shell?.setAudioStatus('ready'))
     .catch(() => shell?.setAudioStatus('error'));
 }
