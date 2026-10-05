@@ -1,0 +1,35 @@
+name: R3 S2 Targeted Verification
+
+on:
+  push:
+    branches:
+      - r3/s2-song-order-workspace
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run check
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium firefox
+      - name: Browser targeted gate
+        env:
+          CI: "1"
+          PW_PROJECTS: chromium,firefox
+          PW_REPORTER: list
+        run: >-
+          npx playwright test
+          tests/browser/song-workspace.spec.js
+          tests/browser/shell.spec.js
