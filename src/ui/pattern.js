@@ -6,7 +6,7 @@ import { el } from './dom.js';
 import { Button, Tooltip } from './kit.js';
 
 const ROW_HEIGHT = 28;
-const HEADER_HEIGHT = 72;
+const HEADER_HEIGHT = 92;
 const ROW_NUMBER_WIDTH = 46;
 const NOTE_WIDTH = 64;
 const INST_WIDTH = 42;
@@ -36,6 +36,7 @@ export function createPatternView({
   getProject,
   registry,
   onAudition,
+  onInstrumentAudition,
   onStatus,
   initialMode = 'audition',
 }) {
@@ -123,7 +124,7 @@ export function createPatternView({
   }
 
   function renderHeader() {
-    const { tracks } = projectInfo();
+    const { project, tracks } = projectInfo();
     header.textContent = '';
 
     trackUi.clear();
@@ -178,13 +179,54 @@ export function createPatternView({
         'aria-valuenow': '0',
         dataset: { action: 'track-meter', trackId: track.id, level: '0' },
       }, [meterFill]);
+      const instrumentSelect = el('select', {
+        class: 'pattern-channel__instrument',
+        'aria-label': t('pattern.instrumentPicker', { track: index + 1 }),
+        dataset: { action: 'track-instrument', trackId: track.id },
+        on: {
+          change: (event) => {
+            event.stopPropagation();
+            const instrumentId = instrumentSelect.value;
+            registry.execute('track.setDefaultInstrument', {
+              trackId: track.id,
+              instrumentId,
+            });
+            onInstrumentAudition?.(instrumentId);
+          },
+          keydown: (event) => {
+            if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+            event.preventDefault();
+            event.stopPropagation();
+
+            const currentIndex = project.instruments.findIndex(
+              (instrument) => instrument.id === instrumentSelect.value,
+            );
+            const delta = event.key === 'ArrowUp' ? -1 : 1;
+            const nextIndex = (
+              currentIndex + delta + project.instruments.length
+            ) % project.instruments.length;
+            const instrumentId = project.instruments[nextIndex].id;
+
+            registry.execute('track.setDefaultInstrument', {
+              trackId: track.id,
+              instrumentId,
+            });
+            onInstrumentAudition?.(instrumentId);
+          },
+        },
+      }, project.instruments.map((instrument, instrumentIndex) => el('option', {
+        value: instrument.id,
+        text: `${String(instrumentIndex + 1).padStart(2, '0')} · ${instrument.name}`,
+      })));
+      instrumentSelect.value = track.defaultInstrumentId;
+
       const controls = el('span', { class: 'pattern-channel__controls' }, [mute, solo, meter]);
       const channel = el('div', {
         class: 'pattern-grid__channel',
         role: 'columnheader',
         'aria-colindex': String(index * FIELDS.length + 1),
         'aria-colspan': String(FIELDS.length),
-      }, [label, controls]);
+      }, [label, instrumentSelect, controls]);
       channelRow.append(channel);
       trackUi.set(track.id, { channel, mute, solo, meter, meterFill });
     });
@@ -646,6 +688,7 @@ export function createPatternView({
     focus: () => scroller.focus(),
     refresh,
     setPlaybackState,
+    getActiveTrackId: () => projectInfo().tracks[cursorChannel]?.id ?? null,
     getUiState: () => ({
       mode,
       octave,
