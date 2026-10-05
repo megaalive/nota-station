@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createBlankProject } from '../../src/core/project.js';
-import { updateSingleSampleInstrument } from '../../src/core/sound-edit.js';
+import {
+  setTrackDefaultInstrument,
+  updateSingleSampleInstrument,
+} from '../../src/core/sound-edit.js';
 
 function fixture() {
   let seq = 0;
@@ -76,5 +79,39 @@ test('sound edit menolak nilai di luar kontrak dan multizone', () => {
       defaultPan: 0,
     }),
     (error) => error.code === 'E_SOUND_EDIT_MULTIZONE',
+  );
+});
+
+
+test('setTrackDefaultInstrument mengganti default secara immutable dan fail-closed', () => {
+  const project = fixture();
+  const trackId = project.song.tracks[0].id;
+  const current = project.song.tracks[0].defaultInstrumentId;
+  const second = {
+    ...project.instruments[0],
+    id: 'instrument-second',
+    name: 'Second',
+  };
+  const withSecond = { ...project, instruments: [...project.instruments, second] };
+
+  const next = setTrackDefaultInstrument(withSecond, {
+    trackId,
+    instrumentId: second.id,
+  });
+  assert.notEqual(next, withSecond);
+  assert.equal(withSecond.song.tracks[0].defaultInstrumentId, current);
+  assert.equal(next.song.tracks[0].defaultInstrumentId, second.id);
+
+  assert.equal(
+    setTrackDefaultInstrument(next, { trackId, instrumentId: second.id }),
+    next,
+  );
+  assert.throws(
+    () => setTrackDefaultInstrument(next, { trackId: 'missing', instrumentId: second.id }),
+    (error) => error.code === 'E_SOUND_EDIT_TRACK',
+  );
+  assert.throws(
+    () => setTrackDefaultInstrument(next, { trackId, instrumentId: 'missing' }),
+    (error) => error.code === 'E_SOUND_EDIT_INSTRUMENT',
   );
 });

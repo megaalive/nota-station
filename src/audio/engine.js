@@ -426,6 +426,29 @@ export function createAudioEngine({
     return when;
   }
 
+  async function previewInstrument(project, instrumentId, pitch = 60, velocity = 100) {
+    await ensureReady();
+    let voiceProfile = null;
+
+    if (!isDemoInstrument(instrumentId)) {
+      const resolved = resolveSamplerVoice(project, { instrumentId, pitch });
+      const decodedBuffer = await ensureSampleCache().get(resolved.sample);
+      voiceProfile = Object.freeze({ ...resolved, buffer: decodedBuffer });
+    }
+
+    const when = context.currentTime + 0.005;
+    scheduleVoice({
+      pitch,
+      velocity,
+      when,
+      durationSeconds: PREVIEW_SECONDS,
+      kind: 'preview',
+      instrumentId,
+      voiceProfile,
+    });
+    return when;
+  }
+
   function currentTick() {
     if (!playback || state !== 'playing' || !context) return positionTick;
     return transportTickAtAudioTime({
@@ -750,6 +773,7 @@ export function createAudioEngine({
     preload,
     activate,
     preview,
+    previewInstrument,
     playPattern,
     pause,
     stop,

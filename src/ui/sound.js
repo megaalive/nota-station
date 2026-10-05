@@ -402,7 +402,10 @@ export function createSoundView({
   }
 
   refresh();
-  return Object.freeze({ refresh });
+  return Object.freeze({
+    refresh,
+    getSelectedTrackId: () => selectedTrackId,
+  });
 }
 
 function sectionHead(title, label, count) {
