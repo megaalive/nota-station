@@ -35,6 +35,7 @@ const messages = {
     'song.moveEarlier': 'Geser lebih awal',
     'song.moveLater': 'Geser lebih akhir',
     'song.keyboardHint': 'Panah pilih · Alt+Panah pindah · Ctrl+D pakai ulang · Ctrl+Shift+D jadikan unik',
+    'song.focusStoppedPlayback': 'Playback dihentikan karena fokus berpindah ke Pattern lain.',
 
     'sound.title': 'Sample & Instrument',
     'sound.lead': 'Import WAV ke track, lalu gunakan Sample/Instrument yang sama dari Pattern.',
@@ -228,6 +229,7 @@ const messages = {
     'song.moveEarlier': 'Move earlier',
     'song.moveLater': 'Move later',
     'song.keyboardHint': 'Arrows select · Alt+Arrow moves · Ctrl+D reuses · Ctrl+Shift+D makes unique',
+    'song.focusStoppedPlayback': 'Playback stopped because focus moved to a different Pattern.',
 
     'sound.title': 'Sample & Instrument',
     'sound.lead': 'Import a WAV into a track, then reuse its Sample/Instrument from Pattern.',
