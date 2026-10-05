@@ -5,6 +5,16 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R2 — Sample + Instrument (ACTIVE)
 
+### R2-S4 — import transaction + decode cache boundary (CLOSED · PASS)
+
+- Ditambahkan commit Project murni setelah persistence sukses: Sample/Instrument masuk secara atomik dan track tujuan menunjuk instrument baru.
+- Candidate stale tetap dedup berdasarkan contentHash dan zone diremap ke Sample existing; collision track/instrument ditolak tanpa mutasi Project.
+- Ditambahkan decoded sample cache keyed contentHash; concurrent request untuk hash identik coalesce menjadi satu load + satu decode, termasuk alias Sample dengan ID berbeda.
+- Failure decode tidak meracuni cache; retry berikutnya tetap dapat berhasil.
+- Loader bytes memahami factory sample lazy dan storageRef IndexedDB.
+- Gate run **37283388036**: 0 vulnerability, unit **75/75 PASS**, check PASS, build **212.0 KiB PASS**, browser import/cache/storage Chromium+Firefox **8/8 PASS**.
+- Berikutnya: **R2-S5 custom sample playback melalui Instrument/Zone/ADSR/pan model R2**.
+
 ### R2-S3 — persistensi sample + dedup IndexedDB (CLOSED · PASS)
 
 - Ditambahkan sample store IndexedDB hash-addressed; key berasal dari SHA-256 sehingga dedup ditegakkan oleh storage, bukan hanya state Project.
