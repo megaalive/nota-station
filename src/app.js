@@ -50,6 +50,7 @@ const audio = createAudioEngine({
   onStateChange: () => syncTransportUi(),
   onPositionChange: () => syncTransportUi(),
 });
+audio.setTracks(project.song.tracks);
 
 applyTheme(theme);
 
@@ -198,6 +199,38 @@ function registerCommands() {
         audio.setMetronome(project, activePattern(project), transportState.metronome);
         syncTransportUi();
         return transportState.metronome;
+      },
+    },
+    {
+      id: 'audio.toggleTrackMute',
+      group: 'Mixer',
+      labelKey: 'audio.trackMute',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('audio.toggleTrackMute', args);
+        const trackId = String(args.trackId ?? '');
+        if (!project.song.tracks.some((track) => track.id === trackId)) {
+          throw commandError('E_TRACK_NOT_FOUND', `Track tidak dikenal: ${trackId}`);
+        }
+        const result = audio.toggleTrackMute(trackId);
+        syncTransportUi();
+        return result;
+      },
+    },
+    {
+      id: 'audio.toggleTrackSolo',
+      group: 'Mixer',
+      labelKey: 'audio.trackSolo',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('audio.toggleTrackSolo', args);
+        const trackId = String(args.trackId ?? '');
+        if (!project.song.tracks.some((track) => track.id === trackId)) {
+          throw commandError('E_TRACK_NOT_FOUND', `Track tidak dikenal: ${trackId}`);
+        }
+        const result = audio.toggleTrackSolo(trackId);
+        syncTransportUi();
+        return result;
       },
     },
     {
@@ -448,6 +481,7 @@ function replaceProject(nextProject, statusKey) {
   audio.stop();
   history.reset(nextProject);
   project = nextProject;
+  audio.setTracks(project.song.tracks);
 
   // Recreate Pattern view supaya mode awal mengikuti keymap project baru.
   const activeTab = shell?.getActiveTab() ?? 'pattern';
@@ -492,6 +526,7 @@ function syncTransportUi() {
     lengthTicks: pattern.lengthTicks,
     rowTicks: pattern.rowTicks,
   });
+  patternView?.setPlaybackState(audioState);
 }
 
 
