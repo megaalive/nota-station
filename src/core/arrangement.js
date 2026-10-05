@@ -115,11 +115,12 @@ export function makeOrderEntryUnique(
     );
   }
 
-  const clone = clonePattern(source, project.song.patterns, idFactory);
+  const { pattern: clone, noteIdMap } = clonePattern(source, project.song.patterns, idFactory);
   const patterns = [...project.song.patterns, clone];
   const order = project.song.order.map((item, index) => (
     index === orderIndex ? { ...item, patternId: clone.id } : item
   ));
+  const lyrics = remapOccurrenceLyrics(project.song.lyrics, orderEntryId, noteIdMap);
 
   return {
     ...project,
@@ -128,6 +129,7 @@ export function makeOrderEntryUnique(
       ...project.song,
       patterns,
       order,
+      lyrics,
     },
   };
 }
@@ -136,11 +138,30 @@ function clonePattern(source, patterns, idFactory) {
   const clone = structuredClone(source);
   clone.id = idFactory('pattern');
   clone.name = nextPatternName(patterns, source.name);
-  clone.notes = cloneEvents(source.notes, 'note', idFactory);
+  const noteIdMap = new Map();
+  clone.notes = source.notes.map((event) => {
+    const cloned = { ...structuredClone(event), id: idFactory('note') };
+    noteIdMap.set(event.id, cloned.id);
+    return cloned;
+  });
   clone.effects = cloneEvents(source.effects, 'effect', idFactory);
   clone.chords = cloneEvents(source.chords, 'chord', idFactory);
   clone.tempoEvents = cloneEvents(source.tempoEvents, 'tempo', idFactory);
-  return clone;
+  return { pattern: clone, noteIdMap };
+}
+
+function remapOccurrenceLyrics(lyrics, orderEntryId, noteIdMap) {
+  return lyrics.map((block) => ({
+    ...block,
+    syllables: (block.syllables ?? []).map((syllable) => ({
+      ...syllable,
+      anchors: (syllable.anchors ?? []).map((anchor) => (
+        anchor.orderEntryId === orderEntryId && noteIdMap.has(anchor.noteId)
+          ? { ...anchor, noteId: noteIdMap.get(anchor.noteId) }
+          : anchor
+      )),
+    })),
+  }));
 }
 
 function cloneEvents(events, prefix, idFactory) {
