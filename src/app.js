@@ -4,6 +4,11 @@
 import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
 import { commandError, createCommandRegistry } from './core/commands.js';
 import { createHistory } from './core/history.js';
+import {
+  insertOrderEntry,
+  makeOrderEntryUnique,
+  moveOrderEntry,
+} from './core/arrangement.js';
 import { createTemplateProject } from './core/templates.js';
 import { createDemoProject, STABILITY_DEMO_ID } from './core/demos.js';
 import {
@@ -47,6 +52,7 @@ import { Toast } from './ui/kit.js';
 import { createPalette } from './ui/palette.js';
 import { createPatternView } from './ui/pattern.js';
 import { createSoundView } from './ui/sound.js';
+import { createSongView } from './ui/song.js';
 import { createShell } from './ui/shell.js';
 import { createWelcome } from './ui/welcome.js';
 
@@ -97,6 +103,7 @@ let sessionProjectState = Object.freeze({
 const history = createHistory(loadInitialProject());
 let project = history.current();
 let shell = null;
+let songView = null;
 let patternView = null;
 let soundView = null;
 const transportState = {
@@ -391,6 +398,74 @@ function registerCommands() {
         audio.setTempo(project, activePattern(project));
         syncTransportUi();
         return { tempo: project.song.initial.tempo };
+      },
+    },
+    {
+      id: 'song.reuseOrderEntry',
+      group: 'Song',
+      labelKey: 'song.reuse',
+      shortcut: 'Ctrl+D',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('song.reuseOrderEntry', args);
+        const orderEntryId = String(args.orderEntryId ?? '');
+        const index = project.song.order.findIndex((entry) => entry.id === orderEntryId);
+        if (index < 0) {
+          throw commandError(
+            'E_PROJECT_ORDER_MISSING',
+            `OrderEntry tidak dikenal: ${orderEntryId}`,
+          );
+        }
+
+        const source = project.song.order[index];
+        const nextProject = insertOrderEntry(project, {
+          patternId: source.patternId,
+          index: index + 1,
+          sectionId: source.sectionId ?? null,
+          keyOverride: source.keyOverride ?? null,
+        });
+        const inserted = nextProject.song.order[index + 1];
+        commitProject(nextProject, 'song.reuseOrderEntry');
+        return {
+          orderEntryId: inserted.id,
+          patternId: inserted.patternId,
+          index: index + 1,
+        };
+      },
+    },
+    {
+      id: 'song.makeOrderUnique',
+      group: 'Song',
+      labelKey: 'song.makeUnique',
+      shortcut: 'Ctrl+Shift+D',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('song.makeOrderUnique', args);
+        const orderEntryId = String(args.orderEntryId ?? '');
+        const nextProject = makeOrderEntryUnique(project, { orderEntryId });
+        const changed = nextProject !== project;
+        commitProject(nextProject, 'song.makeOrderUnique');
+        const entry = project.song.order.find((item) => item.id === orderEntryId);
+        return {
+          orderEntryId,
+          patternId: entry?.patternId ?? null,
+          changed,
+        };
+      },
+    },
+    {
+      id: 'song.moveOrderEntry',
+      group: 'Song',
+      labelKey: 'song.moveOrder',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('song.moveOrderEntry', args);
+        const orderEntryId = String(args.orderEntryId ?? '');
+        const toIndex = Number(args.toIndex);
+        const nextProject = moveOrderEntry(project, { orderEntryId, toIndex });
+        const changed = nextProject !== project;
+        commitProject(nextProject, 'song.moveOrderEntry');
+        return { orderEntryId, toIndex, changed };
       },
     },
     {
@@ -783,6 +858,7 @@ function commitProject(nextProject, label) {
   persistSessionProjectSnapshot();
   setSaveStatus('status.notSaved');
   syncTransportUi();
+  songView?.refresh();
   patternView?.refresh();
   soundView?.refresh();
   return project;
@@ -821,6 +897,7 @@ function restoreHistory(direction) {
   }
 
   syncTransportUi();
+  songView?.refresh();
   patternView?.refresh();
   soundView?.refresh();
   return history.getState();
@@ -870,8 +947,20 @@ function auditionInstrument(instrumentId, pitchOverride = null) {
 }
 
 function renderWorkspace(tab, root) {
+  songView = null;
   patternView = null;
   soundView = null;
+
+  if (tab === 'song') {
+    songView = createSongView({
+      root,
+      t: (key, vars) => i18n.t(key, vars),
+      getProject: () => project,
+      registry,
+      initialMode: project.settings.keymapPreset === 'openmpt' ? 'order' : 'map',
+    });
+    return true;
+  }
 
   if (tab === 'pattern') {
     patternView = createPatternView({
