@@ -30,13 +30,19 @@ export function patternDurationSeconds(pattern, tempo, ppq = PPQ) {
 export function patternEventTemplates(pattern, tempo, ppq = PPQ) {
   const tickSeconds = secondsPerTick(tempo, ppq);
   return [...pattern.notes]
-    .sort((a, b) => a.startTickLocal - b.startTickLocal || a.trackId.localeCompare(b.trackId))
+    .sort((a, b) => (
+      a.startTickLocal - b.startTickLocal
+      || a.trackId.localeCompare(b.trackId)
+      || voiceLaneOf(a) - voiceLaneOf(b)
+      || a.id.localeCompare(b.id)
+    ))
     .map((note) => ({
       id: note.id,
       trackId: note.trackId,
       instrumentId: note.instrumentId,
       pitch: note.pitch,
       velocity: note.velocity,
+      voiceLane: voiceLaneOf(note),
       startTickLocal: note.startTickLocal,
       offsetSeconds: note.startTickLocal * tickSeconds,
       durationSeconds: note.durationTicks * tickSeconds,
@@ -165,4 +171,9 @@ export function createMetronomeScheduleCursor(pattern, tempo, {
     tempo,
     { loop, startTick, ppq },
   );
+}
+
+
+function voiceLaneOf(note) {
+  return Number.isInteger(note?.voiceLane) ? note.voiceLane : 0;
 }
