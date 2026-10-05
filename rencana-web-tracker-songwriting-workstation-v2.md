@@ -230,7 +230,10 @@ Track
 - **1 Track = 1 header channel** di Pattern (batas baseline 32 track).
 - Track `mono`: note baru memotong note sebelumnya (semantik tracker).
 - Track `poly`: note yang overlap dialokasikan otomatis ke **voice lane** 1..n. Di Pattern, track tampil sebagai sub-kolom (`Lane 1`, `Lane 2`, …) yang dapat dilipat; di Piano Roll semua lane tampil sebagai satu track.
-- Drum track: pitch dipetakan ke zone instrument (§6.3); polifonik secara default.
+- **Drum kit tetap satu Track/header utama**, bukan satu track per piece. Kick, snare, closed/open hat, ride, crash, tom, dan percussion dipilih lewat pitch → zone/sample mapping (§6.3).
+- Drum track polifonik secara default. Hit simultan pada tick yang sama dialokasikan ke **voice lane internal**; lane dapat dilipat agar 8–12 piece drum tidak menghabiskan 8–12 channel utama.
+- Mute/Solo/meter di Pattern berlaku di level Drum Track. Kontrol per-piece (mute/solo/level/pan/choke) berada di Sound/Drum Kit UI; bukan dengan menambah top-level track untuk setiap piece.
+- **Dependensi milestone:** minimal polyphony/voice-lane yang dibutuhkan Drum Track masuk R2 bersama Drum Kit. R3 menggeneralisasikan voice-lane ke semua track polifonik dan menambah UI editing/32 channel penuh.
 
 ### 5.5 Pattern, Order, Section
 
@@ -987,13 +990,13 @@ Setiap milestone memuat **Deliverable UX** di samping deliverable teknis.
 
 ### R2 — Sample + Instrument
 
-**Teknis:** impor WAV; preview waveform; root note, fine tune, volume/pan, loop; instrument single-sample; model multisample tanpa editor kompleks; drum kit mapping + choke group; persistensi IndexedDB; factory pack lazy; deduplikasi hash.
+**Teknis:** impor WAV; preview waveform; root note, fine tune, volume/pan, loop; instrument single-sample; model multisample tanpa editor kompleks; **drum kit mapping + choke group + minimal polyphonic voice-lane untuk Drum Track** (satu track/header dapat memainkan beberapa piece simultan); persistensi IndexedDB; factory pack lazy; deduplikasi hash.
 **UX:** tab **Sound** (mode Sederhana/Lanjutan); **seret-lepas WAV di mana saja → instrument terpasang + toast Urungkan**; picker instrumen di header channel dengan audisi ↑/↓; progress pemuatan; pesan galat WAV spesifik.
-**Exit:** impor WAV user → instrument → mainkan kromatis → reload tetap bisa; choke hi-hat; sample tak didecode berulang; WAV rusak gagal jelas tanpa merusak proyek; fuzz WAV lulus (§10.5). **T3 ≤ 90 dtk.**
+**Exit:** impor WAV user → instrument → mainkan kromatis → reload tetap bisa; satu Drum Track dapat memainkan minimal kick+snare+hi-hat secara simultan tanpa memakai tiga top-level channel; choke hi-hat; sample tak didecode berulang; WAV rusak gagal jelas tanpa merusak proyek; fuzz WAV lulus (§10.5). **T3 ≤ 90 dtk.**
 
 ### R3 — Kematangan editing tracker + struktur lagu
 
-**Teknis:** 32 channel logis; Order List; reuse & clone pattern; seleksi blok; salin/tempel; transpose; sisip/hapus baris; interpolasi volume; kolom instrumen/volume/FX bertipe; efek v0.1; follow playback; mute/solo/volume channel; track polifonik + voice lane; resolusi LPB + kolom DLY.
+**Teknis:** 32 channel logis; Order List; reuse & clone pattern; seleksi blok; salin/tempel; transpose; sisip/hapus baris; interpolasi volume; kolom instrumen/volume/FX bertipe; efek v0.1; follow playback; mute/solo/volume channel; **generalisasi track polifonik + voice lane dari fondasi Drum Track R2 ke semua track**; resolusi LPB + kolom DLY.
 **UX:** **Song Map + Order List (dua pandangan, data sama)**; peringatan *pattern bersama* + "Jadikan unik"; **Command Palette penuh + overlay `?`**; **dua preset keymap** (Songwriter, OpenMPT-like — diverifikasi terhadap OpenMPT); seleksi bertahap `Ctrl+A`; header channel lengkap; progressive disclosure FX.
 **Exit:** lagu 8 pattern dapat disusun tanpa mouse untuk operasi dasar; pattern reuse berubah serentak, clone menghasilkan definisi baru; efek v0.1 punya tes deterministik; 32 channel tetap responsif; reorder Order tidak menggeser chord/tempo (tes properti terhadap §5.1). **T4 ≤ 20 dtk, T5 ≤ 3 mnt.**
 
