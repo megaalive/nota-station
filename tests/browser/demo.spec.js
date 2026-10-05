@@ -58,6 +58,7 @@ test.describe('stability demo', () => {
       expect(after.scheduledInstrumentIds).toEqual([
         'demo.arp',
         'demo.bass',
+        'demo.harmony',
         'demo.hat',
         'demo.kick',
         'demo.lead',
