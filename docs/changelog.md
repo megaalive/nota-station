@@ -3,7 +3,19 @@
 Format singkat: satu entri per slice/PR yang menutup bagian dari milestone.
 Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
-## R2 — Sample + Instrument (ACTIVE)
+## R2 — Sample + Instrument (IMPLEMENTATION COMPLETE · MANUAL UX UAT PENDING)
+
+### R2-S11 — reload custom sample + exit closure (CLOSED · PASS)
+
+- Project aktif kini memiliki snapshot sesi ringan di `sessionStorage` agar reload tab memulihkan model Project; bytes WAV **tidak** digandakan ke sana dan tetap berada di IndexedDB.
+- Restore memakai parser/validator debug JSON yang sama. Snapshot invalid dibuang fail-closed; kegagalan read/write/quota snapshot tidak membatalkan edit Project.
+- Browser gate mengimpor WAV kustom, memasang Instrument, menulis pitch **60 dan 67**, reload, lalu memverifikasi Project/Instrument/note pulih dan bytes WAV IndexedDB tetap identik.
+- Playback sesudah reload memakai Instrument kustom yang dipulihkan. Stop→Play kedua mempertahankan `sampleDecodeCount = 1`, sehingga sample tidak didecode ulang dalam sesi.
+- Factory Basic + Drum Kit berjumlah **57.330 byte raw**, jauh di bawah budget pack **12 MiB**. Regresi Drum UI tetap membuktikan modul bytes drum belum diminta sebelum Play dan baru di-load saat diperlukan.
+- Gate awal run **37313250566**: unit/check/build PASS dan 10/12 browser PASS; dua kegagalan identik berasal dari typo harness `trackId`, bukan runtime. Harness dikoreksi tanpa mengubah runtime.
+- Gate final run **37313557305** pada branch HEAD `39ed918…`: 0 vulnerability, unit **96/96 PASS**, check PASS, build **363,6 KiB PASS**, browser reload/custom playback/Sound/Drum Chromium+Firefox **12/12 PASS**.
+- Exit teknis R2 telah terpenuhi oleh S1–S11. **R2 belum ditandai CLOSED** karena kriteria UX §8.20 **T3 ≤ 90 detik, ≥4/5 peserta tanpa bantuan** masih membutuhkan moderated manual UAT nyata.
+- Persistence ini sengaja hanya recovery reload tab untuk membuktikan exit R2; autosave durable, project library, multi-tab lock, dan format portable tetap scope R4.
 
 ### R2-S10 — Drum Track user-facing + factory Drum Kit (CLOSED · PASS)
 

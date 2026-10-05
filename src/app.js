@@ -35,6 +35,10 @@ import {
 import { summarizeWavWaveform } from './io/wav-waveform.js';
 import { openSampleStore } from './storage/sample-store.js';
 import {
+  restoreSessionProject,
+  saveSessionProject,
+} from './storage/session-project.js';
+import {
   debugJsonFilename,
   parseDebugProject,
   serializeDebugProject,
@@ -84,10 +88,13 @@ async function loadSampleWaveform(sampleId) {
 
 let theme = readInitialTheme();
 let buildInfo = null;
-const history = createHistory(applyProjectPreferences(createBlankProject(), {
-  locale: i18n.getLocale(),
-  keymap: readInitialKeymap(),
-}));
+let sessionProjectState = Object.freeze({
+  restored: false,
+  saved: false,
+  bytes: 0,
+  errorCode: null,
+});
+const history = createHistory(loadInitialProject());
 let project = history.current();
 let shell = null;
 let patternView = null;
@@ -161,6 +168,59 @@ function applyProjectPreferences(nextProject, {
       theme,
     },
   };
+}
+
+function loadInitialProject() {
+  let restored = null;
+  try {
+    restored = restoreSessionProject();
+  } catch (error) {
+    // Snapshot sesi yang rusak tidak boleh membuat aplikasi gagal boot. Modul storage
+    // sudah membuang snapshot invalid; kita fallback ke project kosong yang valid.
+    sessionProjectState = Object.freeze({
+      restored: false,
+      saved: false,
+      bytes: 0,
+      errorCode: error?.code ?? 'E_SESSION_PROJECT_RESTORE',
+    });
+  }
+
+  if (restored) {
+    sessionProjectState = Object.freeze({
+      restored: true,
+      saved: true,
+      bytes: new TextEncoder().encode(serializeDebugProject(restored)).byteLength,
+      errorCode: null,
+    });
+  }
+
+  return applyProjectPreferences(restored ?? createBlankProject(), {
+    locale: i18n.getLocale(),
+    keymap: readInitialKeymap(),
+  });
+}
+
+function persistSessionProjectSnapshot() {
+  try {
+    const result = saveSessionProject(project);
+    sessionProjectState = Object.freeze({
+      restored: sessionProjectState.restored,
+      saved: result.saved,
+      bytes: result.bytes,
+      errorCode: null,
+    });
+    return result;
+  } catch (error) {
+    // Edit tetap sah walau browser menolak sessionStorage (quota/privacy mode).
+    // Persistence sesi hanya recovery untuk reload R2, bukan sumber kebenaran project.
+    sessionProjectState = Object.freeze({
+      restored: sessionProjectState.restored,
+      saved: false,
+      bytes: 0,
+      errorCode: error?.code ?? 'E_SESSION_PROJECT_SAVE',
+    });
+    return Object.freeze({ saved: false, reason: 'error', bytes: 0 });
+  }
 }
 
 function readInitialTheme() {
@@ -661,6 +721,7 @@ function replaceProject(nextProject, statusKey) {
   history.reset(nextProject);
   project = nextProject;
   audio.setTracks(project.song.tracks);
+  persistSessionProjectSnapshot();
 
   // Recreate Pattern view supaya mode awal mengikuti keymap project baru.
   const activeTab = shell?.getActiveTab() ?? 'pattern';
@@ -719,6 +780,7 @@ function commitProject(nextProject, label) {
   if (nextProject === project) return project;
 
   project = history.commit(nextProject, label);
+  persistSessionProjectSnapshot();
   setSaveStatus('status.notSaved');
   syncTransportUi();
   patternView?.refresh();
@@ -749,6 +811,7 @@ function restoreHistory(direction) {
 
   const previous = project;
   project = nextProject;
+  persistSessionProjectSnapshot();
   setSaveStatus('status.notSaved');
 
   if (previous.song.initial.tempo !== project.song.initial.tempo) {
@@ -1059,6 +1122,7 @@ async function boot() {
         positionTick: audio.getState().positionTick,
       },
       history: history.getState(),
+      session: sessionProjectState,
       project: {
         id: project.id,
         patternId: activePattern(project).id,
