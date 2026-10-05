@@ -109,7 +109,34 @@ export function createSampleBufferCache({
 export function createProjectSampleBytesLoader({
   sampleStore = null,
 } = {}) {
-  let factoryBytes = null;
+  const factoryBytes = new Map();
+  let drumPackPromise = null;
+
+  async function loadFactoryBytes(key) {
+    if (factoryBytes.has(key)) return factoryBytes.get(key).slice(0);
+
+    let encoded = null;
+    if (key === 'basic') {
+      encoded = FACTORY_BASIC_WAV_BASE64;
+    } else if (key.startsWith('drum.')) {
+      if (!drumPackPromise) {
+        drumPackPromise = import('./factory-drum-samples.js');
+      }
+      const drumPack = await drumPackPromise;
+      encoded = drumPack.FACTORY_DRUM_WAV_BASE64[key] ?? null;
+    }
+
+    if (!encoded) {
+      throw cacheError(
+        'E_SAMPLE_CACHE_FACTORY_KEY',
+        `Factory sample tidak dikenal: ${key}`,
+      );
+    }
+
+    const bytes = decodeBase64(encoded);
+    factoryBytes.set(key, bytes);
+    return bytes.slice(0);
+  }
 
   return async function loadProjectSampleBytes(sample) {
     if (!sample?.storageRef) {
@@ -117,14 +144,7 @@ export function createProjectSampleBytesLoader({
     }
 
     if (sample.storageRef.kind === 'factory') {
-      if (sample.storageRef.key !== 'basic') {
-        throw cacheError(
-          'E_SAMPLE_CACHE_FACTORY_KEY',
-          `Factory sample tidak dikenal: ${sample.storageRef.key}`,
-        );
-      }
-      if (!factoryBytes) factoryBytes = decodeBase64(FACTORY_BASIC_WAV_BASE64);
-      return factoryBytes.slice(0);
+      return loadFactoryBytes(sample.storageRef.key);
     }
 
     if (sample.storageRef.kind === 'indexeddb') {
