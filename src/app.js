@@ -15,11 +15,16 @@ import {
   updateNoteAtCell,
 } from './core/project.js';
 import { createAudioEngine } from './audio/engine.js';
+import {
+  createProjectSampleBytesLoader,
+} from './audio/sample-buffer-cache.js';
+import { updateSingleSampleInstrument } from './core/sound-edit.js';
 import { applyPreparedWavImport } from './core/sample-import.js';
 import {
   prepareWavImport,
   persistPreparedWavImport,
 } from './io/wav-import.js';
+import { summarizeWavWaveform } from './io/wav-waveform.js';
 import { openSampleStore } from './storage/sample-store.js';
 import {
   debugJsonFilename,
@@ -40,6 +45,7 @@ const KEYMAPS = ['songwriter', 'openmpt'];
 const WELCOME_COMPLETED_KEY = 'notastation.welcome.completed';
 const KEYMAP_STORAGE_KEY = 'notastation.keymapPreset';
 let sampleStorePromise = null;
+const waveformCache = new Map();
 
 function getSampleStore() {
   if (!sampleStorePromise) {
@@ -49,6 +55,22 @@ function getSampleStore() {
     });
   }
   return sampleStorePromise;
+}
+
+async function loadSampleWaveform(sampleId) {
+  const sample = project.samples.find((item) => item.id === sampleId);
+  if (!sample) {
+    throw commandError('E_SAMPLE_NOT_FOUND', `Sample tidak dikenal: ${sampleId}`);
+  }
+  if (waveformCache.has(sample.contentHash)) return waveformCache.get(sample.contentHash);
+
+  const loader = sample.storageRef?.kind === 'indexeddb'
+    ? createProjectSampleBytesLoader({ sampleStore: await getSampleStore() })
+    : createProjectSampleBytesLoader();
+  const bytes = await loader(sample);
+  const summary = summarizeWavWaveform(bytes, { bins: 128 });
+  waveformCache.set(sample.contentHash, summary);
+  return summary;
 }
 
 let theme = readInitialTheme();
@@ -388,6 +410,27 @@ function registerCommands() {
       run: () => cycleTheme(),
     },
     {
+      id: 'sound.updateInstrument',
+      group: 'Sound',
+      labelKey: 'sound.apply',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('sound.updateInstrument', args);
+        const instrumentId = String(args.instrumentId ?? '');
+        const instrument = project.instruments.find((item) => item.id === instrumentId);
+        if (!instrument) {
+          throw commandError('E_SOUND_EDIT_INSTRUMENT', `Instrument tidak dikenal: ${instrumentId}`);
+        }
+
+        const nextProject = updateSingleSampleInstrument(project, args);
+        commitProject(nextProject, 'sound.updateInstrument');
+        return {
+          instrumentId,
+          instrumentName: instrument.name,
+        };
+      },
+    },
+    {
       id: 'io.importWav',
       group: 'File',
       labelKey: 'sound.importWav',
@@ -621,8 +664,8 @@ function commitPatternProject(nextProject, label) {
   return project;
 }
 
-function undoImportedWav() {
-  if (history.getState().undoLabel !== 'io.importWav') {
+function undoSoundEdit(expectedLabel) {
+  if (history.getState().undoLabel !== expectedLabel) {
     return { changed: false, reason: 'history-moved' };
   }
   restoreHistory('undo');
@@ -703,7 +746,9 @@ function renderWorkspace(tab, root) {
       t: (key, vars) => i18n.t(key, vars),
       getProject: () => project,
       onImportWav: (args) => registry.execute('io.importWav', args),
-      onUndo: undoImportedWav,
+      onUpdateInstrument: (args) => registry.execute('sound.updateInstrument', args),
+      onLoadWaveform: loadSampleWaveform,
+      onUndo: undoSoundEdit,
     });
     return true;
   }

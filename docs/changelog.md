@@ -5,6 +5,17 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R2 — Sample + Instrument (ACTIVE)
 
+### R2-S7 — editor Sample/Instrument + waveform (CLOSED · PASS)
+
+- Sound workspace kini memiliki pemilihan Instrument, mode **Sederhana/Lanjutan**, waveform preview, dan editor root note, fine tune, volume, pan, loop, ADSR, serta loop frame.
+- Perubahan parameter menggunakan model kanonik Sample/Instrument dan satu transaksi history; Undo hanya membatalkan edit Sound yang sesuai.
+- Waveform diringkas langsung dari PCM/float WAV tanpa `decodeAudioData`, sehingga preview tidak menambah decode audio kedua.
+- Ditambahkan parser waveform bounded untuk PCM 8/16/24/32-bit dan float32.
+- Factory WAV lama ditemukan tidak memiliki RIFF pad byte untuk data ganjil 1543 byte. Fixture internal diperbaiki menjadi RIFF-valid tanpa mengubah PCM; content hash factory diperbarui ke `1239a698…`.
+- Nilai loop/ADSR invalid ditolak fail-closed tanpa mutasi Project.
+- Gate final run **37294978888** pada HEAD `d85ffff…`: 0 vulnerability, unit **83/83 PASS**, check PASS, build **255.8 KiB PASS**, browser Sound editor/import/playback Chromium+Firefox **16/16 PASS**.
+- Berikutnya: **R2-S8 drag-drop WAV global + picker Instrument di header channel dengan audisi keyboard**.
+
 ### R2-S6 — Sound workspace + Import WAV UI (CLOSED · PASS)
 
 - Tab **Sound** kini menjadi workspace nyata untuk memilih track tujuan, mengimpor WAV, melihat daftar Sample/Instrument, dan status proses/galat.
