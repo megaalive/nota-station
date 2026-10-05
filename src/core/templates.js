@@ -1,7 +1,17 @@
-// Template R1 §6.5. R1 hanya mengirim Kosong + Pop 4/4.
-// Balada 6/8 dan Demo lagu tetap R4 sesuai roadmap.
+// Template R1/R2. Kosong tetap minimal; Pop 4/4 memakai factory Drum Kit R2
+// agar satu top-level channel dapat membawa kick/snare/hi-hat polifonik.
 
-import { activePattern, createBlankProject, enterNote } from './project.js';
+import {
+  activePattern,
+  configureDrumTrack,
+  createBlankProject,
+  enterNote,
+  enterVoiceNote,
+} from './project.js';
+import {
+  createFactoryDrumKitInstrument,
+  createFactoryDrumSamples,
+} from './factory-drum-kit.js';
 
 export const R1_TEMPLATES = Object.freeze([
   { id: 'blank', labelKey: 'template.blank' },
@@ -18,15 +28,19 @@ export function createTemplateProject(templateId, options = {}) {
 
   let project = createBlankProject(options);
   const pattern = activePattern(project);
-  const [kick, snare, bass, melody] = project.song.tracks;
+  const [drums, bass, melody] = project.song.tracks;
+  const drumSamples = createFactoryDrumSamples();
+  const drumKit = createFactoryDrumKitInstrument();
 
   const tracks = project.song.tracks.map((track, index) => ({
     ...track,
-    name: ['Kick', 'Snare', 'Bass', 'Melodi'][index] ?? track.name,
+    name: ['Drums', 'Bass', 'Melodi'][index] ?? track.name,
   }));
   project = {
     ...project,
     title: 'Pop 4/4',
+    samples: [...project.samples, ...drumSamples],
+    instruments: [...project.instruments, drumKit],
     song: {
       ...project.song,
       initial: {
@@ -37,11 +51,32 @@ export function createTemplateProject(templateId, options = {}) {
       tracks,
     },
   };
+  project = configureDrumTrack(project, {
+    trackId: drums.id,
+    instrumentId: drumKit.id,
+  }, options);
+
+  const drumHits = [
+    // Kick lane 0.
+    [0, 0, 36, 96], [4, 0, 36, 92], [8, 0, 36, 96], [12, 0, 36, 92],
+    // Snare lane 1; row 4/12 bersamaan dengan kick + hi-hat.
+    [4, 1, 38, 82], [12, 1, 38, 84],
+    // Hi-hat lane 2. Closed/Open saling choke melalui zone chokeGroup.
+    [0, 2, 42, 48], [2, 2, 42, 42], [4, 2, 42, 50], [6, 2, 42, 42],
+    [8, 2, 42, 48], [10, 2, 42, 42], [12, 2, 42, 50], [14, 2, 46, 46],
+  ];
+  for (const [row, voiceLane, pitch, velocity] of drumHits) {
+    project = enterVoiceNote(project, {
+      patternId: pattern.id,
+      trackId: drums.id,
+      row,
+      voiceLane,
+      pitch,
+      velocity,
+    }, options);
+  }
 
   const notes = [
-    // Drum-like guide memakai factory Basic R1. Factory drum nyata baru R2.
-    [kick.id, 0, 36], [kick.id, 4, 36], [kick.id, 8, 36], [kick.id, 12, 36],
-    [snare.id, 4, 38], [snare.id, 12, 38],
     // Bass guide: C-C-F-G.
     [bass.id, 0, 36], [bass.id, 4, 36], [bass.id, 8, 41], [bass.id, 12, 43],
     // Melodi sederhana 16 row agar langsung terdengar dan mudah diedit.
