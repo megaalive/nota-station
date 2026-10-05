@@ -66,15 +66,15 @@ export function createDemoProject(demoId, options = {}) {
   // Empat bar 4/4. Pulse kick memberi anchor yang stabil untuk didengar lama.
   for (let bar = 0; bar < 4; bar += 1) {
     const start = bar * 16;
-    for (const row of [0, 4, 8, 12]) notes.push([kick.id, start + row, 36, 112]);
-    notes.push([kick.id, start + 14, 38, 76]);
+    for (const row of [0, 4, 8, 12]) notes.push([kick.id, start + row, 36, 84]);
+    notes.push([kick.id, start + 14, 38, 54]);
 
-    for (const row of [4, 12]) notes.push([snare.id, start + row, 50, 96]);
-    notes.push([snare.id, start + 11, 48, 48]);
+    for (const row of [4, 12]) notes.push([snare.id, start + row, 50, 72]);
+    notes.push([snare.id, start + 11, 48, 34]);
 
     // Hi-hat 1/8 dengan aksen bergantian.
     for (let row = 0; row < 16; row += 2) {
-      notes.push([hat.id, start + row, row % 4 === 0 ? 84 : 88, row % 4 === 0 ? 62 : 44]);
+      notes.push([hat.id, start + row, row % 4 === 0 ? 84 : 88, row % 4 === 0 ? 38 : 24]);
     }
   }
 
@@ -87,7 +87,7 @@ export function createDemoProject(demoId, options = {}) {
   ];
   bassBars.forEach((pitches, bar) => {
     pitches.forEach((pitch, beat) => {
-      notes.push([bass.id, bar * 16 + beat * 4, pitch, beat === 0 ? 104 : 88]);
+      notes.push([bass.id, bar * 16 + beat * 4, pitch, beat === 0 ? 116 : 104]);
     });
   });
 
@@ -99,7 +99,7 @@ export function createDemoProject(demoId, options = {}) {
   ];
   arpBars.forEach((pitches, bar) => {
     pitches.forEach((pitch, step) => {
-      notes.push([arp.id, bar * 16 + step * 2, pitch, step % 4 === 0 ? 78 : 62]);
+      notes.push([arp.id, bar * 16 + step * 2, pitch, step % 4 === 0 ? 92 : 76]);
     });
   });
 
@@ -112,16 +112,16 @@ export function createDemoProject(demoId, options = {}) {
   ];
   harmonyBars.forEach((pitches, bar) => {
     pitches.forEach((pitch, beat) => {
-      notes.push([harmony.id, bar * 16 + beat * 4 + 2, pitch, 52]);
+      notes.push([harmony.id, bar * 16 + beat * 4 + 2, pitch, 76]);
     });
   });
 
   // Melodi utama dibuat lapang supaya motifnya tetap terbaca di atas pola ritmis.
   const melody = [
-    [0, 69, 98], [4, 72, 92], [8, 76, 104], [12, 72, 84],
-    [16, 69, 94], [20, 72, 86], [24, 74, 96], [28, 72, 82],
-    [32, 67, 90], [36, 72, 94], [40, 76, 102], [44, 74, 86],
-    [48, 71, 92], [52, 74, 98], [56, 72, 88], [60, 69, 106],
+    [0, 69, 118], [4, 72, 112], [8, 76, 122], [12, 72, 104],
+    [16, 69, 114], [20, 72, 108], [24, 74, 116], [28, 72, 102],
+    [32, 67, 110], [36, 72, 114], [40, 76, 120], [44, 74, 106],
+    [48, 71, 112], [52, 74, 118], [56, 72, 108], [60, 69, 124],
   ];
   for (const [row, pitch, velocity] of melody) {
     notes.push([lead.id, row, pitch, velocity]);
@@ -130,7 +130,7 @@ export function createDemoProject(demoId, options = {}) {
   // Fill menjelang pergantian bar; bar terakhir lebih padat sebagai penanda loop kembali ke awal.
   for (const row of [14, 30, 46]) notes.push([fill.id, row, 55, 58]);
   for (const [row, pitch, velocity] of [
-    [56, 52, 62], [58, 55, 70], [60, 57, 78], [62, 60, 92],
+    [56, 52, 46], [58, 55, 52], [60, 57, 58], [62, 60, 66],
   ]) {
     notes.push([fill.id, row, pitch, velocity]);
   }
