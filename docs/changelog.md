@@ -5,6 +5,13 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### UAT correction — rebalance sustain vs percussion (PASS)
+
+- Setelah sustain nyata ditambahkan, re-test pendengaran menemukan Lead terlalu dominan dan menutupi channel lain; perkusi menjadi terlalu lemah.
+- Mix fixture dikoreksi: Lead/Harmony/Bass sedikit diturunkan, kick/snare/hi-hat dinaikkan moderat. Sustain tetap dipertahankan.
+- Gate run **37258776104**: 0 vulnerability, unit **53/53 PASS**, check/build PASS (**175.3 KiB**), browser demo/audio Chromium+Firefox **10/10 PASS**.
+- Status pendengaran: **FIX DEPLOY PENDING / perlu user re-test**.
+
 ### UAT correction — sustain note nyata pada demo stabilitas (PASS)
 
 - Re-test UAT menemukan semua instrument memang bersuara, tetapi hampir seluruh note masih pendek satu row sehingga belum ada beban sustain yang representatif.

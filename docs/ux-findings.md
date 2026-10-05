@@ -67,4 +67,10 @@ Persona minimum:
 - **Koreksi:** dukungan duration eksplisit yang backward-compatible + Bass 4 row, Lead 8 row, Harmony 16 row, dengan envelope hold/release.
 - **Status:** koreksi otomatis PASS; **menunggu re-test pendengaran user pada build live baru**.
 
+### UAT ad-hoc — Lead menutupi perkusi setelah sustain
+
+- **Observasi:** setelah sustain nyata ditambahkan, Lead menjadi terlalu dominan dan channel perkusi hampir tidak terdengar.
+- **Koreksi:** turunkan gain/sustain Lead/Harmony/Bass secukupnya dan naikkan kick/snare/hi-hat secara moderat tanpa menghapus sustain.
+- **Status:** gate otomatis PASS; **menunggu re-test pendengaran user pada build live baru**.
+
 Sesi uji tugas bermoderasi P1–P5 belum dijalankan.
