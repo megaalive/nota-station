@@ -105,7 +105,59 @@ export function noteAtCell(project, { patternId, trackId, row }) {
   const pattern = project.song.patterns.find((item) => item.id === patternId);
   if (!pattern) return null;
   const tick = row * pattern.rowTicks;
-  return pattern.notes.find((note) => note.trackId === trackId && note.startTickLocal === tick) ?? null;
+  return pattern.notes.find(
+    (note) => note.trackId === trackId
+      && note.startTickLocal === tick
+      && voiceLaneOf(note) === 0,
+  ) ?? null;
+}
+
+export function notesAtCell(project, { patternId, trackId, row }) {
+  const pattern = project.song.patterns.find((item) => item.id === patternId);
+  if (!pattern) return [];
+  const tick = row * pattern.rowTicks;
+  return pattern.notes
+    .filter((note) => note.trackId === trackId && note.startTickLocal === tick)
+    .sort((a, b) => voiceLaneOf(a) - voiceLaneOf(b));
+}
+
+export function configureDrumTrack(
+  project,
+  { trackId, instrumentId },
+  { now = isoNow } = {},
+) {
+  const track = project.song.tracks.find((item) => item.id === trackId);
+  if (!track) {
+    throw projectError('E_PROJECT_TRACK_MISSING', `Track tidak ditemukan: ${trackId}`);
+  }
+  if (!project.instruments.some((item) => item.id === instrumentId)) {
+    throw projectError('E_PROJECT_INSTRUMENT_MISSING', `Instrument tidak ditemukan: ${instrumentId}`);
+  }
+  if (
+    track.kind === 'drum'
+    && track.polyphony === 'poly'
+    && track.defaultInstrumentId === instrumentId
+  ) {
+    return project;
+  }
+
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      tracks: project.song.tracks.map((item) => (
+        item.id === trackId
+          ? {
+              ...item,
+              kind: 'drum',
+              polyphony: 'poly',
+              defaultInstrumentId: instrumentId,
+            }
+          : item
+      )),
+    },
+  };
 }
 
 export function enterNote(
@@ -150,7 +202,9 @@ export function enterNote(
   }
 
   const existing = pattern.notes.find(
-    (note) => note.trackId === trackId && note.startTickLocal === startTickLocal,
+    (note) => note.trackId === trackId
+      && note.startTickLocal === startTickLocal
+      && voiceLaneOf(note) === 0,
   );
   const note = {
     id: existing?.id ?? idFactory('note'),
@@ -165,9 +219,117 @@ export function enterNote(
   };
 
   const notes = pattern.notes
-    .filter((item) => !(item.trackId === trackId && item.startTickLocal === startTickLocal))
+    .filter((item) => !(
+      item.trackId === trackId
+      && item.startTickLocal === startTickLocal
+      && voiceLaneOf(item) === 0
+    ))
     .concat(note)
-    .sort((a, b) => a.startTickLocal - b.startTickLocal || a.trackId.localeCompare(b.trackId));
+    .sort(compareNotes);
+
+  const patterns = [...project.song.patterns];
+  patterns[patternIndex] = { ...pattern, notes };
+
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      patterns,
+    },
+  };
+}
+
+export function enterVoiceNote(
+  project,
+  {
+    patternId,
+    trackId,
+    row,
+    voiceLane,
+    pitch,
+    velocity = 100,
+    instrumentId = null,
+    durationTicks = null,
+  },
+  { idFactory = makeId, now = isoNow } = {},
+) {
+  const patternIndex = project.song.patterns.findIndex((item) => item.id === patternId);
+  if (patternIndex < 0) {
+    throw projectError('E_PROJECT_PATTERN_MISSING', `Pattern tidak ditemukan: ${patternId}`);
+  }
+
+  const pattern = project.song.patterns[patternIndex];
+  const track = project.song.tracks.find((item) => item.id === trackId);
+  if (!track) {
+    throw projectError('E_PROJECT_TRACK_MISSING', `Track tidak ditemukan: ${trackId}`);
+  }
+  if (track.polyphony !== 'poly') {
+    throw projectError(
+      'E_PROJECT_POLYPHONY',
+      `Track ${trackId} tidak menerima voice lane polifonik.`,
+    );
+  }
+  if (!Number.isInteger(voiceLane) || voiceLane < 0 || voiceLane > 31) {
+    throw projectError('E_PROJECT_VOICE_LANE', `voiceLane di luar 0..31: ${voiceLane}`);
+  }
+  if (!Number.isInteger(row) || row < 0 || row >= pattern.lengthTicks / pattern.rowTicks) {
+    throw projectError('E_PROJECT_ROW_RANGE', `Row di luar pattern: ${row}`);
+  }
+  if (!Number.isInteger(pitch) || pitch < 0 || pitch > 127) {
+    throw projectError('E_PROJECT_PITCH_RANGE', `Pitch di luar MIDI 0..127: ${pitch}`);
+  }
+  if (!Number.isInteger(velocity) || velocity < 0 || velocity > 127) {
+    throw projectError('E_PROJECT_VELOCITY_RANGE', `Velocity di luar MIDI 0..127: ${velocity}`);
+  }
+
+  const resolvedInstrumentId = instrumentId ?? track.defaultInstrumentId ?? FACTORY_INSTRUMENT_ID;
+  if (!project.instruments.some((item) => item.id === resolvedInstrumentId)) {
+    throw projectError(
+      'E_PROJECT_INSTRUMENT_MISSING',
+      `Instrument tidak ditemukan: ${resolvedInstrumentId}`,
+    );
+  }
+
+  const startTickLocal = row * pattern.rowTicks;
+  const resolvedDurationTicks = durationTicks ?? pattern.rowTicks;
+  if (
+    !Number.isInteger(resolvedDurationTicks)
+    || resolvedDurationTicks <= 0
+    || startTickLocal + resolvedDurationTicks > pattern.lengthTicks
+  ) {
+    throw projectError(
+      'E_PROJECT_DURATION_RANGE',
+      `Duration note di luar Pattern: ${resolvedDurationTicks}`,
+    );
+  }
+
+  const existing = pattern.notes.find(
+    (note) => note.trackId === trackId
+      && note.startTickLocal === startTickLocal
+      && voiceLaneOf(note) === voiceLane,
+  );
+  const note = {
+    id: existing?.id ?? idFactory('note'),
+    trackId,
+    startTickLocal,
+    durationTicks: resolvedDurationTicks,
+    pitch,
+    instrumentId: resolvedInstrumentId,
+    velocity,
+    voiceLane,
+    source: 'user',
+    locked: false,
+  };
+
+  const notes = pattern.notes
+    .filter((item) => !(
+      item.trackId === trackId
+      && item.startTickLocal === startTickLocal
+      && voiceLaneOf(item) === voiceLane
+    ))
+    .concat(note)
+    .sort(compareNotes);
 
   const patterns = [...project.song.patterns];
   patterns[patternIndex] = { ...pattern, notes };
@@ -200,7 +362,9 @@ export function updateNoteAtCell(
 
   const startTickLocal = row * pattern.rowTicks;
   const noteIndex = pattern.notes.findIndex(
-    (note) => note.trackId === trackId && note.startTickLocal === startTickLocal,
+    (note) => note.trackId === trackId
+      && note.startTickLocal === startTickLocal
+      && voiceLaneOf(note) === 0,
   );
   if (noteIndex < 0) {
     throw projectError('E_PROJECT_NOTE_MISSING', `Note tidak ditemukan pada row ${row}.`);
@@ -256,7 +420,11 @@ export function deleteNote(
 
   const startTickLocal = row * pattern.rowTicks;
   const notes = pattern.notes.filter(
-    (note) => !(note.trackId === trackId && note.startTickLocal === startTickLocal),
+    (note) => !(
+      note.trackId === trackId
+      && note.startTickLocal === startTickLocal
+      && voiceLaneOf(note) === 0
+    ),
   );
   if (notes.length === pattern.notes.length) return project;
 
@@ -271,6 +439,17 @@ export function deleteNote(
       patterns,
     },
   };
+}
+
+function voiceLaneOf(note) {
+  return Number.isInteger(note?.voiceLane) ? note.voiceLane : 0;
+}
+
+function compareNotes(a, b) {
+  return a.startTickLocal - b.startTickLocal
+    || a.trackId.localeCompare(b.trackId)
+    || voiceLaneOf(a) - voiceLaneOf(b)
+    || a.id.localeCompare(b.id);
 }
 
 export function projectError(code, message) {
