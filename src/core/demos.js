@@ -66,15 +66,15 @@ export function createDemoProject(demoId, options = {}) {
   // Empat bar 4/4. Pulse kick memberi anchor yang stabil untuk didengar lama.
   for (let bar = 0; bar < 4; bar += 1) {
     const start = bar * 16;
-    for (const row of [0, 4, 8, 12]) notes.push([kick.id, start + row, 36, 84]);
+    for (const row of [0, 4, 8, 12]) notes.push([kick.id, start + row, 36, 92]);
     notes.push([kick.id, start + 14, 38, 54]);
 
-    for (const row of [4, 12]) notes.push([snare.id, start + row, 50, 72]);
+    for (const row of [4, 12]) notes.push([snare.id, start + row, 50, 80]);
     notes.push([snare.id, start + 11, 48, 34]);
 
     // Hi-hat 1/8 dengan aksen bergantian.
     for (let row = 0; row < 16; row += 2) {
-      notes.push([hat.id, start + row, row % 4 === 0 ? 84 : 88, row % 4 === 0 ? 38 : 24]);
+      notes.push([hat.id, start + row, row % 4 === 0 ? 84 : 88, row % 4 === 0 ? 46 : 30]);
     }
   }
 
