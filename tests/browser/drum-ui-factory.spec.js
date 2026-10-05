@@ -35,9 +35,9 @@ test.describe('factory Drum Kit + Pattern lanes R2-S10', () => {
     const grid = page.locator('[data-action="pattern-grid"]');
     await expect(grid).toBeFocused();
 
-    await grid.press('Digit1');
-    await grid.press('Digit2');
-    await grid.press('Digit3');
+    await grid.press('1');
+    await grid.press('2');
+    await grid.press('3');
 
     await expect(noteCell(page, 1)).toHaveText('KSC');
     let state = await page.evaluate(() => {
@@ -59,9 +59,9 @@ test.describe('factory Drum Kit + Pattern lanes R2-S10', () => {
     ]);
     expect(state.row).toBe('1');
 
-    await grid.press('Digit3');
+    await grid.press('3');
     await expect(noteCell(page, 1)).toHaveText('KS');
-    await grid.press('Digit4');
+    await grid.press('4');
     await expect(noteCell(page, 1)).toHaveText('KSO');
 
     await grid.press('Delete');
