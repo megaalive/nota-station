@@ -957,6 +957,7 @@ function renderWorkspace(tab, root) {
       t: (key, vars) => i18n.t(key, vars),
       getProject: () => project,
       registry,
+      initialMode: project.settings.keymapPreset === 'openmpt' ? 'order' : 'map',
     });
     return true;
   }
