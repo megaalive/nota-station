@@ -6,6 +6,17 @@ import { STABILITY_DEMO_INSTRUMENTS } from '../core/demos.js';
 const DEMO_IDS = new Set(STABILITY_DEMO_INSTRUMENTS.map((item) => item.id));
 const noiseBuffers = new WeakMap();
 
+export const DEMO_TIMBRE_SIGNATURES = Object.freeze({
+  'demo.kick': 'osc:sine:pitch-drop:pan0.00',
+  'demo.snare': 'noise:bandpass1850:pan+0.12',
+  'demo.hat': 'noise:highpass6800:pan-0.58',
+  'demo.bass': 'osc:triangle:lowpass720:pan-0.08',
+  'demo.arp': 'osc:square:lowpass2600:pan-0.42',
+  'demo.lead': 'osc:sawtooth:lowpass2100:pan+0.26',
+  'demo.harmony': 'osc:sine:steady:pan+0.56',
+  'demo.fill': 'osc:sine:pitch-drop:pan-0.20',
+});
+
 export function isDemoInstrument(instrumentId) {
   return DEMO_IDS.has(instrumentId);
 }
