@@ -457,6 +457,16 @@ function registerCommands() {
       },
     },
     {
+      id: 'focus.setOrderEntry',
+      group: 'Song',
+      labelKey: 'song.focusOrder',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('focus.setOrderEntry', args);
+        return setFocusedOrderEntry(String(args.orderEntryId ?? ''));
+      },
+    },
+    {
       id: 'song.reuseOrderEntry',
       group: 'Song',
       labelKey: 'song.reuse',
@@ -1018,7 +1028,6 @@ function renderWorkspace(tab, root) {
       getProject: () => project,
       registry,
       getFocusedOrderEntryId: () => focus.getState().orderEntryId,
-      onFocusOrderEntry: setFocusedOrderEntry,
       initialMode: project.settings.keymapPreset === 'openmpt' ? 'order' : 'map',
     });
     return true;
