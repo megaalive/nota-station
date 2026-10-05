@@ -7,8 +7,9 @@ export function createSongView({
   t,
   getProject,
   registry,
+  initialMode = 'map',
 }) {
-  let mode = 'map';
+  let mode = initialMode === 'order' ? 'order' : 'map';
   let selectedOrderId = null;
 
   const heading = el('div', { class: 'song-workspace__heading' }, [
