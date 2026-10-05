@@ -344,6 +344,55 @@ export function enterVoiceNote(
   };
 }
 
+export function deleteVoiceNote(
+  project,
+  { patternId, trackId, row, voiceLane },
+  { now = isoNow } = {},
+) {
+  const patternIndex = project.song.patterns.findIndex((item) => item.id === patternId);
+  if (patternIndex < 0) {
+    throw projectError('E_PROJECT_PATTERN_MISSING', `Pattern tidak ditemukan: ${patternId}`);
+  }
+
+  const pattern = project.song.patterns[patternIndex];
+  const track = project.song.tracks.find((item) => item.id === trackId);
+  if (!track) {
+    throw projectError('E_PROJECT_TRACK_MISSING', `Track tidak ditemukan: ${trackId}`);
+  }
+  if (track.polyphony !== 'poly') {
+    throw projectError(
+      'E_PROJECT_POLYPHONY',
+      `Track ${trackId} tidak menerima voice lane polifonik.`,
+    );
+  }
+  if (!Number.isInteger(voiceLane) || voiceLane < 0 || voiceLane > 31) {
+    throw projectError('E_PROJECT_VOICE_LANE', `voiceLane di luar 0..31: ${voiceLane}`);
+  }
+  if (!Number.isInteger(row) || row < 0 || row >= pattern.lengthTicks / pattern.rowTicks) {
+    throw projectError('E_PROJECT_ROW_RANGE', `Row di luar pattern: ${row}`);
+  }
+
+  const startTickLocal = row * pattern.rowTicks;
+  const notes = pattern.notes.filter((note) => !(
+    note.trackId === trackId
+    && note.startTickLocal === startTickLocal
+    && voiceLaneOf(note) === voiceLane
+  ));
+  if (notes.length === pattern.notes.length) return project;
+
+  const patterns = [...project.song.patterns];
+  patterns[patternIndex] = { ...pattern, notes };
+
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      patterns,
+    },
+  };
+}
+
 export function updateNoteAtCell(
   project,
   { patternId, trackId, row, instrumentId, velocity },
