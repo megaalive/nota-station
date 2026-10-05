@@ -4,10 +4,9 @@ Web Tracker Songwriting Workstation — static site untuk GitHub Pages.
 Seluruh aplikasi berdiri di atas satu model musik kanonik, lalu diproyeksikan ke beberapa
 tampilan sekaligus (Pattern, Piano Roll, Lyrics, Guitar, Score).
 
-Status: **R1 — Tracker yang bisa dimainkan: ACTIVE**. R0 sudah CLOSED.
-Slice R1-S1 sudah memberi Pattern editor 8 channel × 64 row, mode AUDISI/EDIT,
-factory sample CC0, serta Play/Stop Web Audio. R1 belum selesai: transport penuh,
-loop/metronome, undo/redo, JSON import/export, dan operasi tracker lanjutan masih menyusul.
+Status implementasi: **R2 — Sample + Instrument: COMPLETE**, dengan moderated manual UX UAT T3 masih pending. R0 sudah CLOSED; implementasi R1 juga sudah selesai dengan manual audio/UX UAT tersisa.
+
+Saat ini NotaStation sudah memiliki Pattern editor 8 channel × 64 row, transport/loop/metronome, undo/redo, debug JSON, Sound workspace, impor WAV + IndexedDB, editor Sample/Instrument, picker + global WAV drop, serta satu Drum Track polifonik dengan choke hi-hat dan factory Drum Kit lazy-loaded.
 
 ## Menjalankan
 
