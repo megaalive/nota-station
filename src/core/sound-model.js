@@ -16,7 +16,7 @@ export function createFactoryBasicSample() {
     id: FACTORY_BASIC_SAMPLE_ID,
     name: 'Basic',
     sourceFilename: 'factory-basic.wav',
-    contentHash: 'sha256:78a8007e9b2f6c239a1d33542d8d13b535e0c248edb30d6046af9a9bba4f6438',
+    contentHash: 'sha256:1239a6983b871bda0ff4863346b1770f99ec30dc2685962e0c19c90a1f489557',
     channels: 1,
     sampleRate: 11025,
     frameCount: 1543,
