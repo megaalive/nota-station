@@ -15,6 +15,11 @@ import {
   updateNoteAtCell,
 } from './core/project.js';
 import { createAudioEngine } from './audio/engine.js';
+import { applyPreparedWavImport } from './core/sample-import.js';
+import {
+  prepareWavImport,
+  persistPreparedWavImport,
+} from './io/wav-import.js';
 import { openSampleStore } from './storage/sample-store.js';
 import {
   debugJsonFilename,
@@ -23,6 +28,7 @@ import {
 } from './io/debug-json.js';
 import { createPalette } from './ui/palette.js';
 import { createPatternView } from './ui/pattern.js';
+import { createSoundView } from './ui/sound.js';
 import { createShell } from './ui/shell.js';
 import { createWelcome } from './ui/welcome.js';
 
@@ -35,6 +41,16 @@ const WELCOME_COMPLETED_KEY = 'notastation.welcome.completed';
 const KEYMAP_STORAGE_KEY = 'notastation.keymapPreset';
 let sampleStorePromise = null;
 
+function getSampleStore() {
+  if (!sampleStorePromise) {
+    sampleStorePromise = openSampleStore().catch((error) => {
+      sampleStorePromise = null;
+      throw error;
+    });
+  }
+  return sampleStorePromise;
+}
+
 let theme = readInitialTheme();
 let buildInfo = null;
 const history = createHistory(applyProjectPreferences(createBlankProject(), {
@@ -44,6 +60,7 @@ const history = createHistory(applyProjectPreferences(createBlankProject(), {
 let project = history.current();
 let shell = null;
 let patternView = null;
+let soundView = null;
 const transportState = {
   loopPattern: true,
   metronome: false,
@@ -51,15 +68,7 @@ const transportState = {
 const audio = createAudioEngine({
   onStateChange: () => syncTransportUi(),
   onPositionChange: () => syncTransportUi(),
-  getSampleStore: () => {
-    if (!sampleStorePromise) {
-      sampleStorePromise = openSampleStore().catch((error) => {
-        sampleStorePromise = null;
-        throw error;
-      });
-    }
-    return sampleStorePromise;
-  },
+  getSampleStore,
 });
 audio.setTracks(project.song.tracks);
 
@@ -379,6 +388,51 @@ function registerCommands() {
       run: () => cycleTheme(),
     },
     {
+      id: 'io.importWav',
+      group: 'File',
+      labelKey: 'sound.importWav',
+      requiresArgs: true,
+      run: async (args) => {
+        requireCommandArgs('io.importWav', args);
+        const trackId = String(args.trackId ?? '');
+        const sourceFilename = String(args.sourceFilename ?? '');
+        const bytes = args.bytes;
+        const track = project.song.tracks.find((item) => item.id === trackId);
+        if (!track) {
+          throw commandError('E_TRACK_NOT_FOUND', `Track tidak dikenal: ${trackId}`);
+        }
+
+        const beforeProject = project;
+        const prepared = await prepareWavImport(project, {
+          bytes,
+          sourceFilename,
+        });
+        const sampleStore = await getSampleStore();
+        const persisted = await persistPreparedWavImport(prepared, bytes, sampleStore);
+
+        if (project !== beforeProject) {
+          throw commandError(
+            'E_IMPORT_STALE_PROJECT',
+            'Project berubah ketika WAV sedang diproses. Ulangi import pada state terbaru.',
+          );
+        }
+
+        const applied = applyPreparedWavImport(project, persisted, { trackId });
+        commitProject(applied.project, 'io.importWav');
+
+        return {
+          sampleAdded: applied.sampleAdded,
+          sampleId: applied.sampleId,
+          instrumentId: applied.instrumentId,
+          instrumentName: persisted.instrument.name,
+          trackId,
+          trackName: track.name,
+          duplicateSampleId: persisted.duplicateSampleId,
+          storageInserted: persisted.storage.inserted,
+        };
+      },
+    },
+    {
       id: 'io.exportDebugJson',
       group: 'File',
       labelKey: 'io.exportDebugJson',
@@ -554,6 +608,7 @@ function commitProject(nextProject, label) {
   setSaveStatus('status.notSaved');
   syncTransportUi();
   patternView?.refresh();
+  soundView?.refresh();
   return project;
 }
 
@@ -564,6 +619,14 @@ function commitPatternProject(nextProject, label) {
     audio.reschedulePattern(project, activePattern(project));
   }
   return project;
+}
+
+function undoImportedWav() {
+  if (history.getState().undoLabel !== 'io.importWav') {
+    return { changed: false, reason: 'history-moved' };
+  }
+  restoreHistory('undo');
+  return { changed: true };
 }
 
 function restoreHistory(direction) {
@@ -582,6 +645,7 @@ function restoreHistory(direction) {
 
   syncTransportUi();
   patternView?.refresh();
+  soundView?.refresh();
   return history.getState();
 }
 
@@ -618,18 +682,33 @@ function auditionPitch(pitch) {
 
 function renderWorkspace(tab, root) {
   patternView = null;
-  if (tab !== 'pattern') return false;
+  soundView = null;
 
-  patternView = createPatternView({
-    root,
-    t: (key, vars) => i18n.t(key, vars),
-    getProject: () => project,
-    registry,
-    onAudition: auditionPitch,
-    onStatus: (status) => shell?.setPatternStatus(status),
-    initialMode: project.settings.keymapPreset === 'openmpt' ? 'edit' : 'audition',
-  });
-  return true;
+  if (tab === 'pattern') {
+    patternView = createPatternView({
+      root,
+      t: (key, vars) => i18n.t(key, vars),
+      getProject: () => project,
+      registry,
+      onAudition: auditionPitch,
+      onStatus: (status) => shell?.setPatternStatus(status),
+      initialMode: project.settings.keymapPreset === 'openmpt' ? 'edit' : 'audition',
+    });
+    return true;
+  }
+
+  if (tab === 'sound') {
+    soundView = createSoundView({
+      root,
+      t: (key, vars) => i18n.t(key, vars),
+      getProject: () => project,
+      onImportWav: (args) => registry.execute('io.importWav', args),
+      onUndo: undoImportedWav,
+    });
+    return true;
+  }
+
+  return false;
 }
 
 function mountShell(activeTab = 'pattern') {

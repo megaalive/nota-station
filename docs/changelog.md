@@ -5,6 +5,16 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R2 — Sample + Instrument (ACTIVE)
 
+### R2-S6 — Sound workspace + Import WAV UI (CLOSED · PASS)
+
+- Tab **Sound** kini menjadi workspace nyata untuk memilih track tujuan, mengimpor WAV, melihat daftar Sample/Instrument, dan status proses/galat.
+- Import UI memakai pipeline R2 yang sama dengan core: parse/hash → persist IndexedDB → commit Project → pasang Instrument ke track.
+- Import dapat di-Undo dari toast melalui history. Undo hanya berjalan bila top history masih `io.importWav`, sehingga tidak dapat membatalkan edit lain yang terjadi sesudah import.
+- Undo memulihkan Project/track assignment, sedangkan bytes sample tetap tersimpan di IndexedDB untuk dedup dan tidak dihapus destruktif.
+- WAV rusak menampilkan error code spesifik tanpa mengubah Project.
+- Gate final run **37293657677** pada HEAD `8750980…`: 0 vulnerability, unit **78/78 PASS**, check PASS, build **236.0 KiB PASS**, browser Sound/import/shell/storage Chromium+Firefox **62/62 PASS**.
+- Berikutnya: **R2-S7 editor Sample/Instrument + waveform + mode Sederhana/Lanjutan**.
+
 ### R2-S5 — custom sample playback melalui model Instrument (CLOSED · PASS)
 
 - Audio engine kini resolve Instrument → Zone → Sample secara data-driven; tuning, gain, pan, ADSR, dan loop dibaca dari model R2.
