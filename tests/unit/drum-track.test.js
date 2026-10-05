@@ -184,3 +184,43 @@ test('enterVoiceNote menolak lane pada track mono dan lane di luar batas', () =>
     (error) => error.code === 'E_PROJECT_VOICE_LANE',
   );
 });
+
+
+test('configureDrumTrack menolak konversi track berisi note agar data lama tidak ditafsirkan ulang', () => {
+  let project = createBlankProject({
+    idFactory: (() => {
+      let seq = 0;
+      return (prefix) => `filled-${prefix}-${++seq}`;
+    })(),
+    now: () => '2026-10-05T11:20:00.000Z',
+  });
+  const patternId = project.song.patterns[0].id;
+  const trackId = project.song.tracks[0].id;
+  project = enterVoiceNote(
+    configureDrumTrack({
+      ...project,
+      instruments: [...project.instruments, fixture().kit],
+      samples: [...project.samples, fixture().drumSample],
+    }, { trackId, instrumentId: 'instrument.drum-kit' }),
+    { patternId, trackId, row: 0, voiceLane: 0, pitch: 36 },
+  );
+
+  // Kembalikan metadata track saja menjadi instrument untuk mensimulasikan track lama berisi note.
+  const legacyLike = {
+    ...project,
+    song: {
+      ...project.song,
+      tracks: project.song.tracks.map((track) => (
+        track.id === trackId ? { ...track, kind: 'instrument', polyphony: 'mono' } : track
+      )),
+    },
+  };
+
+  assert.throws(
+    () => configureDrumTrack(legacyLike, {
+      trackId,
+      instrumentId: 'instrument.drum-kit',
+    }),
+    (error) => error.code === 'E_PROJECT_DRUM_TRACK_NOT_EMPTY',
+  );
+});

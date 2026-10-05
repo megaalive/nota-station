@@ -5,6 +5,18 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R2 — Sample + Instrument (ACTIVE)
 
+### R2-S10 — Drum Track user-facing + factory Drum Kit (CLOSED · PASS)
+
+- Template Pop 4/4 kini memakai **satu** top-level `Drums` channel dengan voice lane kick/snare/hi-hat, bukan channel terpisah per piece.
+- Pattern menampilkan ringkasan hit `K/S/C/O`; tombol 1–4 mengaudisi/toggle Kick, Snare, Closed HH, Open HH tanpa auto-advance sehingga beberapa piece dapat berada pada row yang sama.
+- Delete pada Drum Track membersihkan seluruh row drum sebagai satu transaksi history.
+- Ditambahkan Factory Drum Kit CC0 dengan empat WAV sintetis deterministik dan metadata SHA-256 yang diverifikasi byte-for-byte.
+- Pack drum dimuat dengan dynamic import hanya saat storage key `drum.*` benar-benar dibutuhkan; sebelum Play modul bytes drum tidak diambil.
+- Memilih Drum Kit pada channel kosong mengubah track menjadi `kind=drum`, `polyphony=poly`. Konversi track yang sudah berisi note ditolak `E_PROJECT_DRUM_TRACK_NOT_EMPTY` agar data lama tidak ditafsirkan ulang diam-diam.
+- Drum Kit S9 tanpa marker `drumKit` tetap dikenali melalui bentuk multi-zone exact-note untuk kompatibilitas.
+- Gate final run **37307629497** pada HEAD `9c0b354…`: 0 vulnerability, unit **91/91 PASS**, check PASS, build **359.7 KiB PASS**, browser Drum UI/factory/Pattern/Sound Chromium+Firefox **44/44 PASS**.
+- Berikutnya: **R2-S11 exit closure — reload custom sample tetap playable, persistence session, dan audit factory/lazy budget**.
+
 ### R2-S9 — Drum Track voice lane + choke group (CLOSED · PASS)
 
 - Satu top-level Drum Track kini dapat menyimpan beberapa `NoteEvent` pada tick yang sama melalui `voiceLane` 0..31; track biasa tetap mono dan kompatibel dengan data lama.

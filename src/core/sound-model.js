@@ -92,6 +92,7 @@ export function createDrumKitInstrument({
     id,
     name,
     type: 'sampler',
+    drumKit: true,
     zones: zones.map((zone) => {
       const note = zone.note;
       return {
@@ -195,6 +196,12 @@ export function validateInstrumentModel(instrument, sampleIds) {
   if (instrument.type !== 'sampler') {
     throw soundError('E_SOUND_INSTRUMENT_TYPE', 'Instrument R2 harus type=sampler.');
   }
+  if (
+    Object.hasOwn(instrument, 'drumKit')
+    && typeof instrument.drumKit !== 'boolean'
+  ) {
+    throw soundError('E_SOUND_DRUM_KIT', 'instrument.drumKit harus boolean.');
+  }
   if (!Array.isArray(instrument.zones) || instrument.zones.length < 1 || instrument.zones.length > 128) {
     throw soundError('E_SOUND_ZONES', 'Instrument harus punya 1..128 zone.');
   }
@@ -222,6 +229,22 @@ export function validateInstrumentModel(instrument, sampleIds) {
     }
   }
 
+  if (instrument.drumKit === true) {
+    if (instrument.zones.length < 2) {
+      throw soundError('E_SOUND_DRUM_KIT', 'Drum Kit harus memiliki minimal dua zone.');
+    }
+    const notes = new Set();
+    for (const zone of instrument.zones) {
+      if (zone.keyLow !== zone.keyHigh) {
+        throw soundError('E_SOUND_DRUM_KIT', 'Zone Drum Kit harus memetakan tepat satu note.');
+      }
+      if (notes.has(zone.keyLow)) {
+        throw soundError('E_SOUND_DRUM_KIT', `Note Drum Kit duplikat: ${zone.keyLow}`);
+      }
+      notes.add(zone.keyLow);
+    }
+  }
+
   requireObject(instrument.ampEnvelope, 'instrument.ampEnvelope');
   requireFiniteRange(instrument.ampEnvelope.attackSeconds, 0, 60, 'ampEnvelope.attackSeconds');
   requireFiniteRange(instrument.ampEnvelope.decaySeconds, 0, 60, 'ampEnvelope.decaySeconds');
@@ -232,6 +255,15 @@ export function validateInstrumentModel(instrument, sampleIds) {
     throw soundError('E_SOUND_CHOKE_GROUP', 'chokeGroup harus null atau string.');
   }
   return instrument;
+}
+
+export function isDrumKitInstrument(instrument) {
+  if (instrument?.type !== 'sampler' || !Array.isArray(instrument.zones)) return false;
+  if (instrument.drumKit === true) return true;
+  // Kompatibilitas project S9: sebelum marker drumKit ada, kit sudah berbentuk
+  // multi-zone dengan setiap zone memetakan tepat satu MIDI note.
+  return instrument.zones.length >= 2
+    && instrument.zones.every((zone) => zone.keyLow === zone.keyHigh);
 }
 
 function isCanonicalSample(sample) {

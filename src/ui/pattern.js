@@ -1,7 +1,8 @@
 // Pattern editor R1: DOM windowed, 8 channel, kolom tracker NOTE | INST | VOL.
 // View tidak pernah menulis project langsung; semua mutasi lewat command registry.
 
-import { activePattern, noteAtCell } from '../core/project.js';
+import { activePattern, noteAtCell, notesAtCell } from '../core/project.js';
+import { isDrumKitInstrument } from '../core/sound-model.js';
 import { el } from './dom.js';
 import { Button, Tooltip } from './kit.js';
 
@@ -29,6 +30,20 @@ const HEX_CODES = new Map([
 ]);
 
 const NOTE_NAMES = ['C-', 'C#', 'D-', 'D#', 'E-', 'F-', 'F#', 'G-', 'G#', 'A-', 'A#', 'B-'];
+
+const DRUM_KEYS = new Map([
+  ['Digit1', { voiceLane: 0, pitch: 36, label: 'K' }],
+  ['Digit2', { voiceLane: 1, pitch: 38, label: 'S' }],
+  ['Digit3', { voiceLane: 2, pitch: 42, label: 'C' }],
+  ['Digit4', { voiceLane: 2, pitch: 46, label: 'O' }],
+]);
+
+const DRUM_PITCH_LABELS = new Map([
+  [36, 'K'],
+  [38, 'S'],
+  [42, 'C'],
+  [46, 'O'],
+]);
 
 export function createPatternView({
   root,
@@ -139,7 +154,9 @@ export function createPatternView({
     tracks.forEach((track, index) => {
       const label = el('span', {
         class: 'pattern-channel__name',
-        text: `${index + 1} · ${track.name}`,
+        text: track.kind === 'drum'
+          ? `${index + 1} · ${track.name} · ${t('pattern.drumBadge')}`
+          : `${index + 1} · ${track.name}`,
       });
       const mute = el('button', {
         type: 'button',
@@ -179,6 +196,9 @@ export function createPatternView({
         'aria-valuenow': '0',
         dataset: { action: 'track-meter', trackId: track.id, level: '0' },
       }, [meterFill]);
+      const instrumentChoices = track.kind === 'drum'
+        ? project.instruments.filter((instrument) => isDrumKitInstrument(instrument))
+        : project.instruments;
       const instrumentSelect = el('select', {
         class: 'pattern-channel__instrument',
         'aria-label': t('pattern.instrumentPicker', { track: index + 1 }),
@@ -198,14 +218,14 @@ export function createPatternView({
             event.preventDefault();
             event.stopPropagation();
 
-            const currentIndex = project.instruments.findIndex(
+            const currentIndex = instrumentChoices.findIndex(
               (instrument) => instrument.id === instrumentSelect.value,
             );
             const delta = event.key === 'ArrowUp' ? -1 : 1;
             const nextIndex = (
-              currentIndex + delta + project.instruments.length
-            ) % project.instruments.length;
-            const instrumentId = project.instruments[nextIndex].id;
+              currentIndex + delta + instrumentChoices.length
+            ) % instrumentChoices.length;
+            const instrumentId = instrumentChoices[nextIndex].id;
 
             registry.execute('track.setDefaultInstrument', {
               trackId: track.id,
@@ -214,15 +234,18 @@ export function createPatternView({
             onInstrumentAudition?.(instrumentId);
           },
         },
-      }, project.instruments.map((instrument, instrumentIndex) => el('option', {
-        value: instrument.id,
-        text: `${String(instrumentIndex + 1).padStart(2, '0')} · ${instrument.name}`,
-      })));
+      }, instrumentChoices.map((instrument) => {
+        const instrumentIndex = project.instruments.findIndex((item) => item.id === instrument.id);
+        return el('option', {
+          value: instrument.id,
+          text: `${String(instrumentIndex + 1).padStart(2, '0')} · ${instrument.name}`,
+        });
+      }));
       instrumentSelect.value = track.defaultInstrumentId;
 
       const controls = el('span', { class: 'pattern-channel__controls' }, [mute, solo, meter]);
       const channel = el('div', {
-        class: 'pattern-grid__channel',
+        class: `pattern-grid__channel${track.kind === 'drum' ? ' is-drum' : ''}`,
         role: 'columnheader',
         'aria-colindex': String(index * FIELDS.length + 1),
         'aria-colspan': String(FIELDS.length),
@@ -450,6 +473,46 @@ export function createPatternView({
     moveVertical(step);
   }
 
+  function toggleDrumHit(code) {
+    if (cursorField !== 'note') return false;
+    const hit = DRUM_KEYS.get(code);
+    if (!hit) return false;
+
+    const { project, pattern, tracks } = projectInfo();
+    const track = tracks[cursorChannel];
+    if (track?.kind !== 'drum') return false;
+
+    onInstrumentAudition?.(track.defaultInstrumentId, hit.pitch);
+    if (mode !== 'edit') return true;
+
+    const hits = notesAtCell(project, {
+      patternId: pattern.id,
+      trackId: track.id,
+      row: cursorRow,
+    });
+    const existing = hits.find((note) => (note.voiceLane ?? 0) === hit.voiceLane);
+
+    if (existing?.pitch === hit.pitch) {
+      registry.execute('pattern.deleteVoiceNote', {
+        patternId: pattern.id,
+        trackId: track.id,
+        row: cursorRow,
+        voiceLane: hit.voiceLane,
+      });
+    } else {
+      registry.execute('pattern.enterVoiceNote', {
+        patternId: pattern.id,
+        trackId: track.id,
+        row: cursorRow,
+        voiceLane: hit.voiceLane,
+        pitch: hit.pitch,
+      });
+    }
+    renderWindow();
+    syncStatus();
+    return true;
+  }
+
   function toolButton(action, label, icon, onClick, shortcut = null) {
     const button = Button({
       label,
@@ -558,6 +621,23 @@ export function createPatternView({
   }
 
   function displayCellText(project, note, field, row, channel) {
+    const track = project.song.tracks[channel];
+    if (field === 'note' && track?.kind === 'drum') {
+      const hits = notesAtCell(project, {
+        patternId: activePattern(project).id,
+        trackId: track.id,
+        row,
+      });
+      if (hits.length > 0) {
+        return hits
+          .map((hit) => DRUM_PITCH_LABELS.get(hit.pitch) ?? '•')
+          .join('');
+      }
+      if (emptyFirstCell(project, note, field, row, channel)) {
+        return t('pattern.emptyDrumCell');
+      }
+      return '···';
+    }
     if (emptyFirstCell(project, note, field, row, channel)) {
       return t('pattern.emptyCell');
     }
@@ -578,11 +658,15 @@ export function createPatternView({
     if (mode !== 'edit' || cursorField !== 'note') return;
 
     const { pattern, tracks } = projectInfo();
-    registry.execute('pattern.deleteNote', {
-      patternId: pattern.id,
-      trackId: tracks[cursorChannel].id,
-      row: cursorRow,
-    });
+    const track = tracks[cursorChannel];
+    registry.execute(
+      track.kind === 'drum' ? 'pattern.clearVoiceRow' : 'pattern.deleteNote',
+      {
+        patternId: pattern.id,
+        trackId: track.id,
+        row: cursorRow,
+      },
+    );
     renderWindow();
     syncStatus();
   }
@@ -594,8 +678,11 @@ export function createPatternView({
     scroller.classList.toggle('is-audition', mode !== 'edit');
     octaveText.textContent = `${t('status.octave')} ${octave}`;
     stepText.textContent = `${t('status.step')} ${step}`;
+    const currentTrack = projectInfo().tracks[cursorChannel];
     if (feedback) {
       hint.textContent = t(feedback.key, feedback.vars);
+    } else if (cursorField === 'note' && currentTrack?.kind === 'drum') {
+      hint.textContent = t(mode === 'edit' ? 'pattern.hintDrum' : 'pattern.hintDrumAudition');
     } else if (mode !== 'edit') {
       hint.textContent = t('pattern.hintAudition');
     } else if (cursorField === 'note') {
@@ -627,6 +714,11 @@ export function createPatternView({
       return;
     }
     if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+    if (DRUM_KEYS.has(event.code) && toggleDrumHit(event.code)) {
+      event.preventDefault();
+      return;
+    }
 
     if (event.code === 'ArrowUp') {
       event.preventDefault();
