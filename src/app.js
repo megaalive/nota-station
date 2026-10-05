@@ -4,6 +4,7 @@
 import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
 import { commandError, createCommandRegistry } from './core/commands.js';
 import { createHistory } from './core/history.js';
+import { createFocusStore, patternForFocus } from './core/focus.js';
 import {
   insertOrderEntry,
   makeOrderEntryUnique,
@@ -12,7 +13,6 @@ import {
 import { createTemplateProject } from './core/templates.js';
 import { createDemoProject, STABILITY_DEMO_ID } from './core/demos.js';
 import {
-  activePattern,
   configureDrumTrack,
   createBlankProject,
   deleteNote,
@@ -43,6 +43,10 @@ import {
   restoreSessionProject,
   saveSessionProject,
 } from './storage/session-project.js';
+import {
+  restoreSessionFocus,
+  saveSessionFocus,
+} from './storage/session-focus.js';
 import {
   debugJsonFilename,
   parseDebugProject,
@@ -102,6 +106,9 @@ let sessionProjectState = Object.freeze({
 });
 const history = createHistory(loadInitialProject());
 let project = history.current();
+const focus = createFocusStore(loadInitialFocus());
+focus.reconcile(project);
+persistSessionFocusState();
 let shell = null;
 let songView = null;
 let patternView = null;
@@ -230,6 +237,55 @@ function persistSessionProjectSnapshot() {
   }
 }
 
+function loadInitialFocus() {
+  try {
+    return restoreSessionFocus() ?? {};
+  } catch {
+    // Focus cuma state UI. Snapshot rusak tidak boleh menghalangi project yang valid.
+    return {};
+  }
+}
+
+function persistSessionFocusState() {
+  try {
+    return saveSessionFocus(focus.getState());
+  } catch {
+    // Privacy mode/quota tidak boleh membuat navigasi occurrence gagal.
+    return Object.freeze({ saved: false, reason: 'error' });
+  }
+}
+
+function reconcileFocus() {
+  const before = focus.getState().orderEntryId;
+  const state = focus.reconcile(project);
+  if (state.orderEntryId !== before) persistSessionFocusState();
+  return state;
+}
+
+function focusedPattern(currentProject = project) {
+  return patternForFocus(currentProject, focus.getState());
+}
+
+function setFocusedOrderEntry(orderEntryId) {
+  const beforePatternId = focusedPattern(project).id;
+  const previousOrderId = focus.getState().orderEntryId;
+  const state = focus.setOrderEntry(project, orderEntryId);
+  if (state.orderEntryId === previousOrderId) return state;
+
+  persistSessionFocusState();
+  const nextPatternId = focusedPattern(project).id;
+  if (beforePatternId !== nextPatternId && audio.getState().state === 'playing') {
+    audio.stop();
+    Toast({ message: i18n.t('song.focusStoppedPlayback') });
+  }
+
+  syncTransportUi();
+  songView?.refresh();
+  patternView?.refresh();
+  return state;
+}
+
+
 function readInitialTheme() {
   const stored = store?.getItem('notastation.theme');
   return THEMES.includes(stored) ? stored : 'light';
@@ -303,7 +359,7 @@ function registerCommands() {
       labelKey: 'transport.loopPattern',
       run: () => {
         transportState.loopPattern = !transportState.loopPattern;
-        audio.setLoop(project, activePattern(project), transportState.loopPattern);
+        audio.setLoop(project, focusedPattern(project), transportState.loopPattern);
         syncTransportUi();
         return transportState.loopPattern;
       },
@@ -314,7 +370,7 @@ function registerCommands() {
       labelKey: 'transport.metronome',
       run: () => {
         transportState.metronome = !transportState.metronome;
-        audio.setMetronome(project, activePattern(project), transportState.metronome);
+        audio.setMetronome(project, focusedPattern(project), transportState.metronome);
         syncTransportUi();
         return transportState.metronome;
       },
@@ -358,7 +414,7 @@ function registerCommands() {
       requiresArgs: true,
       run: (args) => {
         requireCommandArgs('playback.seek', args);
-        return audio.seek(project, activePattern(project), Number(args.tick));
+        return audio.seek(project, focusedPattern(project), Number(args.tick));
       },
     },
     {
@@ -395,7 +451,7 @@ function registerCommands() {
       run: (args) => {
         requireCommandArgs('song.setTempo', args);
         commitProject(setInitialTempo(project, Number(args.tempo)), 'song.setTempo');
-        audio.setTempo(project, activePattern(project));
+        audio.setTempo(project, focusedPattern(project));
         syncTransportUi();
         return { tempo: project.song.initial.tempo };
       },
@@ -476,7 +532,7 @@ function registerCommands() {
       run: (args) => {
         requireCommandArgs('pattern.enterNote', args);
         commitPatternProject(enterNote(project, args), 'pattern.enterNote');
-        return { noteCount: activePattern(project).notes.length };
+        return { noteCount: focusedPattern(project).notes.length };
       },
     },
     {
@@ -487,7 +543,7 @@ function registerCommands() {
       run: (args) => {
         requireCommandArgs('pattern.enterVoiceNote', args);
         commitPatternProject(enterVoiceNote(project, args), 'pattern.enterVoiceNote');
-        return { noteCount: activePattern(project).notes.length };
+        return { noteCount: focusedPattern(project).notes.length };
       },
     },
     {
@@ -501,7 +557,7 @@ function registerCommands() {
         commitPatternProject(deleteVoiceNote(project, args), 'pattern.deleteVoiceNote');
         return {
           changed: project !== before,
-          noteCount: activePattern(project).notes.length,
+          noteCount: focusedPattern(project).notes.length,
         };
       },
     },
@@ -516,7 +572,7 @@ function registerCommands() {
         commitPatternProject(deleteVoiceRow(project, args), 'pattern.clearVoiceRow');
         return {
           changed: project !== before,
-          noteCount: activePattern(project).notes.length,
+          noteCount: focusedPattern(project).notes.length,
         };
       },
     },
@@ -531,7 +587,7 @@ function registerCommands() {
         commitPatternProject(deleteNote(project, args), 'pattern.deleteNote');
         return {
           changed: project !== before,
-          noteCount: activePattern(project).notes.length,
+          noteCount: focusedPattern(project).notes.length,
         };
       },
     },
@@ -546,7 +602,7 @@ function registerCommands() {
         commitPatternProject(updateNoteAtCell(project, args), 'pattern.updateNote');
         return {
           changed: project !== before,
-          noteCount: activePattern(project).notes.length,
+          noteCount: focusedPattern(project).notes.length,
         };
       },
     },
@@ -743,7 +799,7 @@ function importDebugJsonText(text) {
   return {
     projectId: project.id,
     schemaVersion: project.schemaVersion,
-    noteCount: activePattern(project).notes.length,
+    noteCount: focusedPattern(project).notes.length,
   };
 }
 
@@ -758,7 +814,7 @@ function loadTemplateProject(templateId, {
     templateId,
     projectId: project.id,
     title: project.title,
-    noteCount: activePattern(project).notes.length,
+    noteCount: focusedPattern(project).notes.length,
     keymap: project.settings.keymapPreset,
   };
 }
@@ -773,7 +829,7 @@ function loadDemoProject(demoId, {
     demoId,
     projectId: project.id,
     title: project.title,
-    noteCount: activePattern(project).notes.length,
+    noteCount: focusedPattern(project).notes.length,
     keymap: project.settings.keymapPreset,
   };
 }
@@ -795,8 +851,10 @@ function replaceProject(nextProject, statusKey) {
   audio.stop();
   history.reset(nextProject);
   project = nextProject;
+  reconcileFocus();
   audio.setTracks(project.song.tracks);
   persistSessionProjectSnapshot();
+  persistSessionFocusState();
 
   // Recreate Pattern view supaya mode awal mengikuti keymap project baru.
   const activeTab = shell?.getActiveTab() ?? 'pattern';
@@ -828,7 +886,7 @@ function openDebugJsonPicker() {
 }
 
 function syncTransportUi() {
-  const pattern = activePattern(project);
+  const pattern = focusedPattern(project);
   const audioState = audio.getState();
   shell?.setAudioStatus(audioState.state);
   shell?.setTransportStatus({
@@ -855,6 +913,7 @@ function commitProject(nextProject, label) {
   if (nextProject === project) return project;
 
   project = history.commit(nextProject, label);
+  reconcileFocus();
   persistSessionProjectSnapshot();
   setSaveStatus('status.notSaved');
   syncTransportUi();
@@ -868,7 +927,7 @@ function commitPatternProject(nextProject, label) {
   const before = project;
   commitProject(nextProject, label);
   if (project !== before) {
-    audio.reschedulePattern(project, activePattern(project));
+    audio.reschedulePattern(project, focusedPattern(project));
   }
   return project;
 }
@@ -887,13 +946,14 @@ function restoreHistory(direction) {
 
   const previous = project;
   project = nextProject;
+  reconcileFocus();
   persistSessionProjectSnapshot();
   setSaveStatus('status.notSaved');
 
   if (previous.song.initial.tempo !== project.song.initial.tempo) {
-    audio.setTempo(project, activePattern(project));
+    audio.setTempo(project, focusedPattern(project));
   } else {
-    audio.reschedulePattern(project, activePattern(project));
+    audio.reschedulePattern(project, focusedPattern(project));
   }
 
   syncTransportUi();
@@ -917,7 +977,7 @@ async function activateAudio() {
 
 async function playActivePattern() {
   try {
-    const result = await audio.playPattern(project, activePattern(project), {
+    const result = await audio.playPattern(project, focusedPattern(project), {
       loop: transportState.loopPattern,
       metronome: transportState.metronome,
     });
@@ -957,6 +1017,8 @@ function renderWorkspace(tab, root) {
       t: (key, vars) => i18n.t(key, vars),
       getProject: () => project,
       registry,
+      getFocusedOrderEntryId: () => focus.getState().orderEntryId,
+      onFocusOrderEntry: setFocusedOrderEntry,
       initialMode: project.settings.keymapPreset === 'openmpt' ? 'order' : 'map',
     });
     return true;
@@ -967,6 +1029,7 @@ function renderWorkspace(tab, root) {
       root,
       t: (key, vars) => i18n.t(key, vars),
       getProject: () => project,
+      getActivePattern: (currentProject) => focusedPattern(currentProject),
       registry,
       onAudition: auditionPitch,
       onInstrumentAudition: auditionInstrument,
@@ -1212,10 +1275,11 @@ async function boot() {
       },
       history: history.getState(),
       session: sessionProjectState,
+      focus: focus.getState(),
       project: {
         id: project.id,
-        patternId: activePattern(project).id,
-        noteCount: activePattern(project).notes.length,
+        patternId: focusedPattern(project).id,
+        noteCount: focusedPattern(project).notes.length,
       },
     }),
     getProject: () => structuredClone(project),
