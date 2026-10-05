@@ -978,7 +978,7 @@ Setiap milestone memuat **Deliverable UX** di samping deliverable teknis.
 **Tidak masuk:** editing pattern nyata, sample, notasi, LLM.
 **Exit:** Pages live dari build `main`; branch `gh-pages` hanya berisi artefak dengan SHA build yang cocok; semua aset resolve di `/<repo>/`; refresh tidak 404; tanpa galat console; SHA/build id terbaca; deployment manual hanya dilakukan setelah gate lokal yang relevan PASS; shell lulus uji keyboard (Tab/Esc/focus trap).
 
-### R1 — Tracker yang bisa dimainkan
+### R1 — Tracker yang bisa dimainkan — **IMPLEMENTATION COMPLETE · MANUAL UAT PENDING**
 
 **Teknis:** model Project/Pattern/Track/Order minimum; Pattern editor 8 channel × 64 baris; note entry keyboard (`KeyboardEvent.code`); oktaf + step; satu factory sample; scheduler Web Audio; Play/Pause/Stop/Seek; tempo; loop pattern; metronome; undo/redo (transaksi); JSON debug export/import; **spike efek pitch (§7.4)**; **live edit saat playback (§7.2)**.
 **UX:** mode EDIT/AUDISI dengan badge & warna kursor; status bar; banner audio terkunci; **template Kosong + Pop 4/4** dan layar sambutan sederhana; empty state sel pertama; tooltip shortcut.

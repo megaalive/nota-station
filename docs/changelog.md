@@ -5,6 +5,23 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R1 — Tracker yang bisa dimainkan (ACTIVE)
 
+### S12 — Automated exit R1 (PASS)
+
+- Ditambahkan skenario browser end-to-end yang mengikuti jalur exit R1: first-run
+  Pop 4/4 → Play → buat Pattern 16 note → ubah tempo saat playback → Stop →
+  hapus note + Undo → export JSON debug → reload → import → state semantik sama →
+  Play kembali.
+- T1 mesin dari load hingga playback siap berada jauh di bawah budget 3 detik:
+  **572 ms Chromium** dan **918 ms Firefox** pada gate final.
+- Drift loop 100× tetap dibuktikan oleh unit scheduler deterministik yang menghitung
+  event dari anchor + cycle × duration, bukan dari akumulasi timer.
+- Gate final run **37246931905** pada clean stack R1: `npm ci` 0 vulnerability,
+  unit **50/50 PASS**, `npm run check` PASS, build **151.1 KiB PASS**,
+  Playwright Chromium+Firefox **142/142 PASS** (1,1 mnt).
+- Implementasi otomatis R1 dinyatakan lengkap. Milestone **belum CLOSED** sampai build
+  live lulus smoke, T1 manual/uji tugas UX selesai, dan uji audio real-time 2 menit
+  membuktikan 0 underrun pada mesin referensi.
+
 ### S13 — Empty state sel pertama Pattern (PASS)
 
 - Pattern kosong kini memberi cue langsung pada sel NOTE pertama: `Z=C`, dengan
