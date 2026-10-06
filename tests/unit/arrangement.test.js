@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   addSection,
   assignOrderEntrySection,
+  createSectionOccurrence,
   insertOrderEntry,
   makeOrderEntryUnique,
   moveOrderEntry,
@@ -141,6 +142,119 @@ test('Section + assignment round-trip lewat debug JSON dan sectionId yatim ditol
   assert.throws(
     () => serializeDebugProject(invalid),
     (error) => error.code === 'E_DEBUG_JSON_SECTION_REF',
+  );
+});
+
+test('createSectionOccurrence reuse membuat Section + Order dalam satu hasil tanpa clone Pattern', () => {
+  const { project, idFactory, patternId } = fixture();
+  const next = createSectionOccurrence(project, {
+    name: 'Verse',
+    patternMode: 'reuse',
+    sourcePatternId: patternId,
+    index: 1,
+  }, {
+    idFactory,
+    now: () => '2026-10-05T14:01:55.000Z',
+  });
+
+  assert.equal(next.song.sections.length, 1);
+  assert.equal(next.song.patterns.length, 1);
+  assert.equal(next.song.order.length, 2);
+  assert.equal(next.song.order[1].patternId, patternId);
+  assert.equal(next.song.order[1].sectionId, next.song.sections[0].id);
+  assert.equal(next.modifiedAt, '2026-10-05T14:01:55.000Z');
+});
+
+test('createSectionOccurrence clone membuat Pattern independen dengan ID event baru', () => {
+  const { project, idFactory, patternId } = fixture();
+  const source = project.song.patterns[0];
+  const next = createSectionOccurrence(project, {
+    name: 'Chorus',
+    patternMode: 'clone',
+    sourcePatternId: patternId,
+    index: 1,
+  }, { idFactory });
+
+  assert.equal(next.song.patterns.length, 2);
+  const clone = next.song.patterns[1];
+  assert.notEqual(clone.id, source.id);
+  assert.equal(next.song.order[1].patternId, clone.id);
+  assert.equal(next.song.order[1].sectionId, next.song.sections[0].id);
+  assert.deepEqual(
+    clone.notes.map(({ id, ...event }) => event),
+    source.notes.map(({ id, ...event }) => event),
+  );
+  assert.notDeepEqual(
+    clone.notes.map((event) => event.id),
+    source.notes.map((event) => event.id),
+  );
+});
+
+test('createSectionOccurrence new membuat Pattern kosong dengan geometri sumber', () => {
+  const { project, idFactory, patternId } = fixture();
+  const source = project.song.patterns[0];
+  const next = createSectionOccurrence(project, {
+    name: 'Bridge',
+    patternMode: 'new',
+    sourcePatternId: patternId,
+    index: 1,
+  }, { idFactory });
+
+  const created = next.song.patterns[1];
+  assert.equal(next.song.patterns.length, 2);
+  assert.equal(created.name, 'Pattern 02');
+  assert.deepEqual(
+    {
+      lengthTicks: created.lengthTicks,
+      meter: created.meter,
+      rowTicks: created.rowTicks,
+      notes: created.notes,
+      effects: created.effects,
+      chords: created.chords,
+      tempoEvents: created.tempoEvents,
+    },
+    {
+      lengthTicks: source.lengthTicks,
+      meter: source.meter,
+      rowTicks: source.rowTicks,
+      notes: [],
+      effects: [],
+      chords: [],
+      tempoEvents: [],
+    },
+  );
+  assert.equal(next.song.order[1].patternId, created.id);
+});
+
+test('createSectionOccurrence menolak mode/sumber/index invalid', () => {
+  const { project, patternId } = fixture();
+
+  assert.throws(
+    () => createSectionOccurrence(project, {
+      name: 'Verse',
+      patternMode: 'copy-ish',
+      sourcePatternId: patternId,
+      index: 1,
+    }),
+    (error) => error.code === 'E_PROJECT_SECTION_PATTERN_MODE',
+  );
+  assert.throws(
+    () => createSectionOccurrence(project, {
+      name: 'Verse',
+      patternMode: 'reuse',
+      sourcePatternId: 'missing',
+      index: 1,
+    }),
+    (error) => error.code === 'E_PROJECT_PATTERN_MISSING',
+  );
+  assert.throws(
+    () => createSectionOccurrence(project, {
+      name: 'Verse',
+      patternMode: 'reuse',
+      sourcePatternId: patternId,
+      index: 99,
+    }),
+    (error) => error.code === 'E_PROJECT_ORDER_INDEX',
   );
 });
 
