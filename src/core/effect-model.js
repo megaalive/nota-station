@@ -291,6 +291,19 @@ function validateDurationWithinPattern(type, value, tickLocal, patternLengthTick
       `${type}.durationTicks melewati akhir Pattern.`,
     );
   }
+
+  if (type === 'delay' && tickLocal + value.ticks >= patternLengthTicks) {
+    throw effectError(
+      'E_EFFECT_TIMING_RANGE',
+      'delay.ticks membuat onset efektif berada di luar Pattern.',
+    );
+  }
+  if (type === 'cut' && tickLocal + value.afterTicks > patternLengthTicks) {
+    throw effectError(
+      'E_EFFECT_TIMING_RANGE',
+      'cut.afterTicks melewati akhir Pattern.',
+    );
+  }
 }
 
 function sameEffect(a, b) {
