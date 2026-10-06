@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createBlankProject, activePattern, enterNote } from '../../src/core/project.js';
+import { addPatternEffect } from '../../src/core/effect-model.js';
 import {
   DEBUG_JSON_MAX_BYTES,
   debugJsonFilename,
@@ -56,6 +57,83 @@ test('parser fail-closed pada JSON rusak, schema asing, reference rusak, dan abs
     velocity: 100,
   });
   assert.throws(() => parseDebugProject(JSON.stringify(absolute)), (e) => e.code === 'E_DEBUG_JSON_ABSOLUTE_TICK');
+});
+
+test('JSON debug round-trip menjaga EffectEvent typed', () => {
+  let project = fixture();
+  const patternId = project.song.patterns[0].id;
+  const trackId = project.song.tracks[0].id;
+  project = addPatternEffect(project, {
+    patternId,
+    trackId,
+    tickLocal: 120,
+    type: 'vibrato',
+    value: { depthSemitones: 0.5, rateHz: 5 },
+  }, {
+    idFactory: () => 'effect-debug-1',
+    now: () => '2026-10-06T06:45:00.000Z',
+  });
+
+  const restored = parseDebugProject(serializeDebugProject(project));
+  assert.deepEqual(restored.song.patterns[0].effects, [{
+    id: 'effect-debug-1',
+    trackId,
+    tickLocal: 120,
+    type: 'vibrato',
+    value: { depthSemitones: 0.5, rateHz: 5 },
+  }]);
+});
+
+test('parser menolak EffectEvent type/value/ref/tick/cell invalid', () => {
+  const makeEffectProject = () => {
+    const project = fixture();
+    project.song.patterns[0].effects = [{
+      id: 'effect-debug-1',
+      trackId: project.song.tracks[0].id,
+      tickLocal: 120,
+      type: 'volume',
+      value: { level: 100 },
+    }];
+    return project;
+  };
+
+  const badType = makeEffectProject();
+  badType.song.patterns[0].effects[0].type = 'opaqueHex';
+  assert.throws(
+    () => parseDebugProject(JSON.stringify(badType)),
+    (error) => error.code === 'E_DEBUG_JSON_EFFECT_TYPE',
+  );
+
+  const badValue = makeEffectProject();
+  badValue.song.patterns[0].effects[0].value = { level: 999 };
+  assert.throws(
+    () => parseDebugProject(JSON.stringify(badValue)),
+    (error) => error.code === 'E_DEBUG_JSON_EFFECT_VALUE',
+  );
+
+  const badTrack = makeEffectProject();
+  badTrack.song.patterns[0].effects[0].trackId = 'missing';
+  assert.throws(
+    () => parseDebugProject(JSON.stringify(badTrack)),
+    (error) => error.code === 'E_DEBUG_JSON_TRACK_REF',
+  );
+
+  const badTick = makeEffectProject();
+  badTick.song.patterns[0].effects[0].tickLocal = badTick.song.patterns[0].lengthTicks;
+  assert.throws(
+    () => parseDebugProject(JSON.stringify(badTick)),
+    (error) => error.code === 'E_DEBUG_JSON_EFFECT_TICK',
+  );
+
+  const duplicate = makeEffectProject();
+  duplicate.song.patterns[0].effects.push({
+    ...structuredClone(duplicate.song.patterns[0].effects[0]),
+    id: 'effect-debug-2',
+  });
+  assert.throws(
+    () => parseDebugProject(JSON.stringify(duplicate)),
+    (error) => error.code === 'E_DEBUG_JSON_DUPLICATE_EFFECT_CELL',
+  );
 });
 
 test('parser membatasi ukuran dan nama export aman', () => {
