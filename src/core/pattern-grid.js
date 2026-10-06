@@ -151,6 +151,30 @@ export function quantizePatternNotes(
   };
 }
 
+export function quantizePatternCell(
+  project,
+  {
+    patternId,
+    trackId,
+    row,
+    rowTicks,
+  },
+  options = {},
+) {
+  const notes = notesAtDisplayCell(project, {
+    patternId,
+    trackId,
+    row,
+    rowTicks,
+  });
+  if (notes.length === 0) return project;
+  return quantizePatternNotes(project, {
+    patternId,
+    noteIds: notes.map((note) => note.id),
+    rowTicks,
+  }, options);
+}
+
 export function notesAtDisplayCell(
   project,
   {
