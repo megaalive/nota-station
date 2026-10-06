@@ -1200,6 +1200,7 @@ function renderWorkspace(tab, root) {
       t: (key, vars) => i18n.t(key, vars),
       getProject: () => project,
       getActivePattern: (currentProject) => focusedPattern(currentProject),
+      getFocusedOrderEntryId: () => focus.getState().orderEntryId,
       registry,
       onAudition: auditionPitch,
       onInstrumentAudition: auditionInstrument,
