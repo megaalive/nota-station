@@ -1382,3 +1382,38 @@
     min-width: 0;
   }
 }
+
+
+/* --------------------------------------------------- R3 Add Section dialog */
+.song-section-dialog {
+  display: grid;
+  gap: var(--space-3);
+  min-width: min(420px, 78vw);
+}
+
+.song-section-dialog__field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.song-section-dialog__label {
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.song-section-dialog input,
+.song-section-dialog select {
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-1);
+  border-radius: 5px;
+  background: var(--surface-1);
+  color: var(--text-1);
+}
+
+.song-section-dialog__feedback {
+  min-height: 20px;
+  color: var(--text-2);
+  font-size: 0.82rem;
+}
