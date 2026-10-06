@@ -142,33 +142,80 @@ export function createSongView({
       t(mode === 'map' ? 'song.viewMap' : 'song.viewOrder'),
     );
 
-    const rendered = project.song.order.map((entry, index) => {
+    const entryModels = project.song.order.map((entry, index) => {
       const pattern = project.song.patterns.find((item) => item.id === entry.patternId);
-      return renderEntry({
+      const section = project.song.sections.find((item) => item.id === entry.sectionId) ?? null;
+      return {
         entry,
         index,
         patternName: pattern?.name ?? entry.patternId,
         usage: patternUsageCount(project, entry.patternId),
         selected: entry.id === selectedOrderId,
-      });
+        section,
+      };
     });
 
     if (mode === 'map') {
-      surface.append(el('div', { class: 'song-map__section' }, [
-        el('div', { class: 'song-map__section-title', text: t('song.unsectioned') }),
-        el('div', { class: 'song-map__entries' }, rendered),
-      ]));
+      const runs = [];
+      for (const model of entryModels) {
+        const sectionId = model.entry.sectionId ?? null;
+        const current = runs[runs.length - 1];
+        if (!current || current.sectionId !== sectionId) {
+          runs.push({
+            sectionId,
+            section: model.section,
+            entries: [model],
+          });
+        } else {
+          current.entries.push(model);
+        }
+      }
+
+      for (const run of runs) {
+        const block = el('div', {
+          class: 'song-map__section',
+          dataset: {
+            action: 'song-section',
+            entity: run.sectionId ?? 'unsectioned',
+          },
+        }, [
+          el('div', {
+            class: 'song-map__section-title',
+            text: run.section?.name ?? t('song.unsectioned'),
+          }),
+          el('div', {
+            class: 'song-map__entries',
+          }, run.entries.map((model) => renderEntry(model))),
+        ]);
+        if (run.section?.color) block.style.borderColor = run.section.color;
+        surface.append(block);
+      }
     } else {
-      surface.append(el('ol', { class: 'song-order__entries' }, rendered.map((entry) => (
-        el('li', { class: 'song-order__item' }, [entry])
+      surface.append(el('ol', {
+        class: 'song-order__entries',
+      }, entryModels.map((model) => (
+        el('li', { class: 'song-order__item' }, [
+          renderEntry({
+            ...model,
+            sectionName: model.section?.name ?? null,
+          }),
+        ])
       ))));
     }
 
     syncActionState(project);
   }
 
-  function renderEntry({ entry, index, patternName, usage, selected }) {
+  function renderEntry({
+    entry,
+    index,
+    patternName,
+    usage,
+    selected,
+    sectionName = null,
+  }) {
     const usageText = usage > 1 ? ' · ⛓ ×' + usage : '';
+    const sectionText = sectionName ? ' · ' + sectionName : '';
     return el('button', {
       type: 'button',
       class: 'song-entry' + (selected ? ' is-selected' : ''),
@@ -179,7 +226,8 @@ export function createSongView({
       el('span', {
         class: 'song-entry__body',
         dataset: { action: 'song-entry-body' },
-        text: String(index + 1).padStart(2, '0') + ' · ' + patternName + usageText,
+        text: String(index + 1).padStart(2, '0')
+          + ' · ' + patternName + usageText + sectionText,
       }),
     ]);
   }
