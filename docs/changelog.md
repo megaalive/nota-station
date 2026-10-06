@@ -5,6 +5,20 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S3 — occurrence Focus Store lintas Song/Pattern/transport (CLOSED · PASS)
+
+- Ditambahkan **Focus Store** untuk `orderEntryId` sebagai state UI terpisah dari Project. Memilih occurrence tidak memutasi lagu dan tidak menambah langkah Undo.
+- Song view mengubah focus lewat command registry `focus.setOrderEntry`, sehingga aksi yang sama tetap discoverable untuk UI dan agent.
+- Pattern editor menerima resolver Pattern aktif dari app; fallback lama tetap tersedia agar komponen/test yang belum occurrence-aware tetap kompatibel.
+- Transport, seek, loop, metronom, live reschedule, note count, dan state `window.tracker` kini memakai Pattern milik occurrence focus yang sama.
+- Bila focus berpindah ke **Pattern berbeda** ketika Pattern-scoped playback sedang berjalan, playback dihentikan dengan Toast; ini mencegah UI Pattern B sementara audio diam-diam masih memainkan Pattern A. SongTimeline continuous playback tetap scope R3 lanjutan.
+- Focus disimpan ringan di `sessionStorage` hanya sebagai `orderEntryId`; snapshot invalid dibuang fail-closed. Reload memulihkan occurrence yang sama bila masih valid, sedangkan Undo/project replace merekonsiliasi fallback ke occurrence pertama bila target hilang.
+- Browser acceptance membuktikan dua occurrence dengan Pattern berbeda: edit di Pattern hanya mengubah occurrence fokus, playback menjadwalkan Pattern itu, focus tidak menambah Undo, dan focus pulih setelah reload.
+- Gate terarah run **37320396089** pada HEAD `70da4c9…`: 0 vulnerability, unit **109/109 PASS**, check PASS, build **390,4 KiB PASS**, focus/Song/Pattern/transport Chromium+Firefox **56/56 PASS**.
+- Gate final run **37395979236** pada HEAD `fe565b0…`: 0 vulnerability, unit **109/109 PASS**, check PASS, build **390,4 KiB PASS**, full browser Chromium+Firefox **194/194 PASS**.
+- Audit dependency mengoreksi urutan roadmap internal: shared-pattern guard belum aman sebelum editor/transport memiliki occurrence context. Karena itu Focus Store ditutup lebih dulu.
+- Berikutnya: **R3-S4 Section + shared-pattern guard** — Section nyata pada Song Map, assign occurrence ke section, lalu warning non-modal yang dapat menjalankan **Jadikan unik untuk tempat ini** dengan occurrence context yang sudah tidak ambigu.
+
 ### R3-S2 — Song Map + Order List (CLOSED · PASS)
 
 - Tab **Song** kini menampilkan Song Map dan Order List sebagai dua proyeksi dari `song.order[]` yang sama; mengganti view tidak membuat salinan state lain.
@@ -15,7 +29,7 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 - Gate terarah run **37318431492** pada HEAD `6c21c01…`: 0 vulnerability, unit **102/102 PASS**, check PASS, build **383,6 KiB PASS**, Song+shell Chromium/Firefox **58/58 PASS**.
 - Gate final run **37318735675** pada HEAD `9631365…`: 0 vulnerability, unit **102/102 PASS**, check PASS, build **383,6 KiB PASS**, full browser Chromium+Firefox **192/192 PASS**.
 - Section editor penuh, drag Song Map, dan peringatan edit pertama Pattern shared tetap slice lanjutan; S2 sengaja hanya menutup dua proyeksi Order + operasi dasar yang stabil.
-- Berikutnya: **R3-S3 Section + shared-pattern guard** — Section nyata pada Song Map, tambah/assign section, dan guard non-modal saat mengedit Pattern yang dipakai >1 tempat.
+- Berikutnya direvisi menjadi **R3-S3 occurrence Focus Store** setelah audit dependency menunjukkan shared-pattern guard membutuhkan occurrence context lintas Song/Pattern/transport terlebih dahulu.
 
 ### R3-S1 — fondasi Order + reuse/clone Pattern (CLOSED · PASS)
 

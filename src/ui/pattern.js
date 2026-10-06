@@ -49,6 +49,7 @@ export function createPatternView({
   root,
   t,
   getProject,
+  getActivePattern = activePattern,
   registry,
   onAudition,
   onInstrumentAudition,
@@ -121,7 +122,7 @@ export function createPatternView({
 
   function projectInfo() {
     const project = getProject();
-    const pattern = activePattern(project);
+    const pattern = getActivePattern(project);
     return {
       project,
       pattern,
@@ -617,14 +618,14 @@ export function createPatternView({
       && field === 'note'
       && row === 0
       && channel === 0
-      && activePattern(project).notes.length === 0;
+      && getActivePattern(project).notes.length === 0;
   }
 
   function displayCellText(project, note, field, row, channel) {
     const track = project.song.tracks[channel];
     if (field === 'note' && track?.kind === 'drum') {
       const hits = notesAtCell(project, {
-        patternId: activePattern(project).id,
+        patternId: getActivePattern(project).id,
         trackId: track.id,
         row,
       });
