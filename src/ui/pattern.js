@@ -352,6 +352,16 @@ export function createPatternView({
     return exactEffectsAtCursor().find((effect) => effect.type === selectedEffectType) ?? null;
   }
 
+  function selectExistingEffectTypeAtCursor() {
+    const cellEffects = exactEffectsAtCursor();
+    if (
+      cellEffects.length > 0
+      && !cellEffects.some((effect) => effect.type === selectedEffectType)
+    ) {
+      selectedEffectType = cellEffects[0].type;
+    }
+  }
+
   function cursorHasOffGridEffect() {
     const { pattern, tracks, displayRowTicks } = projectInfo();
     const track = tracks[cursorChannel];
@@ -370,14 +380,6 @@ export function createPatternView({
     if (!showEffects) return;
 
     const cellEffects = exactEffectsAtCursor();
-    if (
-      cellEffects.length > 0
-      && !cellEffects.some((effect) => effect.type === selectedEffectType)
-      && document.activeElement !== effectTypeSelect
-      && document.activeElement !== effectParamInput
-    ) {
-      selectedEffectType = cellEffects[0].type;
-    }
     effectTypeSelect.value = selectedEffectType;
 
     const current = selectedEffectAtCursor();
@@ -883,6 +885,9 @@ export function createPatternView({
                 cursorRow = row;
                 cursorChannel = channel;
                 cursorField = field;
+                if (field === 'effect' || field === 'param') {
+                  selectExistingEffectTypeAtCursor();
+                }
                 scroller.focus();
                 renderWindow();
                 syncStatus();
@@ -1796,6 +1801,7 @@ export function createPatternView({
       && !effectEditor.hidden
     ) {
       event.preventDefault();
+      selectExistingEffectTypeAtCursor();
       syncEffectEditor();
       effectParamInput.focus();
       effectParamInput.select();
