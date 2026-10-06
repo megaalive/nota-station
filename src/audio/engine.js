@@ -71,7 +71,7 @@ export function createAudioEngine({
 
   async function ensureReady() {
     if (!context) context = new AudioContext({ latencyHint: 'interactive' });
-    await ensureContextRunning();
+    requestResume();
 
     if (!buffer) {
       const bytes = await preload();
@@ -154,27 +154,14 @@ export function createAudioEngine({
     return true;
   }
 
-  async function ensureContextRunning() {
-    if (!context || context.state !== 'suspended') return context?.state ?? 'none';
-
-    let timeoutId = null;
+  function requestResume() {
+    if (!context || context.state !== 'suspended') return;
     try {
-      const resume = context.resume();
-      if (!resume || typeof resume.then !== 'function') return context.state;
-
-      await Promise.race([
-        resume.catch(() => null),
-        new Promise((resolve) => {
-          timeoutId = setTimeout(resolve, 500);
-        }),
-      ]);
+      const pending = context.resume();
+      if (pending && typeof pending.catch === 'function') void pending.catch(() => {});
     } catch {
-      // Autoplay policy boleh menolak resume di luar user gesture.
-      // Batas waktu mencegah command menggantung tanpa mengubah kontrak fail-soft audio.
-    } finally {
-      if (timeoutId !== null) clearTimeout(timeoutId);
+      // Browser boleh menunda unlock; scheduler tetap dapat menyiapkan node.
     }
-    return context.state;
   }
 
   function trackSource(source, when, kind, metadata = {}) {
