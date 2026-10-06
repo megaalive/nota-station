@@ -5,6 +5,21 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S8A — EffectEvent typed + scheduler contract (CLOSED · PASS)
+
+- Dibuka model kanonik **EffectEvent** sesuai §5.7 dengan tepat lima field: `id, trackId, tickLocal, type, value`. Tidak ada hex opaque atau field tambahan liar.
+- Sepuluh type v0.1 dikunci: `volume`, `pan`, `pitchSlide`, `porta`, `vibrato`, `retrigger`, `offset`, `cut`, `delay`, dan `arpeggio`.
+- `value` divalidasi per type, bukan satu angka generik: volume/pan memakai range tracker yang eksplisit; pitch/porta/vibrato/retrigger/arpeggio memakai object parameter bertipe; offset/cut/delay punya unit yang jelas.
+- Primitive immutable `addPatternEffect()`, `updatePatternEffect()`, dan `deletePatternEffect()` menegakkan reference/tick/range serta uniqueness per `trackId + tickLocal + type`; type berbeda boleh hidup pada tick yang sama.
+- Debug JSON kini memvalidasi EffectEvent sepenuhnya: type/value/tick/track invalid, ID duplikat, dan duplicate effect cell ditolak fail-closed. Fixture lama yang masih memakai placeholder numeric dimigrasikan ke shape typed.
+- Scheduler memperoleh `effectEventTemplates()` dan `createEffectScheduleCursor()`: sort/timing, seek, loop, dan clone value deterministic, tetapi **belum menerapkan DSP** ke audio node.
+- Insert/delete row S6 kini ikut menggeser FX track-local. FX di rentang delete dibuang; FX yang terdorong dan tak lagi valid pada Pattern fixed-length dibuang utuh, bukan dibiarkan dengan timing invalid.
+- Command registry mengekspos add/update/delete EffectEvent. Semua mutasi tetap melalui shared-pattern guard S4, history/session, dan live-reschedule path yang sama; browser test membuktikan satu transaksi Undo dan guard tidak dapat dilewati.
+- Gate terarah awal run **37421543979** berhenti di unit karena expected cursor test salah: horizon 18,01 detik memang mencakup event cycle berikutnya pada detik 18. Runtime scheduler tidak diubah.
+- Gate terarah koreksi run **37421641020** pada HEAD `0583798…`: 0 vulnerability, unit **156/156 PASS**, check PASS, build **485,6 KiB**, EffectEvent/row/shared-guard Chromium+Firefox **18/18 PASS**.
+- Gate final run **37421782949** pada HEAD `312118e…`: 0 vulnerability, unit **156/156 PASS**, check PASS, build **485,6 KiB**, full browser Chromium+Firefox **234/234 PASS**.
+- Belum ada kolom FX/PARAM atau efek audible pada slice ini. Berikutnya: **R3-S8B audible FX pertama + progressive FX projection**, dimulai dari efek yang tidak membutuhkan arsitektur voice baru.
+
 ### R3-S7B — LPB projection + explicit quantize (CLOSED · PASS)
 
 - Pattern toolbar kini memiliki selector **LPB** sebagai **state proyeksi**, bukan mutasi Project. Mengganti LPB mempertahankan tick musik di bawah cursor dan tidak mengubah `NoteEvent.startTickLocal`.
