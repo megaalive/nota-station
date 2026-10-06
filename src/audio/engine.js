@@ -463,7 +463,7 @@ export function createAudioEngine({
     }
 
     if (voiceProfile) {
-      scheduleSamplerVoice({
+      return scheduleSamplerVoice({
         voiceProfile,
         velocity,
         when,
@@ -480,7 +480,6 @@ export function createAudioEngine({
         retriggerIndex,
         sampleOffsetFrames,
       });
-      return true;
     }
 
     // Preview R1 tanpa instrument eksplisit tetap memakai factory sample.
