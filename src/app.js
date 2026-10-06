@@ -5,7 +5,11 @@ import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
 import { commandError, createCommandRegistry } from './core/commands.js';
 import { createHistory } from './core/history.js';
 import { createFocusStore, patternForFocus } from './core/focus.js';
+import { createSharedPatternGuard } from './core/shared-pattern-guard.js';
 import {
+  addSection,
+  assignOrderEntrySection,
+  createSectionOccurrence,
   insertOrderEntry,
   makeOrderEntryUnique,
   moveOrderEntry,
@@ -47,6 +51,10 @@ import {
   restoreSessionFocus,
   saveSessionFocus,
 } from './storage/session-focus.js';
+import {
+  restoreSessionSharedPatternGuard,
+  saveSessionSharedPatternGuard,
+} from './storage/session-shared-pattern.js';
 import {
   debugJsonFilename,
   parseDebugProject,
@@ -109,6 +117,9 @@ let project = history.current();
 const focus = createFocusStore(loadInitialFocus());
 focus.reconcile(project);
 persistSessionFocusState();
+const sharedPatternGuard = createSharedPatternGuard(loadInitialSharedPatternGuard());
+sharedPatternGuard.reconcile(project);
+persistSessionSharedPatternGuardState();
 let shell = null;
 let songView = null;
 let patternView = null;
@@ -260,6 +271,58 @@ function reconcileFocus() {
   const state = focus.reconcile(project);
   if (state.orderEntryId !== before) persistSessionFocusState();
   return state;
+}
+
+function loadInitialSharedPatternGuard() {
+  try {
+    return restoreSessionSharedPatternGuard() ?? {};
+  } catch {
+    // Keputusan warning bersifat UI-session; payload rusak tidak boleh menghalangi project.
+    return {};
+  }
+}
+
+function persistSessionSharedPatternGuardState() {
+  try {
+    return saveSessionSharedPatternGuard(sharedPatternGuard.getState());
+  } catch {
+    // Privacy mode/quota tidak boleh membuat editing Pattern gagal.
+    return Object.freeze({ saved: false, reason: 'error' });
+  }
+}
+
+function reconcileSharedPatternGuard() {
+  const before = JSON.stringify(sharedPatternGuard.getState().allowedPatternIds);
+  const state = sharedPatternGuard.reconcile(project);
+  if (JSON.stringify(state.allowedPatternIds) !== before) {
+    persistSessionSharedPatternGuardState();
+  }
+  return state;
+}
+
+function requirePatternEditAllowed(args) {
+  const patternId = String(args?.patternId ?? '');
+  const decision = sharedPatternGuard.inspect(project, patternId);
+  if (!decision.required) return decision;
+
+  const focusedOrderId = focus.getState().orderEntryId;
+  const focusedEntry = project.song.order.find((entry) => entry.id === focusedOrderId);
+  const orderEntryId = focusedEntry?.patternId === patternId
+    ? focusedEntry.id
+    : project.song.order.find((entry) => entry.patternId === patternId)?.id ?? null;
+
+  const error = commandError(
+    'E_SHARED_PATTERN_DECISION_REQUIRED',
+    i18n.t('pattern.sharedWarning', {
+      pattern: decision.patternName,
+      count: decision.usage,
+    }),
+  );
+  error.details = Object.freeze({
+    ...decision,
+    orderEntryId,
+  });
+  throw error;
 }
 
 function focusedPattern(currentProject = project) {
@@ -457,6 +520,81 @@ function registerCommands() {
       },
     },
     {
+      id: 'song.createSectionOccurrence',
+      group: 'Song',
+      labelKey: 'song.addSection',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('song.createSectionOccurrence', args);
+        const afterOrderEntryId = String(
+          args.afterOrderEntryId ?? focus.getState().orderEntryId ?? '',
+        );
+        const afterIndex = project.song.order.findIndex(
+          (entry) => entry.id === afterOrderEntryId,
+        );
+        if (afterIndex < 0) {
+          throw commandError(
+            'E_PROJECT_ORDER_MISSING',
+            `OrderEntry tidak dikenal: ${afterOrderEntryId}`,
+          );
+        }
+
+        const sourcePatternId = String(
+          args.sourcePatternId ?? project.song.order[afterIndex].patternId,
+        );
+        const nextProject = createSectionOccurrence(project, {
+          name: args.name,
+          color: args.color,
+          patternMode: String(args.patternMode ?? 'reuse'),
+          sourcePatternId,
+          index: afterIndex + 1,
+        });
+        const section = nextProject.song.sections[nextProject.song.sections.length - 1];
+        const entry = nextProject.song.order[afterIndex + 1];
+        commitProject(nextProject, 'song.createSectionOccurrence');
+        return {
+          section: structuredClone(section),
+          orderEntryId: entry.id,
+          patternId: entry.patternId,
+          index: afterIndex + 1,
+        };
+      },
+    },
+    {
+      id: 'song.addSection',
+      group: 'Song',
+      labelKey: 'song.addSection',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('song.addSection', args);
+        const nextProject = addSection(project, {
+          name: args.name,
+          color: args.color,
+        });
+        const section = nextProject.song.sections[nextProject.song.sections.length - 1];
+        commitProject(nextProject, 'song.addSection');
+        return structuredClone(section);
+      },
+    },
+    {
+      id: 'song.assignSection',
+      group: 'Song',
+      labelKey: 'song.assignSection',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('song.assignSection', args);
+        const orderEntryId = String(args.orderEntryId ?? '');
+        const sectionId = args.sectionId === null ? null : String(args.sectionId ?? '');
+        const nextProject = assignOrderEntrySection(project, {
+          orderEntryId,
+          sectionId,
+        });
+        const changed = nextProject !== project;
+        commitProject(nextProject, 'song.assignSection');
+        return { orderEntryId, sectionId, changed };
+      },
+    },
+    {
       id: 'focus.setOrderEntry',
       group: 'Song',
       labelKey: 'song.focusOrder',
@@ -535,12 +673,27 @@ function registerCommands() {
       },
     },
     {
+      id: 'pattern.allowSharedEdit',
+      group: 'Pattern',
+      labelKey: 'pattern.sharedEditAll',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.allowSharedEdit', args);
+        const patternId = String(args.patternId ?? '');
+        const state = sharedPatternGuard.allowEditAll(patternId);
+        persistSessionSharedPatternGuardState();
+        patternView?.refresh();
+        return state;
+      },
+    },
+    {
       id: 'pattern.enterNote',
       group: 'Pattern',
       labelKey: 'pattern.enterNote',
       requiresArgs: true,
       run: (args) => {
         requireCommandArgs('pattern.enterNote', args);
+        requirePatternEditAllowed(args);
         commitPatternProject(enterNote(project, args), 'pattern.enterNote');
         return { noteCount: focusedPattern(project).notes.length };
       },
@@ -552,6 +705,7 @@ function registerCommands() {
       requiresArgs: true,
       run: (args) => {
         requireCommandArgs('pattern.enterVoiceNote', args);
+        requirePatternEditAllowed(args);
         commitPatternProject(enterVoiceNote(project, args), 'pattern.enterVoiceNote');
         return { noteCount: focusedPattern(project).notes.length };
       },
@@ -563,6 +717,7 @@ function registerCommands() {
       requiresArgs: true,
       run: (args) => {
         requireCommandArgs('pattern.deleteVoiceNote', args);
+        requirePatternEditAllowed(args);
         const before = project;
         commitPatternProject(deleteVoiceNote(project, args), 'pattern.deleteVoiceNote');
         return {
@@ -578,6 +733,7 @@ function registerCommands() {
       requiresArgs: true,
       run: (args) => {
         requireCommandArgs('pattern.clearVoiceRow', args);
+        requirePatternEditAllowed(args);
         const before = project;
         commitPatternProject(deleteVoiceRow(project, args), 'pattern.clearVoiceRow');
         return {
@@ -593,6 +749,7 @@ function registerCommands() {
       requiresArgs: true,
       run: (args) => {
         requireCommandArgs('pattern.deleteNote', args);
+        requirePatternEditAllowed(args);
         const before = project;
         commitPatternProject(deleteNote(project, args), 'pattern.deleteNote');
         return {
@@ -608,6 +765,7 @@ function registerCommands() {
       requiresArgs: true,
       run: (args) => {
         requireCommandArgs('pattern.updateNote', args);
+        requirePatternEditAllowed(args);
         const before = project;
         commitPatternProject(updateNoteAtCell(project, args), 'pattern.updateNote');
         return {
@@ -862,6 +1020,7 @@ function replaceProject(nextProject, statusKey) {
   history.reset(nextProject);
   project = nextProject;
   reconcileFocus();
+  reconcileSharedPatternGuard();
   audio.setTracks(project.song.tracks);
   persistSessionProjectSnapshot();
   persistSessionFocusState();
@@ -924,6 +1083,7 @@ function commitProject(nextProject, label) {
 
   project = history.commit(nextProject, label);
   reconcileFocus();
+  reconcileSharedPatternGuard();
   persistSessionProjectSnapshot();
   setSaveStatus('status.notSaved');
   syncTransportUi();
@@ -957,6 +1117,7 @@ function restoreHistory(direction) {
   const previous = project;
   project = nextProject;
   reconcileFocus();
+  reconcileSharedPatternGuard();
   persistSessionProjectSnapshot();
   setSaveStatus('status.notSaved');
 
@@ -1039,6 +1200,7 @@ function renderWorkspace(tab, root) {
       t: (key, vars) => i18n.t(key, vars),
       getProject: () => project,
       getActivePattern: (currentProject) => focusedPattern(currentProject),
+      getFocusedOrderEntryId: () => focus.getState().orderEntryId,
       registry,
       onAudition: auditionPitch,
       onInstrumentAudition: auditionInstrument,
@@ -1285,6 +1447,7 @@ async function boot() {
       history: history.getState(),
       session: sessionProjectState,
       focus: focus.getState(),
+      sharedPatternGuard: sharedPatternGuard.getState(),
       project: {
         id: project.id,
         patternId: focusedPattern(project).id,

@@ -1298,6 +1298,8 @@
 .song-map__section {
   display: grid;
   gap: var(--space-2);
+  padding-left: var(--space-2);
+  border-left: 4px solid var(--border-1);
 }
 
 .song-map__section-title {
@@ -1379,4 +1381,75 @@
     width: 100%;
     min-width: 0;
   }
+}
+
+
+/* --------------------------------------------------- R3 Add Section dialog */
+.song-section-dialog {
+  display: grid;
+  gap: var(--space-3);
+  min-width: min(420px, 78vw);
+}
+
+.song-section-dialog__field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.song-section-dialog__label {
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.song-section-dialog input,
+.song-section-dialog select {
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-1);
+  border-radius: 5px;
+  background: var(--surface-1);
+  color: var(--text-1);
+}
+
+.song-section-dialog__feedback {
+  min-height: 20px;
+  color: var(--text-2);
+  font-size: 0.82rem;
+}
+
+
+/* ----------------------------------------------- R3 shared Pattern warning */
+.pattern-shared-warning {
+  display: grid;
+  gap: var(--space-2);
+  width: max-content;
+  min-width: min(300px, 72vw);
+  max-width: min(420px, 82vw);
+}
+
+.pattern-shared-warning__message {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.pattern-shared-warning__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pattern-toolbar [data-action="pattern-shared-badge"] {
+  min-height: 30px;
+  white-space: nowrap;
+}
+
+.pattern-toolbar [data-action="pattern-shared-badge"][hidden] {
+  display: none;
+}
+
+.pattern-toolbar [data-action="pattern-shared-popover"] .popover {
+  width: max-content;
+  max-width: min(420px, 82vw);
+  padding: var(--space-3);
 }

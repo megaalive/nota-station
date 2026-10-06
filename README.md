@@ -6,7 +6,7 @@ tampilan sekaligus (Pattern, Piano Roll, Lyrics, Guitar, Score).
 
 Status implementasi: **R3 — Kematangan editing tracker + struktur lagu: ACTIVE**. Implementasi teknis R2 sudah COMPLETE; moderated manual UX UAT T3 masih pending. R0 sudah CLOSED; implementasi R1 juga sudah selesai dengan manual audio/UX UAT tersisa.
 
-Saat ini NotaStation sudah memiliki Pattern editor 8 channel × 64 row, transport/loop/metronome, undo/redo, debug JSON, Sound workspace, impor WAV + IndexedDB, editor Sample/Instrument, picker + global WAV drop, satu Drum Track polifonik dengan choke hi-hat, serta fondasi Order/reuse/clone Pattern, workspace Song Map/Order List keyboard-first, dan occurrence focus yang menyatukan Song → Pattern → transport untuk struktur lagu R3.
+Saat ini NotaStation sudah memiliki Pattern editor 8 channel × 64 row, transport/loop/metronome, undo/redo, debug JSON, Sound workspace, impor WAV + IndexedDB, editor Sample/Instrument, picker + global WAV drop, satu Drum Track polifonik dengan choke hi-hat, serta fondasi Order/reuse/clone Pattern, Song Map/Order List dengan Section, occurrence focus Song → Pattern → transport, dialog Section Baru/Clone/Pakai ulang, dan guard Pattern bersama dengan pilihan Edit semua/Jadikan unik.
 
 ## Menjalankan
 
