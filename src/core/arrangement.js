@@ -32,25 +32,7 @@ export function addSection(
   },
   { idFactory = makeId, now = isoNow } = {},
 ) {
-  const normalizedName = String(name ?? '').trim();
-  if (normalizedName.length < 1 || normalizedName.length > 80) {
-    throw projectError(
-      'E_PROJECT_SECTION_NAME',
-      'Nama Section harus berisi 1..80 karakter.',
-    );
-  }
-  if (typeof color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(color)) {
-    throw projectError(
-      'E_PROJECT_SECTION_COLOR',
-      `Warna Section harus hex #RRGGBB: ${color}`,
-    );
-  }
-
-  const section = {
-    id: idFactory('section'),
-    name: normalizedName,
-    color: color.toUpperCase(),
-  };
+  const section = createSectionRecord(project, { name, color }, idFactory);
 
   return {
     ...project,
@@ -58,6 +40,70 @@ export function addSection(
     song: {
       ...project.song,
       sections: [...project.song.sections, section],
+    },
+  };
+}
+
+export function createSectionOccurrence(
+  project,
+  {
+    name,
+    color = SECTION_COLORS[project.song.sections.length % SECTION_COLORS.length],
+    patternMode,
+    sourcePatternId,
+    index = project.song.order.length,
+  },
+  { idFactory = makeId, now = isoNow } = {},
+) {
+  if (!['new', 'clone', 'reuse'].includes(patternMode)) {
+    throw projectError(
+      'E_PROJECT_SECTION_PATTERN_MODE',
+      `Mode Pattern Section tidak dikenal: ${patternMode}`,
+    );
+  }
+  if (!Number.isInteger(index) || index < 0 || index > project.song.order.length) {
+    throw projectError('E_PROJECT_ORDER_INDEX', `Index Order di luar rentang: ${index}`);
+  }
+
+  const source = project.song.patterns.find((pattern) => pattern.id === sourcePatternId);
+  if (!source) {
+    throw projectError(
+      'E_PROJECT_PATTERN_MISSING',
+      `Pattern tidak ditemukan: ${sourcePatternId}`,
+    );
+  }
+
+  const section = createSectionRecord(project, { name, color }, idFactory);
+  let patternId = source.id;
+  let patterns = project.song.patterns;
+
+  if (patternMode === 'clone') {
+    const cloned = clonePattern(source, project.song.patterns, idFactory).pattern;
+    patternId = cloned.id;
+    patterns = [...project.song.patterns, cloned];
+  } else if (patternMode === 'new') {
+    const created = createBlankPatternFrom(source, project.song.patterns, idFactory);
+    patternId = created.id;
+    patterns = [...project.song.patterns, created];
+  }
+
+  const order = [...project.song.order];
+  const orderEntry = {
+    id: idFactory('order'),
+    patternId,
+    sectionId: section.id,
+    keyOverride: null,
+  };
+  order.splice(index, 0, orderEntry);
+
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      sections: [...project.song.sections, section],
+      patterns,
+      order,
     },
   };
 }
@@ -218,6 +264,53 @@ export function makeOrderEntryUnique(
       lyrics,
     },
   };
+}
+
+function createSectionRecord(project, { name, color }, idFactory) {
+  const normalizedName = String(name ?? '').trim();
+  if (normalizedName.length < 1 || normalizedName.length > 80) {
+    throw projectError(
+      'E_PROJECT_SECTION_NAME',
+      'Nama Section harus berisi 1..80 karakter.',
+    );
+  }
+  if (typeof color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(color)) {
+    throw projectError(
+      'E_PROJECT_SECTION_COLOR',
+      `Warna Section harus hex #RRGGBB: ${color}`,
+    );
+  }
+
+  return {
+    id: idFactory('section'),
+    name: normalizedName,
+    color: color.toUpperCase(),
+  };
+}
+
+function createBlankPatternFrom(source, patterns, idFactory) {
+  return {
+    id: idFactory('pattern'),
+    name: nextBlankPatternName(patterns),
+    lengthTicks: source.lengthTicks,
+    meter: structuredClone(source.meter),
+    rowTicks: source.rowTicks,
+    notes: [],
+    effects: [],
+    chords: [],
+    tempoEvents: [],
+  };
+}
+
+function nextBlankPatternName(patterns) {
+  const names = new Set(patterns.map((pattern) => pattern.name));
+  let number = 1;
+  let candidate;
+  do {
+    candidate = `Pattern ${String(number).padStart(2, '0')}`;
+    number += 1;
+  } while (names.has(candidate));
+  return candidate;
 }
 
 function clonePattern(source, patterns, idFactory) {
