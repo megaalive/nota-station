@@ -79,8 +79,12 @@ export function validateDebugProject(project) {
 
   for (const section of project.song.sections) {
     assertString(section.name, 'section.name');
-    if (section.name.trim().length > 80) {
-      throw debugJsonError('E_DEBUG_JSON_SECTION', 'Nama Section maksimal 80 karakter.');
+    const sectionNameLength = section.name.trim().length;
+    if (sectionNameLength < 1 || sectionNameLength > 80) {
+      throw debugJsonError(
+        'E_DEBUG_JSON_SECTION',
+        'Nama Section harus berisi 1..80 karakter setelah trim.',
+      );
     }
     if (typeof section.color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(section.color)) {
       throw debugJsonError('E_DEBUG_JSON_SECTION', `Warna Section tidak valid: ${section.color}`);
