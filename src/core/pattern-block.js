@@ -1,3 +1,4 @@
+import { compareEffects, validateEffectEvent } from './effect-model.js';
 import { projectError } from './project.js';
 
 function makeId(prefix) {
@@ -219,9 +220,14 @@ export function insertPatternRows(
     notes.push(note);
   }
 
-  if (!changed) return project;
+  const effects = shiftEffectsForInsert(project, pattern, selectedTrackIds, atTick, delta);
+  const effectsChanged = effects.length !== pattern.effects.length
+    || effects.some((effect, index) => effect !== pattern.effects[index]);
+
+  if (!changed && !effectsChanged) return project;
   notes.sort(compareNotes);
-  return replacePatternNotes(project, patternIndex, pattern, notes, now);
+  effects.sort(compareEffects);
+  return replacePatternEvents(project, patternIndex, pattern, { notes, effects }, now);
 }
 
 export function deletePatternRows(
@@ -291,9 +297,14 @@ export function deletePatternRows(
     notes.push(note);
   }
 
-  if (!changed) return project;
+  const effects = shiftEffectsForDelete(pattern.effects, selectedTrackIds, atTick, deleteEnd, delta);
+  const effectsChanged = effects.length !== pattern.effects.length
+    || effects.some((effect, index) => effect !== pattern.effects[index]);
+
+  if (!changed && !effectsChanged) return project;
   notes.sort(compareNotes);
-  return replacePatternNotes(project, patternIndex, pattern, notes, now);
+  effects.sort(compareEffects);
+  return replacePatternEvents(project, patternIndex, pattern, { notes, effects }, now);
 }
 
 export function interpolatePatternVelocity(
@@ -427,6 +438,50 @@ export function transposePatternBlock(
   return replacePatternNotes(project, patternIndex, pattern, notes, now);
 }
 
+function shiftEffectsForInsert(project, pattern, selectedTrackIds, atTick, delta) {
+  const trackIds = new Set(project.song.tracks.map((track) => track.id));
+  const effects = [];
+
+  for (const effect of pattern.effects) {
+    if (!selectedTrackIds.has(effect.trackId) || effect.tickLocal < atTick) {
+      effects.push(effect);
+      continue;
+    }
+
+    const shifted = {
+      ...effect,
+      tickLocal: effect.tickLocal + delta,
+    };
+    if (shifted.tickLocal >= pattern.lengthTicks) continue;
+
+    try {
+      validateEffectEvent(shifted, {
+        trackIds,
+        patternLengthTicks: pattern.lengthTicks,
+      });
+      effects.push(shifted);
+    } catch (error) {
+      if (error.code !== 'E_EFFECT_DURATION_RANGE') throw error;
+      // Fixed-length Pattern: effect berdurasi yang terdorong tak lagi muat dibuang utuh.
+    }
+  }
+  return effects;
+}
+
+function shiftEffectsForDelete(effects, selectedTrackIds, atTick, deleteEnd, delta) {
+  const result = [];
+  for (const effect of effects) {
+    if (!selectedTrackIds.has(effect.trackId)) {
+      result.push(effect);
+    } else if (effect.tickLocal >= deleteEnd) {
+      result.push({ ...effect, tickLocal: effect.tickLocal - delta });
+    } else if (effect.tickLocal < atTick) {
+      result.push(effect);
+    }
+  }
+  return result;
+}
+
 function validateRowOperation(row, count, rowCount) {
   validateIndex(row, 0, rowCount - 1, 'row');
   if (!Number.isInteger(count) || count < 1 || row + count > rowCount) {
@@ -539,8 +594,12 @@ function validateIndex(value, min, max, label) {
 }
 
 function replacePatternNotes(project, patternIndex, pattern, notes, now) {
+  return replacePatternEvents(project, patternIndex, pattern, { notes }, now);
+}
+
+function replacePatternEvents(project, patternIndex, pattern, changes, now) {
   const patterns = [...project.song.patterns];
-  patterns[patternIndex] = { ...pattern, notes };
+  patterns[patternIndex] = { ...pattern, ...changes };
   return {
     ...project,
     modifiedAt: now(),
