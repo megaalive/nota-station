@@ -5,6 +5,20 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S5 — block selection + copy/paste + transpose (CLOSED · PASS)
+
+- Pattern editor kini memiliki seleksi blok **row × channel**. `Shift+Arrow` memperluas blok; `Esc` membatalkan seleksi.
+- `Ctrl+A` bersifat bertahap: pertama memilih seluruh row pada channel aktif, kedua memilih seluruh Pattern, sesuai UX tracker tanpa memaksa satu mode seleksi baru.
+- `Ctrl+C` menyimpan clipboard Pattern sebagai state UI non-Undo. Clipboard menyimpan offset tick asli, duration, Instrument, velocity, dan `voiceLane`, sehingga sustain serta event off-grid masa depan tidak dipaksa ke grid saat dicopy.
+- `Ctrl+V` memetakan blok ke row/channel cursor, memberi ID note baru, mengganti collision pada lane yang sama, dan menolak overflow secara atomik.
+- Clipboard membawa metadata jenis track. Paste **instrument ↔ drum** ditolak dengan `E_PATTERN_BLOCK_TRACK_KIND`; voice lane nonzero juga ditolak bila target bukan track polyphonic.
+- `Ctrl+↑/↓` transpose ±1 semitone dan `Ctrl+Shift+↑/↓` transpose ±12 semitone. Drum Track dilewati; bila satu pitch keluar MIDI 0..127 seluruh operasi ditolak tanpa mutasi parsial.
+- Copy tidak masuk history. Paste dan transpose masing-masing satu transaksi Undo dan tetap melewati shared-pattern guard S4, sehingga Pattern shared tidak dapat dimutasi lewat shortcut maupun command/agent tanpa keputusan sesi.
+- Agent hook mengekspos ringkasan clipboard serta state cursor/selection Pattern, bukan raw mutable state.
+- Gate terarah run **37405305724** pada HEAD `6a8a31c…`: 0 vulnerability, unit **130/130 PASS**, check PASS, build **438,0 KiB**, Pattern/block/shared-guard Chromium+Firefox **44/44 PASS**.
+- Gate final run **37405446105** pada HEAD `61603dc…`: 0 vulnerability, unit **130/130 PASS**, check PASS, build **438,0 KiB**, full browser Chromium+Firefox **208/208 PASS**.
+- Berikutnya: **R3-S6 row operations + velocity interpolation** — insert/delete row secara atomik, lalu interpolasi velocity pada selection yang sama sebelum membuka FX typed.
+
 ### R3-S4 — Section + shared-pattern guard (CLOSED · PASS)
 
 - Model `Section` yang sejak awal tersedia di Project kini benar-benar dipakai: nama wajib **1..80 karakter setelah trim**, warna `#RRGGBB`, ID unik, dan `OrderEntry.sectionId` tervalidasi. Debug JSON menolak section yatim dengan `E_DEBUG_JSON_SECTION_REF`.
