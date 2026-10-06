@@ -8,7 +8,21 @@ const PORT = Number(process.env.PORT ?? 4173);
 
 const ALL_PROJECTS = [
   { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-  { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+  {
+    name: 'firefox',
+    use: {
+      ...devices['Desktop Firefox'],
+      // Firefox headless CI memblokir AudioContext walau Play dipicu lewat klik.
+      // Gate audio membutuhkan clock benar-benar berjalan; preferensi ini hanya
+      // berlaku pada browser tes dan tidak mengubah kebijakan autoplay produk.
+      launchOptions: {
+        firefoxUserPrefs: {
+          'media.autoplay.default': 0,
+          'media.autoplay.blocking_policy': 0,
+        },
+      },
+    },
+  },
 ];
 
 // PW_PROJECTS=chromium menjalankan satu browser saja. Dipakai untuk mengisolasi
