@@ -5,6 +5,20 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S6 — row operations + velocity interpolation (CLOSED · PASS)
+
+- Pattern editor kini mendukung **Insert row** dan **Delete row** pada data channel terpilih tanpa mengubah panjang Pattern. Shortcut tracker: `Insert` menyisipkan row dan `Backspace` menghapus row pada NOTE/block selection; `Ctrl+Insert` / `Ctrl+Backspace` menjalankan operasi yang sama untuk seluruh channel.
+- Semantik fixed-length dibuat eksplisit: event pada channel terpilih digeser; event yang terdorong melewati akhir Pattern dipotong dari Pattern. Channel di luar selection tetap identik.
+- Note sustain yang melintasi titik insert diperpanjang sebanyak row yang disisipkan; saat delete, sustain yang melintasi rentang terhapus dipendekkan. Note yang mulai di dalam rentang delete dihapus sebagai event, bukan diubah menjadi tail tanpa note-on.
+- Drum `voiceLane` dipertahankan oleh insert/delete; operasi row memakai primitive immutable yang sama untuk track mono/poly.
+- `Ctrl+J` menjalankan **interpolasi velocity** pada block selection. Interpolasi linear hanya mengubah NoteEvent yang sudah ada, per `trackId + voiceLane`; blank row tidak dibuat menjadi note baru.
+- Insert/delete/interpolate seluruhnya masuk command registry, melewati shared-pattern guard S4, melakukan reschedule audio bila perlu, dan masing-masing menjadi satu transaksi Undo.
+- Full regression pertama run **37416428965**: unit **135/135 PASS**, check/build PASS, tetapi browser **214/216 PASS**. Dua failure identik menemukan konflik kontrak R1: Backspace pada kolom INST/VOL yang read-only ikut menjalankan delete-row.
+- Koreksi mempertahankan kontrak lama: plain Backspace menjadi delete-row hanya ketika cursor berada di NOTE atau ada block selection; pada INST/VOL tetap no-op. `Ctrl+Backspace` tetap aksi row eksplisit seluruh channel.
+- Gate final run **37416721250** pada HEAD `c659552…`: 0 vulnerability, unit **135/135 PASS**, check PASS, build **448,7 KiB**, full browser Chromium+Firefox **216/216 PASS**.
+- Shortcut `Insert` / `Backspace` dan `Ctrl+J` dipilih agar pintu OpenMPT-like tetap familiar; implementasi NotaStation tetap mengikuti model kanoniknya sendiri, bukan menyalin format tracker.
+- Berikutnya: **R3-S7 typed FX v0.1 + DLY/LPB** atau **generalisasi polyphonic voice lane** setelah audit dependency singkat; row helper S6 sengaja belum menggeser FX karena model FX typed belum dibuka.
+
 ### R3-S5 — block selection + copy/paste + transpose (CLOSED · PASS)
 
 - Pattern editor kini memiliki seleksi blok **row × channel**. `Shift+Arrow` memperluas blok; `Esc` membatalkan seleksi.

@@ -8,6 +8,9 @@ import { createFocusStore, patternForFocus } from './core/focus.js';
 import { createSharedPatternGuard } from './core/shared-pattern-guard.js';
 import {
   copyPatternBlock,
+  deletePatternRows,
+  insertPatternRows,
+  interpolatePatternVelocity,
   pastePatternBlock,
   transposePatternBlock,
 } from './core/pattern-block.js';
@@ -690,6 +693,51 @@ function registerCommands() {
         persistSessionSharedPatternGuardState();
         patternView?.refresh();
         return state;
+      },
+    },
+    {
+      id: 'pattern.insertRows',
+      group: 'Pattern',
+      labelKey: 'pattern.insertRows',
+      shortcut: 'Insert',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.insertRows', args);
+        requirePatternEditAllowed(args);
+        const nextProject = insertPatternRows(project, args);
+        const changed = nextProject !== project;
+        commitPatternProject(nextProject, 'pattern.insertRows');
+        return { changed, count: Number(args.count) || 1 };
+      },
+    },
+    {
+      id: 'pattern.deleteRows',
+      group: 'Pattern',
+      labelKey: 'pattern.deleteRows',
+      shortcut: 'Backspace',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.deleteRows', args);
+        requirePatternEditAllowed(args);
+        const nextProject = deletePatternRows(project, args);
+        const changed = nextProject !== project;
+        commitPatternProject(nextProject, 'pattern.deleteRows');
+        return { changed, count: Number(args.count) || 1 };
+      },
+    },
+    {
+      id: 'pattern.interpolateVelocity',
+      group: 'Pattern',
+      labelKey: 'pattern.interpolateVelocity',
+      shortcut: 'Ctrl+J',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.interpolateVelocity', args);
+        requirePatternEditAllowed(args);
+        const nextProject = interpolatePatternVelocity(project, args);
+        const changed = nextProject !== project;
+        commitPatternProject(nextProject, 'pattern.interpolateVelocity');
+        return { changed };
       },
     },
     {
