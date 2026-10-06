@@ -5,6 +5,21 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S8D — audible volume + pan EffectEvent (CLOSED · PASS)
+
+- `volume` dan `pan` kini benar-benar memengaruhi audio sebagai **state Track yang persisten setelah tick EffectEvent**, bukan pengganti `NoteEvent.velocity` atau metadata note awal.
+- Jalur bus Track dipisah menjadi `mute/solo gain → FX gain → FX pan → meter → destination`. Dengan begitu automation EffectEvent tidak mengubah state mixer mute/solo pengguna.
+- `volume.level 0..127` diproyeksikan ke gain `0..1`; `pan.position -64..64` diproyeksikan ke stereo pan `-1..1`. Browser tanpa `StereoPannerNode` tetap fail-soft: volume berjalan, pan tidak membuat playback gagal.
+- Scheduler memiliki cursor khusus mix FX. Bila Pattern memiliki volume/pan, synthetic reset pada tick 0 mengembalikan baseline gain 1 dan pan center sebelum event cycle baru diterapkan. Loop tidak mewarisi state cycle sebelumnya.
+- Seek dan live-edit merekonstruksi state volume/pan terakhir **sebelum** tick tujuan, lalu cursor menangani effect yang tepat pada tick tujuan. Ini menjaga semantik yang sama untuk start dari tengah Pattern dan freeze-window live edit.
+- Stop dan playback yang selesai alami mengembalikan FX bus ke baseline. Pause mempertahankan posisi; saat resume, `startPlayback` membangun ulang state dari tick resume.
+- Automation mix hanya dijadwalkan sampai tepat sebelum freeze-window 30 ms, sehingga edit effect yang masih mutable tidak dibekukan lebih dini daripada kontrak live-edit R1/S8B.
+- Primitive `track-mix-effects.js` diuji terpisah untuk mapping gain/pan, reset, clamp audio time, fallback panner, dan invalid input.
+- Bukti audible lintas-browser memakai `OfflineAudioContext` stereo: level turun setelah volume FX dan energi berpindah ke channel kanan setelah hard-pan. Integrasi realtime engine diverifikasi pada Chromium tanpa memutasi NoteEvent kanonik.
+- Gate terarah run **37443959974** pada HEAD `98432c9…`: 0 vulnerability, unit **171/171 PASS**, check PASS, build **516,7 KiB**, browser S8D+S8B+S8C **14 PASS + 2 skip**. Dua skip adalah realtime AudioContext Firefox headless yang sudah terdokumentasi; kedua bukti audible OfflineAudioContext tetap berjalan di Firefox.
+- Gate final run **37444121563** pada HEAD `8be8d0d…`: 0 vulnerability, unit **171/171 PASS**, check PASS, build **516,7 KiB**, full browser **248 PASS + 2 skip**.
+- Audit dependency memisahkan keluarga non-pitch: `volume/pan` adalah Track-state automation, sedangkan `retrigger/offset` membuat atau memulai ulang source note. Berikutnya: **R3-S8E retrigger + sample offset**, lalu keluarga pitch automation.
+
 ### R3-S8C — progressive FX | PARAM Pattern (CLOSED · PASS)
 
 - Pattern kini memakai **progressive disclosure** untuk kolom `FX | PARAM`: Pattern tanpa EffectEvent tetap ringkas; tombol **FX** membuka kolom secara eksplisit, dan Pattern yang sudah memiliki EffectEvent membukanya otomatis agar data tidak pernah tersembunyi.
