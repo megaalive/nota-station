@@ -105,9 +105,9 @@ test('copyPatternBlock menyimpan offset tick/channel dan seluruh voice lane', ()
     })),
     [
       { channelOffset: 0, tickOffset: 0, voiceLane: 0, pitch: 60 },
-      { channelOffset: 1, tickOffset: 480, voiceLane: 0, pitch: 64 },
-      { channelOffset: 2, tickOffset: 480, voiceLane: 0, pitch: 36 },
-      { channelOffset: 2, tickOffset: 480, voiceLane: 1, pitch: 38 },
+      { channelOffset: 1, tickOffset: 120, voiceLane: 0, pitch: 64 },
+      { channelOffset: 2, tickOffset: 120, voiceLane: 0, pitch: 36 },
+      { channelOffset: 2, tickOffset: 120, voiceLane: 1, pitch: 38 },
     ],
   );
 });
@@ -208,7 +208,7 @@ test('transposePatternBlock fail-closed bila satu pitch keluar MIDI 0..127', () 
   );
   assert.equal(
     high.song.patterns.find((item) => item.id === patternId)
-      .notes.find((note) => note.startTickLocal === 480).pitch,
+      .notes.find((note) => note.startTickLocal === 120).pitch,
     60,
   );
 });
