@@ -143,6 +143,13 @@ test('Section + assignment round-trip lewat debug JSON dan sectionId yatim ditol
     () => serializeDebugProject(invalid),
     (error) => error.code === 'E_DEBUG_JSON_SECTION_REF',
   );
+
+  const blankName = structuredClone(next);
+  blankName.song.sections[0].name = '   ';
+  assert.throws(
+    () => serializeDebugProject(blankName),
+    (error) => error.code === 'E_DEBUG_JSON_SECTION',
+  );
 });
 
 test('createSectionOccurrence reuse membuat Section + Order dalam satu hasil tanpa clone Pattern', () => {
