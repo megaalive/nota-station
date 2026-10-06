@@ -1417,3 +1417,35 @@
   color: var(--text-2);
   font-size: 0.82rem;
 }
+
+
+/* ----------------------------------------------- R3 shared Pattern warning */
+.pattern-shared-warning {
+  display: grid;
+  gap: var(--space-2);
+  width: max-content;
+  min-width: min(300px, 72vw);
+  max-width: min(420px, 82vw);
+}
+
+.pattern-shared-warning__message {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.pattern-shared-warning__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pattern-toolbar [data-action="pattern-shared-badge"] {
+  min-height: 30px;
+  white-space: nowrap;
+}
+
+.pattern-toolbar [data-action="pattern-shared-popover"] .popover {
+  width: max-content;
+  max-width: min(420px, 82vw);
+  padding: var(--space-3);
+}
