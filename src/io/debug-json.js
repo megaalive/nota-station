@@ -63,17 +63,29 @@ export function validateDebugProject(project) {
   }
   validateMeter(project.song.initial.meter, 'project.song.initial.meter');
 
+  assertArray(project.song.sections, 'project.song.sections', 0, 128);
   assertArray(project.song.tracks, 'project.song.tracks', 1, 32);
   assertArray(project.song.patterns, 'project.song.patterns', 1);
   assertArray(project.song.order, 'project.song.order', 1);
   assertArray(project.instruments, 'project.instruments', 1);
   assertArray(project.samples, 'project.samples', 1);
 
+  const sectionIds = uniqueIds(project.song.sections, 'section');
   const trackIds = uniqueIds(project.song.tracks, 'track');
   const tracksById = new Map(project.song.tracks.map((track) => [track.id, track]));
   const sampleIds = uniqueIds(project.samples, 'sample');
   const instrumentIds = uniqueIds(project.instruments, 'instrument');
   const patternIds = uniqueIds(project.song.patterns, 'pattern');
+
+  for (const section of project.song.sections) {
+    assertString(section.name, 'section.name');
+    if (section.name.trim().length > 80) {
+      throw debugJsonError('E_DEBUG_JSON_SECTION', 'Nama Section maksimal 80 karakter.');
+    }
+    if (typeof section.color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(section.color)) {
+      throw debugJsonError('E_DEBUG_JSON_SECTION', `Warna Section tidak valid: ${section.color}`);
+    }
+  }
 
   for (const sample of project.samples) {
     try {
@@ -173,6 +185,12 @@ export function validateDebugProject(project) {
   for (const entry of project.song.order) {
     if (!patternIds.has(entry.patternId)) {
       throw debugJsonError('E_DEBUG_JSON_PATTERN_REF', `Pattern OrderEntry tidak ada: ${entry.patternId}`);
+    }
+    if (entry.sectionId !== null && entry.sectionId !== undefined && !sectionIds.has(entry.sectionId)) {
+      throw debugJsonError(
+        'E_DEBUG_JSON_SECTION_REF',
+        `Section OrderEntry tidak ada: ${entry.sectionId}`,
+      );
     }
   }
 
