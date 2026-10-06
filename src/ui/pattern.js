@@ -373,6 +373,8 @@ export function createPatternView({
     if (
       cellEffects.length > 0
       && !cellEffects.some((effect) => effect.type === selectedEffectType)
+      && document.activeElement !== effectTypeSelect
+      && document.activeElement !== effectParamInput
     ) {
       selectedEffectType = cellEffects[0].type;
     }
