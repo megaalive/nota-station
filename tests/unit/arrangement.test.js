@@ -42,7 +42,7 @@ function fixture() {
       ...project.song,
       patterns: project.song.patterns.map((pattern) => pattern.id === patternId ? {
         ...pattern,
-        effects: [{ id: 'effect-source', trackId, tickLocal: 120, type: 'volume', value: 90 }],
+        effects: [{ id: 'effect-source', trackId, tickLocal: 120, type: 'volume', value: { level: 90 } }],
         chords: [{
           id: 'chord-source',
           tickLocal: 0,
