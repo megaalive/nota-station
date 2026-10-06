@@ -1,10 +1,11 @@
 // Pattern editor R1: DOM windowed, 8 channel, kolom tracker NOTE | INST | VOL.
 // View tidak pernah menulis project langsung; semua mutasi lewat command registry.
 
+import { patternUsageCount } from '../core/arrangement.js';
 import { activePattern, noteAtCell, notesAtCell } from '../core/project.js';
 import { isDrumKitInstrument } from '../core/sound-model.js';
 import { el } from './dom.js';
-import { Button, Tooltip } from './kit.js';
+import { Button, Popover, Tooltip } from './kit.js';
 
 const ROW_HEIGHT = 28;
 const HEADER_HEIGHT = 92;
@@ -50,6 +51,7 @@ export function createPatternView({
   t,
   getProject,
   getActivePattern = activePattern,
+  getFocusedOrderEntryId = null,
   registry,
   onAudition,
   onInstrumentAudition,
@@ -67,6 +69,8 @@ export function createPatternView({
   let playbackRow = null;
   let playbackState = 'ready';
   let latestTrackMeters = [];
+  let pendingSharedEdit = null;
+  let sharedWarningDetails = null;
   const trackUi = new Map();
 
   const modeButton = Button({
@@ -97,10 +101,53 @@ export function createPatternView({
     child: modeButton,
   });
 
+  const sharedWarningMessage = el('p', {
+    class: 'pattern-shared-warning__message',
+    dataset: { action: 'pattern-shared-message' },
+  });
+  const editAllButton = Button({
+    label: t('pattern.sharedEditAll'),
+    onClick: resolveSharedEditAll,
+  });
+  editAllButton.dataset.action = 'pattern-shared-edit-all';
+
+  const makeUniqueButton = Button({
+    label: t('pattern.sharedMakeUnique'),
+    onClick: resolveSharedMakeUnique,
+  });
+  makeUniqueButton.dataset.action = 'pattern-shared-make-unique';
+
+  const sharedWarningContent = el('div', {
+    class: 'pattern-shared-warning',
+    dataset: { action: 'pattern-shared-warning' },
+  }, [
+    sharedWarningMessage,
+    el('div', { class: 'pattern-shared-warning__actions' }, [
+      editAllButton,
+      makeUniqueButton,
+    ]),
+  ]);
+
+  const sharedBadge = Button({
+    label: t('pattern.sharedBadge', { count: 2 }),
+    variant: 'ghost',
+    onClick: () => showSharedWarning(),
+  });
+  sharedBadge.dataset.action = 'pattern-shared-badge';
+  sharedBadge.hidden = true;
+
+  const sharedPopover = Popover({
+    content: sharedWarningContent,
+    anchor: sharedBadge,
+    placement: 'bottom',
+  });
+  sharedPopover.dataset.action = 'pattern-shared-popover';
+
   const toolbar = el('div', { class: 'pattern-toolbar' }, [
     modeControl,
     octaveGroup,
     stepGroup,
+    sharedPopover,
     hint,
   ]);
 
@@ -119,6 +166,107 @@ export function createPatternView({
   scroller.append(surface);
   root.textContent = '';
   root.append(toolbar, scroller);
+
+  function sharedPatternInfo() {
+    const { project, pattern } = projectInfo();
+    const usage = patternUsageCount(project, pattern.id);
+    return {
+      patternId: pattern.id,
+      patternName: pattern.name,
+      usage,
+      orderEntryId: getFocusedOrderEntryId?.()
+        ?? project.song.order.find((entry) => entry.patternId === pattern.id)?.id
+        ?? null,
+    };
+  }
+
+  function syncSharedPatternBadge() {
+    const info = sharedPatternInfo();
+    sharedBadge.hidden = info.usage <= 1;
+    if (info.usage <= 1) {
+      sharedPopover.close();
+      sharedWarningDetails = null;
+      return;
+    }
+    sharedBadge.querySelector('.btn__label').textContent = t('pattern.sharedBadge', {
+      count: info.usage,
+    });
+  }
+
+  function showSharedWarning(details = null) {
+    const info = details ?? sharedPatternInfo();
+    if (!info || info.usage <= 1) return;
+    sharedWarningDetails = {
+      patternId: info.patternId,
+      patternName: info.patternName,
+      usage: info.usage,
+      orderEntryId: info.orderEntryId
+        ?? getFocusedOrderEntryId?.()
+        ?? null,
+    };
+    sharedBadge.hidden = false;
+    sharedBadge.querySelector('.btn__label').textContent = t('pattern.sharedBadge', {
+      count: info.usage,
+    });
+    sharedWarningMessage.textContent = t('pattern.sharedWarning', {
+      pattern: info.patternName,
+      count: info.usage,
+    });
+    sharedPopover.open();
+  }
+
+  function runPatternCommand(id, args, onSuccess = null) {
+    try {
+      const result = registry.execute(id, args);
+      onSuccess?.(result);
+      return true;
+    } catch (error) {
+      if (error?.code !== 'E_SHARED_PATTERN_DECISION_REQUIRED') throw error;
+      pendingSharedEdit = {
+        id,
+        args: structuredClone(args),
+        onSuccess,
+      };
+      showSharedWarning(error.details);
+      return false;
+    }
+  }
+
+  function resolveSharedEditAll() {
+    const details = sharedWarningDetails;
+    if (!details?.patternId) return;
+
+    const pending = pendingSharedEdit;
+    pendingSharedEdit = null;
+    sharedPopover.close();
+    registry.execute('pattern.allowSharedEdit', {
+      patternId: details.patternId,
+    });
+    if (pending) {
+      runPatternCommand(pending.id, pending.args, pending.onSuccess);
+    }
+  }
+
+  function resolveSharedMakeUnique() {
+    const details = sharedWarningDetails;
+    if (!details?.orderEntryId) return;
+
+    const pending = pendingSharedEdit;
+    pendingSharedEdit = null;
+    sharedPopover.close();
+    registry.execute('song.makeOrderUnique', {
+      orderEntryId: details.orderEntryId,
+    });
+
+    if (pending) {
+      const nextPattern = projectInfo().pattern;
+      runPatternCommand(
+        pending.id,
+        { ...pending.args, patternId: nextPattern.id },
+        pending.onSuccess,
+      );
+    }
+  }
 
   function projectInfo() {
     const project = getProject();
@@ -465,13 +613,12 @@ export function createPatternView({
 
     if (mode !== 'edit') return;
 
-    registry.execute('pattern.enterNote', {
+    runPatternCommand('pattern.enterNote', {
       patternId: pattern.id,
       trackId: tracks[cursorChannel].id,
       row: cursorRow,
       pitch,
-    });
-    moveVertical(step);
+    }, () => moveVertical(step));
   }
 
   function toggleDrumHit(code) {
@@ -494,14 +641,14 @@ export function createPatternView({
     const existing = hits.find((note) => (note.voiceLane ?? 0) === hit.voiceLane);
 
     if (existing?.pitch === hit.pitch) {
-      registry.execute('pattern.deleteVoiceNote', {
+      runPatternCommand('pattern.deleteVoiceNote', {
         patternId: pattern.id,
         trackId: track.id,
         row: cursorRow,
         voiceLane: hit.voiceLane,
       });
     } else {
-      registry.execute('pattern.enterVoiceNote', {
+      runPatternCommand('pattern.enterVoiceNote', {
         patternId: pattern.id,
         trackId: track.id,
         row: cursorRow,
@@ -585,13 +732,12 @@ export function createPatternView({
       }
 
       feedback = null;
-      registry.execute('pattern.updateNote', {
+      runPatternCommand('pattern.updateNote', {
         patternId: pattern.id,
         trackId: track.id,
         row: cursorRow,
         instrumentId: project.instruments[value - 1].id,
-      });
-      moveHorizontal(1);
+      }, () => moveHorizontal(1));
       return true;
     }
 
@@ -603,13 +749,12 @@ export function createPatternView({
     }
 
     feedback = null;
-    registry.execute('pattern.updateNote', {
+    runPatternCommand('pattern.updateNote', {
       patternId: pattern.id,
       trackId: track.id,
       row: cursorRow,
       velocity: value,
-    });
-    moveVertical(step);
+    }, () => moveVertical(step));
     return true;
   }
 
@@ -660,7 +805,7 @@ export function createPatternView({
 
     const { pattern, tracks } = projectInfo();
     const track = tracks[cursorChannel];
-    registry.execute(
+    runPatternCommand(
       track.kind === 'drum' ? 'pattern.clearVoiceRow' : 'pattern.deleteNote',
       {
         patternId: pattern.id,
