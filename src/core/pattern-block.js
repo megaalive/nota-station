@@ -26,6 +26,13 @@ export function copyPatternBlock(project, {
     selectedTrackIds.set(tracks[channel].id, channel - bounds.channelStart);
   }
 
+  const channels = tracks
+    .slice(bounds.channelStart, bounds.channelEnd + 1)
+    .map((track) => ({
+      kind: track.kind,
+      polyphony: track.polyphony,
+    }));
+
   const events = pattern.notes
     .filter((note) => (
       selectedTrackIds.has(note.trackId)
@@ -52,6 +59,7 @@ export function copyPatternBlock(project, {
     channelCount: bounds.channelEnd - bounds.channelStart + 1,
     sourceRowTicks: pattern.rowTicks,
     spanTicks: endTick - startTick,
+    channels: Object.freeze(channels.map((channel) => Object.freeze(channel))),
     events: Object.freeze(events.map((event) => Object.freeze(event))),
   });
 }
@@ -81,8 +89,15 @@ export function pastePatternBlock(
   const targetStartTick = targetRow * pattern.rowTicks;
   const pasted = block.events.map((event) => {
     const track = tracks[targetChannel + event.channelOffset];
+    const sourceChannel = block.channels[event.channelOffset];
     if (!track) {
       throw projectError('E_PATTERN_BLOCK_RANGE', 'Channel tujuan block tidak tersedia.');
+    }
+    if (sourceChannel.kind !== track.kind) {
+      throw projectError(
+        'E_PATTERN_BLOCK_TRACK_KIND',
+        `Jenis channel clipboard ${sourceChannel.kind} tidak cocok dengan tujuan ${track.kind}.`,
+      );
     }
     const startTickLocal = targetStartTick + event.tickOffset;
     if (
@@ -247,9 +262,21 @@ function validateClipboard(block) {
     || block.rowCount < 1
     || !Number.isInteger(block.channelCount)
     || block.channelCount < 1
+    || !Array.isArray(block.channels)
+    || block.channels.length !== block.channelCount
     || !Array.isArray(block.events)
   ) {
     throw projectError('E_PATTERN_BLOCK_CLIPBOARD', 'Clipboard block tidak valid.');
+  }
+
+  for (const channel of block.channels) {
+    if (
+      !channel
+      || !['instrument', 'drum'].includes(channel.kind)
+      || !['mono', 'poly'].includes(channel.polyphony)
+    ) {
+      throw projectError('E_PATTERN_BLOCK_CLIPBOARD', 'Metadata channel clipboard tidak valid.');
+    }
   }
 
   for (const event of block.events) {
