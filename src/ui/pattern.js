@@ -849,6 +849,7 @@ export function createPatternView({
     clearInputState();
     renderHeader();
     renderWindow();
+    syncSharedPatternBadge();
     syncStatus();
   }
 
