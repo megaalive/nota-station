@@ -9,6 +9,7 @@ import {
   pastePatternBlock,
   transposePatternBlock,
 } from '../../src/core/pattern-block.js';
+import { addPatternEffect } from '../../src/core/effect-model.js';
 import {
   configureDrumTrack,
   createBlankProject,
@@ -398,4 +399,84 @@ test('interpolatePatternVelocity no-op bila tiap lane hanya punya satu titik', (
   }, { now });
 
   assert.equal(next, project);
+});
+
+
+test('insert/delete row menggeser EffectEvent track-local bersama NoteEvent', () => {
+  const { project, patternId, idFactory, now } = fixture();
+  const trackA = project.song.tracks[0].id;
+  const trackB = project.song.tracks[1].id;
+  let seeded = addPatternEffect(project, {
+    patternId,
+    trackId: trackA,
+    tickLocal: 4 * 120,
+    type: 'volume',
+    value: { level: 80 },
+  }, { idFactory, now });
+  seeded = addPatternEffect(seeded, {
+    patternId,
+    trackId: trackB,
+    tickLocal: 4 * 120,
+    type: 'pan',
+    value: { position: 16 },
+  }, { idFactory, now });
+
+  const inserted = insertPatternRows(seeded, {
+    patternId,
+    row: 2,
+    count: 2,
+    channelStart: 0,
+    channelEnd: 0,
+  }, { now });
+
+  let effects = inserted.song.patterns.find((item) => item.id === patternId).effects;
+  assert.deepEqual(
+    effects.map((effect) => [effect.trackId, effect.tickLocal, effect.type]),
+    [
+      [trackB, 480, 'pan'],
+      [trackA, 720, 'volume'],
+    ],
+  );
+
+  const deleted = deletePatternRows(inserted, {
+    patternId,
+    row: 2,
+    count: 2,
+    channelStart: 0,
+    channelEnd: 0,
+  }, { now });
+  effects = deleted.song.patterns.find((item) => item.id === patternId).effects;
+  assert.deepEqual(
+    effects.map((effect) => [effect.trackId, effect.tickLocal, effect.type]),
+    [
+      [trackA, 480, 'volume'],
+      [trackB, 480, 'pan'],
+    ],
+  );
+});
+
+test('insert row membuang EffectEvent berdurasi yang tak lagi muat di Pattern', () => {
+  const { project, patternId, idFactory, now } = fixture();
+  const pattern = project.song.patterns.find((item) => item.id === patternId);
+  const trackId = project.song.tracks[0].id;
+  let seeded = addPatternEffect(project, {
+    patternId,
+    trackId,
+    tickLocal: pattern.lengthTicks - 240,
+    type: 'pitchSlide',
+    value: { semitones: 7, durationTicks: 240 },
+  }, { idFactory, now });
+
+  const next = insertPatternRows(seeded, {
+    patternId,
+    row: 62,
+    count: 1,
+    channelStart: 0,
+    channelEnd: 0,
+  }, { now });
+
+  assert.equal(
+    next.song.patterns.find((item) => item.id === patternId).effects.length,
+    0,
+  );
 });
