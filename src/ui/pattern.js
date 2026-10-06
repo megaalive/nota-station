@@ -238,6 +238,7 @@ export function createPatternView({
 
     const pending = pendingSharedEdit;
     pendingSharedEdit = null;
+    sharedWarningDetails = null;
     sharedPopover.close();
     registry.execute('pattern.allowSharedEdit', {
       patternId: details.patternId,
@@ -253,6 +254,7 @@ export function createPatternView({
 
     const pending = pendingSharedEdit;
     pendingSharedEdit = null;
+    sharedWarningDetails = null;
     sharedPopover.close();
     registry.execute('song.makeOrderUnique', {
       orderEntryId: details.orderEntryId,
