@@ -8,6 +8,7 @@ import { createFocusStore, patternForFocus } from './core/focus.js';
 import {
   addSection,
   assignOrderEntrySection,
+  createSectionOccurrence,
   insertOrderEntry,
   makeOrderEntryUnique,
   moveOrderEntry,
@@ -456,6 +457,47 @@ function registerCommands() {
         audio.setTempo(project, focusedPattern(project));
         syncTransportUi();
         return { tempo: project.song.initial.tempo };
+      },
+    },
+    {
+      id: 'song.createSectionOccurrence',
+      group: 'Song',
+      labelKey: 'song.addSection',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('song.createSectionOccurrence', args);
+        const afterOrderEntryId = String(
+          args.afterOrderEntryId ?? focus.getState().orderEntryId ?? '',
+        );
+        const afterIndex = project.song.order.findIndex(
+          (entry) => entry.id === afterOrderEntryId,
+        );
+        if (afterIndex < 0) {
+          throw commandError(
+            'E_PROJECT_ORDER_MISSING',
+            `OrderEntry tidak dikenal: ${afterOrderEntryId}`,
+          );
+        }
+
+        const sourcePatternId = String(
+          args.sourcePatternId ?? project.song.order[afterIndex].patternId,
+        );
+        const nextProject = createSectionOccurrence(project, {
+          name: args.name,
+          color: args.color,
+          patternMode: String(args.patternMode ?? 'reuse'),
+          sourcePatternId,
+          index: afterIndex + 1,
+        });
+        const section = nextProject.song.sections[nextProject.song.sections.length - 1];
+        const entry = nextProject.song.order[afterIndex + 1];
+        commitProject(nextProject, 'song.createSectionOccurrence');
+        return {
+          section: structuredClone(section),
+          orderEntryId: entry.id,
+          patternId: entry.patternId,
+          index: afterIndex + 1,
+        };
       },
     },
     {
