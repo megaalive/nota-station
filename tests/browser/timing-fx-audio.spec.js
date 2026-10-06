@@ -85,6 +85,11 @@ test.describe('Timing FX audio R3-S8B', () => {
     await page.getByRole('button', { name: 'Putar' }).click();
 
     await expect.poll(
+      () => page.evaluate(() => window.tracker.getState().audio.contextState),
+      { timeout: 5000 },
+    ).toBe('running');
+
+    await expect.poll(
       () => page.evaluate(() => window.tracker.getState().audio.notesScheduled),
       { timeout: 5000 },
     ).toBeGreaterThan(0);
