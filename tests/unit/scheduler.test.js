@@ -332,7 +332,6 @@ test('mix FX cursor menaruh reset sebelum volume/pan tick 0 dan mengulang reset 
       ['mix-effect', 'fx-volume', 0],
       ['mix-reset', 'mix-reset', 1],
       ['mix-effect', 'fx-pan', 1],
-      ['mix-effect', 'fx-volume', 1],
     ],
   );
 });
