@@ -211,3 +211,36 @@ test('EffectEvent track/tick/reference invalid fail-closed', () => {
     (error) => error.code === 'E_EFFECT_TICK_RANGE',
   );
 });
+
+
+test('delay dan cut tidak boleh menjadwalkan timing efektif di luar Pattern', () => {
+  const base = {
+    id: 'fx-timing',
+    trackId: 'track-1',
+    tickLocal: 7600,
+  };
+
+  assert.throws(
+    () => validateEffectEvent({
+      ...base,
+      type: 'delay',
+      value: { ticks: 80 },
+    }, { patternLengthTicks: 7680 }),
+    (error) => error.code === 'E_EFFECT_TIMING_RANGE',
+  );
+
+  assert.doesNotThrow(() => validateEffectEvent({
+    ...base,
+    type: 'cut',
+    value: { afterTicks: 80 },
+  }, { patternLengthTicks: 7680 }));
+
+  assert.throws(
+    () => validateEffectEvent({
+      ...base,
+      type: 'cut',
+      value: { afterTicks: 81 },
+    }, { patternLengthTicks: 7680 }),
+    (error) => error.code === 'E_EFFECT_TIMING_RANGE',
+  );
+});

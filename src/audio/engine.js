@@ -19,6 +19,7 @@ import {
   LIVE_EDIT_FREEZE_SECONDS,
   SCHEDULE_AHEAD_SECONDS,
   SCHEDULER_WAKE_MS,
+  createCutScheduleCursor,
   createMetronomeScheduleCursor,
   createPatternScheduleCursor,
   isLiveEditMutable,
@@ -26,6 +27,7 @@ import {
   secondsPerTick,
   transportTickAtAudioTime,
 } from './scheduler.js';
+import { scheduleSourceCut } from './timing-effects.js';
 
 const ROOT_PITCH = FACTORY_BASIC_ROOT_PITCH;
 const PREVIEW_SECONDS = 0.18;
@@ -165,6 +167,27 @@ export function createAudioEngine({
   function trackSource(source, when, kind, metadata = {}) {
     activeSources.set(source, { when, kind, ...metadata });
     source.onended = () => activeSources.delete(source);
+  }
+
+  function scheduleTrackCut(trackId, when) {
+    let stopped = 0;
+    for (const [source, scheduled] of activeSources) {
+      if (scheduled.kind !== 'note' || scheduled.trackId !== trackId) continue;
+      if (scheduled.when > when) continue;
+      if (Number.isFinite(scheduled.cutAt) && scheduled.cutAt <= when) continue;
+
+      try {
+        const cutAt = scheduleSourceCut(source, {
+          when,
+          currentTime: context.currentTime,
+        });
+        scheduled.cutAt = cutAt;
+        stopped += 1;
+      } catch {
+        // Source dapat selesai tepat sebelum note-cut dijadwalkan.
+      }
+    }
+    return stopped;
   }
 
   function chokeActiveGroup(chokeGroup, when) {
@@ -538,6 +561,11 @@ export function createAudioEngine({
         loop: loopEnabled,
         startTick: normalizedTick,
       }),
+      cutAnchor: anchor,
+      cutCursor: createCutScheduleCursor(pattern, tempo, {
+        loop: loopEnabled,
+        startTick: normalizedTick,
+      }),
       metronomeCursor: metronomeEnabled
         ? createMetronomeScheduleCursor(pattern, tempo, {
           loop: loopEnabled,
@@ -548,6 +576,9 @@ export function createAudioEngine({
       endAt: anchor + Math.max(0, pattern.lengthTicks - normalizedTick) * secondsPerTick(tempo),
       revision: ++scheduleRevision,
       notesScheduled: 0,
+      delayedNotesScheduled: 0,
+      cutEffectsScheduled: 0,
+      cutStopsScheduled: 0,
       clicksScheduled: 0,
       instrumentIdsScheduled: new Set(),
     };
@@ -613,6 +644,14 @@ export function createAudioEngine({
       });
       if (instrumentId) playback.instrumentIdsScheduled.add(instrumentId);
       playback.notesScheduled += 1;
+      if (event.delayTicks > 0) playback.delayedNotesScheduled += 1;
+    }
+
+    const cutHorizon = now + LIVE_EDIT_FREEZE_SECONDS;
+    for (const cut of playback.cutCursor.drainUntil(playback.cutAnchor, cutHorizon)) {
+      const when = Math.max(cut.when, now + 0.001);
+      playback.cutEffectsScheduled += 1;
+      playback.cutStopsScheduled += scheduleTrackCut(cut.trackId, when);
     }
 
     if (playback.metronomeCursor) {
@@ -676,6 +715,11 @@ export function createAudioEngine({
     playback.pattern = pattern;
     playback.noteAnchor = rebuildAudioTime;
     playback.noteCursor = createPatternScheduleCursor(pattern, playback.tempo, {
+      loop: playback.loop,
+      startTick: freezeTick,
+    });
+    playback.cutAnchor = rebuildAudioTime;
+    playback.cutCursor = createCutScheduleCursor(pattern, playback.tempo, {
       loop: playback.loop,
       startTick: freezeTick,
     });
@@ -810,6 +854,9 @@ export function createAudioEngine({
       tempo: playback?.tempo ?? lastTempo,
       positionTick: currentTick(),
       notesScheduled: playback?.notesScheduled ?? 0,
+      delayedNotesScheduled: playback?.delayedNotesScheduled ?? 0,
+      cutEffectsScheduled: playback?.cutEffectsScheduled ?? 0,
+      cutStopsScheduled: playback?.cutStopsScheduled ?? 0,
       clicksScheduled: playback?.clicksScheduled ?? 0,
       scheduledInstrumentIds: playback
         ? [...playback.instrumentIdsScheduled].sort()

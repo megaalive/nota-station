@@ -5,6 +5,20 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S8B — audible note delay + note cut (CLOSED · PASS)
+
+- Dua timing FX pertama kini benar-benar terdengar: `delay` menggeser onset scheduler tanpa memutasi `NoteEvent.startTickLocal` atau `durationTicks`; `cut` menjadwalkan stop voice pada audio clock.
+- `delay` diproyeksikan dari EffectEvent pada `trackId + tickLocal` yang sama dengan note. Data note kanonik tetap identik; hanya waktu playback efektif yang berubah.
+- `cut` memakai cursor timing terpisah dengan tick efektif `effect.tickLocal + afterTicks`. Cut hanya menghentikan voice note pada Track target yang sudah mulai dan belum dipotong lebih awal.
+- Validator timing menolak delay yang membuat onset keluar Pattern dan cut yang melewati akhir Pattern. Cut tepat pada batas akhir masih sah.
+- Live edit membangun ulang note cursor dan cut cursor dari freeze tick yang sama. Cut baru hanya di-drain sampai horizon freeze **30 ms**, sehingga event jauh di depan belum dibekukan terlalu dini.
+- Bukti audible lintas-browser dibuat deterministik memakai `OfflineAudioContext`: hasil render harus sunyi sebelum delay, berbunyi setelah onset, lalu sunyi setelah cut. Tes ini berjalan pada Chromium dan Firefox.
+- Integrasi realtime engine tetap diuji pada Chromium. Pada GitHub Actions, Firefox headless mempertahankan realtime `AudioContext` dalam state `suspended` walaupun Play dipicu dari klik; satu case realtime tersebut di-skip secara eksplisit. Firefox tetap menjalankan seluruh tes transport biasa dan bukti audible OfflineAudioContext—limitation CI ini tidak disamarkan sebagai PASS realtime.
+- Percobaan menunggu `resume()` di runtime dan mengubah autoplay prefs Playwright tidak menyelesaikan kondisi Firefox headless, sehingga keduanya **dikembalikan**; runtime produksi tidak diberi latency/workaround khusus runner.
+- Gate terarah final run **37424666619** pada HEAD `ff76455…`: 0 vulnerability, unit **159/159 PASS**, check PASS, build **489,8 KiB**, browser timing/Pattern/transport **49 PASS + 1 skip** terdokumentasi.
+- Gate final run **37424865027** pada HEAD `8ba9c32…`: 0 vulnerability, unit **159/159 PASS**, check PASS, build **489,8 KiB**, full browser **237 PASS + 1 skip** terdokumentasi.
+- Slice ini sengaja hanya menutup audio timing FX. Berikutnya: **R3-S8C progressive FX projection/editing** — kolom `FX | PARAM` di Pattern, baru kemudian keluarga audible FX lain.
+
 ### R3-S8A — EffectEvent typed + scheduler contract (CLOSED · PASS)
 
 - Dibuka model kanonik **EffectEvent** sesuai §5.7 dengan tepat lima field: `id, trackId, tickLocal, type, value`. Tidak ada hex opaque atau field tambahan liar.
