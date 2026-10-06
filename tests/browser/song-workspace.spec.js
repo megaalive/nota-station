@@ -46,6 +46,77 @@ test.describe('Song workspace R3-S2', () => {
     await expect(entries(page)).toHaveCount(1);
   });
 
+  test('dialog Tambah section mendukung reuse clone dan Pattern baru sebagai satu Undo', async ({ page }) => {
+    const addSection = page.locator('[data-action="song-add-section"]');
+    const dialog = page.locator('[data-action="song-section-dialog"]');
+    const preset = page.locator('[data-action="song-section-preset"]');
+    const name = page.locator('[data-action="song-section-name"]');
+    const mode = page.locator('[data-action="song-section-pattern-mode"]');
+    const create = page.locator('[data-action="song-section-create"]');
+
+    await addSection.click();
+    await expect(dialog).toBeVisible();
+    await preset.selectOption('Verse');
+    await expect(name).toHaveValue('Verse');
+    await mode.selectOption('reuse');
+    await create.click();
+
+    let state = await page.evaluate(() => ({
+      sections: window.tracker.getProject().song.sections,
+      patterns: window.tracker.getProject().song.patterns,
+      order: window.tracker.getProject().song.order,
+      history: window.tracker.getState().history,
+      focus: window.tracker.getState().focus,
+    }));
+    expect(state.sections).toHaveLength(1);
+    expect(state.patterns).toHaveLength(1);
+    expect(state.order).toHaveLength(2);
+    expect(state.order[1].sectionId).toBe(state.sections[0].id);
+    expect(state.order[1].patternId).toBe(state.order[0].patternId);
+    expect(state.history.undoLabel).toBe('song.createSectionOccurrence');
+    expect(state.focus.orderEntryId).toBe(state.order[1].id);
+
+    await page.keyboard.press('Control+z');
+    state = await page.evaluate(() => ({
+      sections: window.tracker.getProject().song.sections.length,
+      patterns: window.tracker.getProject().song.patterns.length,
+      order: window.tracker.getProject().song.order.length,
+    }));
+    expect(state).toEqual({ sections: 0, patterns: 1, order: 1 });
+
+    await addSection.click();
+    await preset.selectOption('Chorus');
+    await mode.selectOption('clone');
+    await create.click();
+    state = await page.evaluate(() => ({
+      sections: window.tracker.getProject().song.sections,
+      patterns: window.tracker.getProject().song.patterns,
+      order: window.tracker.getProject().song.order,
+    }));
+    expect(state.sections).toHaveLength(1);
+    expect(state.patterns).toHaveLength(2);
+    expect(state.order[1].patternId).toBe(state.patterns[1].id);
+    expect(state.patterns[1].notes.map(({ id, ...note }) => note))
+      .toEqual(state.patterns[0].notes.map(({ id, ...note }) => note));
+
+    await page.keyboard.press('Control+z');
+
+    await addSection.click();
+    await preset.selectOption('Bridge');
+    await mode.selectOption('new');
+    await create.click();
+    state = await page.evaluate(() => ({
+      sections: window.tracker.getProject().song.sections,
+      patterns: window.tracker.getProject().song.patterns,
+      order: window.tracker.getProject().song.order,
+    }));
+    expect(state.sections[0].name).toBe('Bridge');
+    expect(state.patterns).toHaveLength(2);
+    expect(state.patterns[1].notes).toHaveLength(0);
+    expect(state.order[1].patternId).toBe(state.patterns[1].id);
+    await expect(page.locator('[data-action="workspace-view"]')).toHaveAttribute('data-entity', 'song');
+  });
+
   test('Section mengelompokkan Song Map tanpa mengubah urutan Order dan dapat di-Undo', async ({ page }) => {
     const ids = await page.evaluate(() => {
       const project = window.tracker.getProject();
