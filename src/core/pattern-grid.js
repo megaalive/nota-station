@@ -102,11 +102,15 @@ export function quantizePatternNotes(
     if (targetTick >= pattern.lengthTicks) {
       targetTick = Math.floor((pattern.lengthTicks - 1) / rowTicks) * rowTicks;
     }
-    const maxDuration = pattern.lengthTicks - targetTick;
+    if (targetTick + note.durationTicks > pattern.lengthTicks) {
+      throw projectError(
+        'E_PATTERN_QUANTIZE_DURATION',
+        `Kuantisasi membuat duration note melewati akhir Pattern: ${note.id}`,
+      );
+    }
     replacements.set(note.id, {
       ...note,
       startTickLocal: targetTick,
-      durationTicks: Math.min(note.durationTicks, maxDuration),
     });
   }
 
