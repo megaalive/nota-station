@@ -29,6 +29,7 @@ import {
   secondsPerTick,
   transportTickAtAudioTime,
 } from './scheduler.js';
+import { sampleOffsetSeconds } from './source-note-effects.js';
 import { scheduleSourceCut } from './timing-effects.js';
 import {
   scheduleTrackMixEffect,
@@ -191,6 +192,37 @@ export function createAudioEngine({
         stopped += 1;
       } catch {
         // Source dapat selesai tepat sebelum note-cut dijadwalkan.
+      }
+    }
+    return stopped;
+  }
+
+  function scheduleRetriggerCut({
+    sourceNoteId,
+    trackId,
+    voiceLane,
+    cycle,
+    when,
+  }) {
+    let stopped = 0;
+    for (const [source, scheduled] of activeSources) {
+      if (scheduled.kind !== 'note') continue;
+      if (scheduled.sourceNoteId !== sourceNoteId) continue;
+      if (scheduled.trackId !== trackId) continue;
+      if ((scheduled.voiceLane ?? 0) !== voiceLane) continue;
+      if (scheduled.cycle !== cycle) continue;
+      if (scheduled.when >= when) continue;
+      if (Number.isFinite(scheduled.cutAt) && scheduled.cutAt <= when) continue;
+
+      try {
+        const cutAt = scheduleSourceCut(source, {
+          when,
+          currentTime: context.currentTime,
+        });
+        scheduled.cutAt = cutAt;
+        stopped += 1;
+      } catch {
+        // Source dapat selesai tepat sebelum retrigger berikutnya.
       }
     }
     return stopped;
@@ -399,6 +431,9 @@ export function createAudioEngine({
     trackId = null,
     voiceProfile = null,
     voiceLane = 0,
+    sourceNoteId = noteId,
+    retriggerIndex = 0,
+    sampleOffsetFrames = 0,
   }) {
     const trackBus = trackId ? ensureTrackBus(trackId) : null;
     const output = trackBus?.input ?? context.destination;
@@ -420,12 +455,15 @@ export function createAudioEngine({
         velocity,
         voiceLane,
         pitch,
+        sourceNoteId,
+        retriggerIndex,
+        sampleOffsetFrames,
       });
-      return;
+      return true;
     }
 
     if (voiceProfile) {
-      scheduleSamplerVoice({
+      return scheduleSamplerVoice({
         voiceProfile,
         velocity,
         when,
@@ -438,8 +476,10 @@ export function createAudioEngine({
         trackId,
         voiceLane,
         pitch,
+        sourceNoteId,
+        retriggerIndex,
+        sampleOffsetFrames,
       });
-      return;
     }
 
     // Preview R1 tanpa instrument eksplisit tetap memakai factory sample.
@@ -462,9 +502,28 @@ export function createAudioEngine({
       velocity,
       voiceLane,
       pitch,
+      sourceNoteId,
+      retriggerIndex,
+      sampleOffsetFrames,
     });
-    source.start(when);
+    const offsetSeconds = sampleOffsetSeconds(
+      sampleOffsetFrames,
+      buffer.sampleRate,
+      buffer.duration,
+    );
+    if (offsetSeconds === null) {
+      activeSources.delete(source);
+      try {
+        source.disconnect();
+        gain.disconnect();
+      } catch {
+        // Node yang belum mulai aman dilepas.
+      }
+      return false;
+    }
+    source.start(when, offsetSeconds);
     source.stop(when + Math.max(0.04, durationSeconds));
+    return true;
   }
 
   function scheduleSamplerVoice({
@@ -480,6 +539,9 @@ export function createAudioEngine({
     trackId,
     voiceLane,
     pitch,
+    sourceNoteId,
+    retriggerIndex,
+    sampleOffsetFrames,
   }) {
     const source = context.createBufferSource();
     const gain = context.createGain();
@@ -533,9 +595,28 @@ export function createAudioEngine({
       voiceLane,
       pitch,
       chokeGroup: voiceProfile.chokeGroup,
+      sourceNoteId,
+      retriggerIndex,
+      sampleOffsetFrames,
     });
-    source.start(when);
+    const offsetSeconds = sampleOffsetSeconds(
+      sampleOffsetFrames,
+      voiceProfile.buffer.sampleRate,
+      voiceProfile.buffer.duration,
+    );
+    if (offsetSeconds === null) {
+      activeSources.delete(source);
+      try {
+        source.disconnect();
+        gain.disconnect();
+      } catch {
+        // Node yang belum mulai aman dilepas.
+      }
+      return false;
+    }
+    source.start(when, offsetSeconds);
     source.stop(releaseEnd + 0.01);
+    return true;
   }
 
   function scheduleClick({ when, accent }) {
@@ -664,6 +745,10 @@ export function createAudioEngine({
       volumeEffectsScheduled: 0,
       panEffectsScheduled: 0,
       mixResetsScheduled: 0,
+      retriggerNotesScheduled: 0,
+      retriggerStopsScheduled: 0,
+      sampleOffsetNotesScheduled: 0,
+      sampleOffsetSilenced: 0,
       clicksScheduled: 0,
       instrumentIdsScheduled: new Set(),
     };
@@ -715,21 +800,41 @@ export function createAudioEngine({
         );
       }
 
-      scheduleVoice({
+      const when = Math.max(event.when, now + 0.001);
+      if (event.retriggerIndex > 0) {
+        playback.retriggerStopsScheduled += scheduleRetriggerCut({
+          sourceNoteId: event.sourceNoteId,
+          trackId: event.trackId,
+          voiceLane: event.voiceLane,
+          cycle: event.cycle,
+          when,
+        });
+      }
+
+      const scheduled = scheduleVoice({
         pitch: event.pitch,
         velocity: event.velocity,
-        when: Math.max(event.when, now + 0.001),
+        when,
         durationSeconds: event.durationSeconds,
         noteId: event.id,
+        sourceNoteId: event.sourceNoteId,
+        retriggerIndex: event.retriggerIndex,
+        sampleOffsetFrames: event.sampleOffsetFrames,
         cycle: event.cycle,
         instrumentId,
         trackId: event.trackId,
         voiceProfile,
         voiceLane: event.voiceLane,
       });
+      if (scheduled === false) {
+        playback.sampleOffsetSilenced += 1;
+        continue;
+      }
       if (instrumentId) playback.instrumentIdsScheduled.add(instrumentId);
       playback.notesScheduled += 1;
       if (event.delayTicks > 0) playback.delayedNotesScheduled += 1;
+      if (event.retriggerIndex > 0) playback.retriggerNotesScheduled += 1;
+      if (event.sampleOffsetFrames > 0) playback.sampleOffsetNotesScheduled += 1;
     }
 
     const cutHorizon = now + LIVE_EDIT_FREEZE_SECONDS;
@@ -981,6 +1086,10 @@ export function createAudioEngine({
       volumeEffectsScheduled: playback?.volumeEffectsScheduled ?? 0,
       panEffectsScheduled: playback?.panEffectsScheduled ?? 0,
       mixResetsScheduled: playback?.mixResetsScheduled ?? 0,
+      retriggerNotesScheduled: playback?.retriggerNotesScheduled ?? 0,
+      retriggerStopsScheduled: playback?.retriggerStopsScheduled ?? 0,
+      sampleOffsetNotesScheduled: playback?.sampleOffsetNotesScheduled ?? 0,
+      sampleOffsetSilenced: playback?.sampleOffsetSilenced ?? 0,
       clicksScheduled: playback?.clicksScheduled ?? 0,
       scheduledInstrumentIds: playback
         ? [...playback.instrumentIdsScheduled].sort()

@@ -5,6 +5,22 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S8E — audible retrigger + sample offset (CLOSED · PASS)
+
+- `retrigger.count` dikunci sebagai **jumlah pengulangan tambahan**; trigger note asli tetap trigger pertama. Contoh `count=2` menghasilkan trigger asli + dua restart.
+- Retrigger memperluas `patternEventTemplates()`, bukan membuat scheduler terpisah. Karena itu seek, loop, tempo re-anchor, dan live-edit otomatis memakai cursor note yang sama.
+- Setiap restart mempertahankan pitch, velocity, Instrument, Track, `voiceLane`, dan source NoteEvent. Durasi tiap restart memakai sisa tail NoteEvent, sehingga restart tidak memperpanjang note kanonik.
+- Retrigger me-*restart* source note/cycle/lane yang sama dengan menjadwalkan cut pada source sebelumnya tepat di waktu retrigger; ia tidak menumpuk source identik sebagai overlap.
+- `offset.frames` dibawa ke setiap trigger/retrigger dan dikonversi ke detik memakai sample rate buffer saat `AudioBufferSourceNode.start()`. NoteEvent dan Sample model tidak dimutasi.
+- Offset tepat/lebih jauh dari akhir buffer menghasilkan trigger **silent fail-soft**, bukan exception audio. Jalur demo/synth non-sample tidak dipaksa memiliki semantik sample offset.
+- Bila `delay` dan `retrigger` berada pada cell note yang sama, onset hasil delay menjadi anchor restart; interval retrigger tetap dalam tick. Offset yang sama diterapkan ulang pada setiap restart.
+- Primitive `source-note-effects.js` mengunci expansion tick dan konversi frame→detik secara terpisah. Scheduler test membuktikan canonical NoteEvent tetap identik.
+- Bukti audible lintas-browser memakai `OfflineAudioContext`: buffer uji memiliki leading silence, offset melompat ke bagian berbunyi, lalu retrigger mengulang onset tersebut pada interval deterministik. Integrasi realtime engine diverifikasi pada Chromium.
+- Observability engine menambahkan `retriggerNotesScheduled`, `retriggerStopsScheduled`, `sampleOffsetNotesScheduled`, dan `sampleOffsetSilenced`.
+- Gate terarah run **37494472397** pada HEAD `5340b07…`: 0 vulnerability, unit **176/176 PASS**, check PASS, build **522,5 KiB**, browser source/timing/mix/Pattern FX **17 PASS + 3 skip**. Tiga skip adalah realtime AudioContext Firefox headless dari S8B/S8D/S8E; seluruh bukti audible OfflineAudioContext tetap berjalan di Firefox.
+- Gate final run **37494671344** pada HEAD `8034d94…`: 0 vulnerability, unit **176/176 PASS**, check PASS, build **522,5 KiB**, full browser **251 PASS + 3 skip**.
+- Keluarga FX non-pitch v0.1 kini audible: volume, pan, retrigger, sample offset, note cut, dan note delay. Berikutnya: **R3-S8F pitch automation spike/implementation** untuk pitch slide, portamento, vibrato, dan arpeggio sesuai §7.4.
+
 ### R3-S8D — audible volume + pan EffectEvent (CLOSED · PASS)
 
 - `volume` dan `pan` kini benar-benar memengaruhi audio sebagai **state Track yang persisten setelah tick EffectEvent**, bukan pengganti `NoteEvent.velocity` atau metadata note awal.

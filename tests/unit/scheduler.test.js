@@ -145,6 +145,96 @@ test('delay EffectEvent menggeser onset scheduler tanpa mengubah note kanonik', 
   assert.deepEqual(pattern.notes, original);
 });
 
+test('retrigger memperluas note menjadi restart tambahan dan offset dibawa ke semua trigger', () => {
+  const pattern = {
+    lengthTicks: 1920,
+    notes: [{
+      id: 'note-rtr',
+      trackId: 't1',
+      startTickLocal: 120,
+      durationTicks: 360,
+      pitch: 60,
+      velocity: 100,
+    }],
+    effects: [
+      {
+        id: 'fx-rtr',
+        trackId: 't1',
+        tickLocal: 120,
+        type: 'retrigger',
+        value: { intervalTicks: 90, count: 3 },
+      },
+      {
+        id: 'fx-off',
+        trackId: 't1',
+        tickLocal: 120,
+        type: 'offset',
+        value: { frames: 4800 },
+      },
+    ],
+  };
+
+  const original = structuredClone(pattern.notes);
+  const events = patternEventTemplates(pattern, 120);
+
+  assert.deepEqual(
+    events.map((event) => [
+      event.id,
+      event.sourceNoteId,
+      event.startTickLocal,
+      event.retriggerIndex,
+      event.sampleOffsetFrames,
+    ]),
+    [
+      ['note-rtr', 'note-rtr', 120, 0, 4800],
+      ['note-rtr#r1', 'note-rtr', 210, 1, 4800],
+      ['note-rtr#r2', 'note-rtr', 300, 2, 4800],
+      ['note-rtr#r3', 'note-rtr', 390, 3, 4800],
+    ],
+  );
+  assert.deepEqual(
+    events.map((event) => event.durationSeconds),
+    [360, 270, 180, 90].map((ticks) => ticks / 960),
+  );
+  assert.deepEqual(pattern.notes, original);
+});
+
+test('delay menjadi anchor onset retrigger tanpa mengubah interval atau NoteEvent', () => {
+  const pattern = {
+    lengthTicks: 1920,
+    notes: [{
+      id: 'note-delay-rtr',
+      trackId: 't1',
+      startTickLocal: 0,
+      durationTicks: 240,
+      pitch: 60,
+      velocity: 100,
+    }],
+    effects: [
+      {
+        id: 'fx-delay-rtr',
+        trackId: 't1',
+        tickLocal: 0,
+        type: 'delay',
+        value: { ticks: 30 },
+      },
+      {
+        id: 'fx-rtr-delay',
+        trackId: 't1',
+        tickLocal: 0,
+        type: 'retrigger',
+        value: { intervalTicks: 60, count: 3 },
+      },
+    ],
+  };
+
+  const events = patternEventTemplates(pattern, 120);
+  assert.deepEqual(events.map((event) => event.startTickLocal), [30, 90, 150, 210]);
+  assert.deepEqual(events.map((event) => event.delayTicks), [30, 30, 30, 30]);
+  assert.equal(pattern.notes[0].startTickLocal, 0);
+  assert.equal(pattern.notes[0].durationTicks, 240);
+});
+
 test('cut cursor memakai tick efektif effect.tickLocal + afterTicks', () => {
   const pattern = {
     ...patternFixture(),
