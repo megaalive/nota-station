@@ -71,6 +71,8 @@ export function createPatternView({
   let latestTrackMeters = [];
   let pendingSharedEdit = null;
   let sharedWarningDetails = null;
+  let blockAnchor = null;
+  let blockSelection = null;
   const trackUi = new Map();
 
   const modeButton = Button({
@@ -489,11 +491,12 @@ export function createPatternView({
         const note = noteAtCell(project, { patternId: pattern.id, trackId: track.id, row });
         FIELDS.forEach((field, fieldIndex) => {
           const selected = row === cursorRow && channel === cursorChannel && field === cursorField;
+          const blockSelected = isBlockSelected(row, channel);
           rowNode.append(el('div', {
-            class: `pattern-grid__cell pattern-grid__cell--${field}${selected ? ' is-cursor' : ''}`,
+            class: `pattern-grid__cell pattern-grid__cell--${field}${blockSelected ? ' is-block-selected' : ''}${selected ? ' is-cursor' : ''}`,
             role: 'gridcell',
             'aria-colindex': String(channel * FIELDS.length + fieldIndex + 1),
-            'aria-selected': selected ? 'true' : 'false',
+            'aria-selected': selected || blockSelected ? 'true' : 'false',
             dataset: {
               action: 'pattern-cell',
               row: String(row),
@@ -508,6 +511,7 @@ export function createPatternView({
             on: {
               click: () => {
                 clearInputState();
+                clearBlockSelection();
                 cursorRow = row;
                 cursorChannel = channel;
                 cursorField = field;
@@ -578,10 +582,53 @@ export function createPatternView({
     }
   }
 
-  function moveVertical(delta) {
+  function selectionBoundsOrCursor() {
+    return blockSelection ?? {
+      rowStart: cursorRow,
+      rowEnd: cursorRow,
+      channelStart: cursorChannel,
+      channelEnd: cursorChannel,
+    };
+  }
+
+  function isBlockSelected(row, channel) {
+    return Boolean(
+      blockSelection
+      && row >= blockSelection.rowStart
+      && row <= blockSelection.rowEnd
+      && channel >= blockSelection.channelStart
+      && channel <= blockSelection.channelEnd
+    );
+  }
+
+  function clearBlockSelection() {
+    blockAnchor = null;
+    blockSelection = null;
+  }
+
+  function updateBlockSelection() {
+    if (!blockAnchor) return;
+    blockSelection = {
+      rowStart: Math.min(blockAnchor.row, cursorRow),
+      rowEnd: Math.max(blockAnchor.row, cursorRow),
+      channelStart: Math.min(blockAnchor.channel, cursorChannel),
+      channelEnd: Math.max(blockAnchor.channel, cursorChannel),
+    };
+  }
+
+  function beginBlockSelection() {
+    if (!blockAnchor) {
+      blockAnchor = { row: cursorRow, channel: cursorChannel };
+    }
+  }
+
+  function moveVertical(delta, { extend = false } = {}) {
     clearInputState();
+    if (extend) beginBlockSelection();
+    else clearBlockSelection();
     const { rowCount } = projectInfo();
     cursorRow = Math.max(0, Math.min(rowCount - 1, cursorRow + delta));
+    if (extend) updateBlockSelection();
     renderWindow();
     ensureCursorVisible();
     syncStatus();
@@ -589,6 +636,7 @@ export function createPatternView({
 
   function moveHorizontal(delta) {
     clearInputState();
+    clearBlockSelection();
     const { tracks } = projectInfo();
     const fieldIndex = FIELDS.indexOf(cursorField);
     const flat = Math.max(
@@ -600,6 +648,97 @@ export function createPatternView({
     renderWindow();
     ensureCursorVisible();
     syncStatus();
+  }
+
+  function moveBlockChannel(delta) {
+    clearInputState();
+    beginBlockSelection();
+    const { tracks } = projectInfo();
+    cursorChannel = Math.max(0, Math.min(tracks.length - 1, cursorChannel + delta));
+    updateBlockSelection();
+    renderWindow();
+    ensureCursorVisible();
+    syncStatus();
+  }
+
+  function selectProgressively() {
+    clearInputState();
+    const { rowCount, tracks } = projectInfo();
+    const fullCurrentChannel = blockSelection
+      && blockSelection.rowStart === 0
+      && blockSelection.rowEnd === rowCount - 1
+      && blockSelection.channelStart === cursorChannel
+      && blockSelection.channelEnd === cursorChannel;
+
+    if (fullCurrentChannel) {
+      blockAnchor = { row: 0, channel: 0 };
+      blockSelection = {
+        rowStart: 0,
+        rowEnd: rowCount - 1,
+        channelStart: 0,
+        channelEnd: tracks.length - 1,
+      };
+    } else {
+      blockAnchor = { row: 0, channel: cursorChannel };
+      blockSelection = {
+        rowStart: 0,
+        rowEnd: rowCount - 1,
+        channelStart: cursorChannel,
+        channelEnd: cursorChannel,
+      };
+    }
+    renderWindow();
+    syncStatus();
+  }
+
+  function copyBlock() {
+    const { pattern } = projectInfo();
+    const bounds = selectionBoundsOrCursor();
+    const result = registry.execute('pattern.copyBlock', {
+      patternId: pattern.id,
+      ...bounds,
+    });
+    feedback = { key: 'pattern.blockCopied', vars: { count: result.eventCount } };
+    syncStatus();
+  }
+
+  function pasteBlock() {
+    if (mode !== 'edit') return;
+    const { pattern, rowCount, tracks } = projectInfo();
+    runPatternCommand('pattern.pasteBlock', {
+      patternId: pattern.id,
+      targetRow: cursorRow,
+      targetChannel: cursorChannel,
+    }, (result) => {
+      blockAnchor = { row: cursorRow, channel: cursorChannel };
+      blockSelection = {
+        rowStart: cursorRow,
+        rowEnd: Math.min(rowCount - 1, cursorRow + result.rowCount - 1),
+        channelStart: cursorChannel,
+        channelEnd: Math.min(tracks.length - 1, cursorChannel + result.channelCount - 1),
+      };
+      feedback = { key: 'pattern.blockPasted', vars: { count: result.eventCount } };
+      renderWindow();
+      syncStatus();
+    });
+  }
+
+  function transposeBlock(semitones) {
+    if (mode !== 'edit') return;
+    const { pattern } = projectInfo();
+    const bounds = selectionBoundsOrCursor();
+    runPatternCommand('pattern.transposeBlock', {
+      patternId: pattern.id,
+      ...bounds,
+      semitones,
+    }, () => {
+      feedback = {
+        key: 'pattern.blockTransposed',
+        vars: { amount: semitones > 0 ? `+${semitones}` : String(semitones) },
+      };
+      renderWindow();
+      syncStatus();
+    });
   }
 
   function toggleMode() {
@@ -831,6 +970,11 @@ export function createPatternView({
     const currentTrack = projectInfo().tracks[cursorChannel];
     if (feedback) {
       hint.textContent = t(feedback.key, feedback.vars);
+    } else if (blockSelection) {
+      hint.textContent = t('pattern.blockHint', {
+        rows: blockSelection.rowEnd - blockSelection.rowStart + 1,
+        channels: blockSelection.channelEnd - blockSelection.channelStart + 1,
+      });
     } else if (cursorField === 'note' && currentTrack?.kind === 'drum') {
       hint.textContent = t(mode === 'edit' ? 'pattern.hintDrum' : 'pattern.hintDrumAudition');
     } else if (mode !== 'edit') {
@@ -864,7 +1008,61 @@ export function createPatternView({
       toggleMode();
       return;
     }
+    if (event.ctrlKey && event.code === 'KeyA') {
+      event.preventDefault();
+      selectProgressively();
+      return;
+    }
+    if (event.ctrlKey && event.code === 'KeyC') {
+      event.preventDefault();
+      copyBlock();
+      return;
+    }
+    if (event.ctrlKey && event.code === 'KeyV') {
+      event.preventDefault();
+      pasteBlock();
+      return;
+    }
+    if (event.ctrlKey && event.code === 'ArrowUp') {
+      event.preventDefault();
+      transposeBlock(event.shiftKey ? 12 : 1);
+      return;
+    }
+    if (event.ctrlKey && event.code === 'ArrowDown') {
+      event.preventDefault();
+      transposeBlock(event.shiftKey ? -12 : -1);
+      return;
+    }
     if (event.ctrlKey || event.altKey || event.metaKey) return;
+
+    if (event.shiftKey && event.code === 'ArrowUp') {
+      event.preventDefault();
+      moveVertical(-1, { extend: true });
+      return;
+    }
+    if (event.shiftKey && event.code === 'ArrowDown') {
+      event.preventDefault();
+      moveVertical(1, { extend: true });
+      return;
+    }
+    if (event.shiftKey && event.code === 'ArrowLeft') {
+      event.preventDefault();
+      moveBlockChannel(-1);
+      return;
+    }
+    if (event.shiftKey && event.code === 'ArrowRight') {
+      event.preventDefault();
+      moveBlockChannel(1);
+      return;
+    }
+    if (event.code === 'Escape' && blockSelection) {
+      event.preventDefault();
+      clearInputState();
+      clearBlockSelection();
+      renderWindow();
+      syncStatus();
+      return;
+    }
 
     if (DRUM_KEYS.has(event.code) && toggleDrumHit(event.code)) {
       event.preventDefault();
@@ -939,6 +1137,7 @@ export function createPatternView({
       row: cursorRow,
       channel: cursorChannel,
       field: cursorField,
+      selection: blockSelection ? { ...blockSelection } : null,
     }),
   };
 }
