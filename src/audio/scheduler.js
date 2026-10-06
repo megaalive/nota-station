@@ -1,4 +1,5 @@
 import { PPQ } from '../core/project.js';
+import { expandRetriggerTicks } from './source-note-effects.js';
 
 export const SCHEDULE_AHEAD_SECONDS = 0.12;
 export const SCHEDULER_WAKE_MS = 25;
@@ -29,45 +30,63 @@ export function patternDurationSeconds(pattern, tempo, ppq = PPQ) {
 
 export function patternEventTemplates(pattern, tempo, ppq = PPQ) {
   const tickSeconds = secondsPerTick(tempo, ppq);
-  const delayByCell = new Map(
-    (pattern.effects ?? [])
-      .filter((effect) => effect.type === 'delay')
-      .map((effect) => [
-        `${effect.trackId}|${effect.tickLocal}`,
-        effect.value.ticks,
-      ]),
-  );
+  const effectsByCell = new Map();
+
+  for (const effect of pattern.effects ?? []) {
+    if (!['delay', 'retrigger', 'offset'].includes(effect.type)) continue;
+    const key = `${effect.trackId}|${effect.tickLocal}`;
+    const current = effectsByCell.get(key) ?? {};
+    current[effect.type] = effect;
+    effectsByCell.set(key, current);
+  }
 
   return [...pattern.notes]
-    .map((note) => {
-      const delayTicks = delayByCell.get(
-        `${note.trackId}|${note.startTickLocal}`,
-      ) ?? 0;
-      return {
-        note,
-        delayTicks,
-        effectiveTick: note.startTickLocal + delayTicks,
-      };
+    .flatMap((note) => {
+      const key = `${note.trackId}|${note.startTickLocal}`;
+      const cell = effectsByCell.get(key) ?? {};
+      const delayTicks = cell.delay?.value.ticks ?? 0;
+      const sampleOffsetFrames = cell.offset?.value.frames ?? 0;
+      const retrigger = cell.retrigger?.value ?? null;
+      const effectiveStart = note.startTickLocal + delayTicks;
+      const triggerTicks = expandRetriggerTicks({
+        startTick: effectiveStart,
+        durationTicks: note.durationTicks,
+        patternLengthTicks: pattern.lengthTicks,
+        intervalTicks: retrigger?.intervalTicks ?? null,
+        count: retrigger?.count ?? 0,
+      });
+
+      return triggerTicks.map((effectiveTick, retriggerIndex) => {
+        const consumedTicks = retriggerIndex === 0
+          ? 0
+          : retriggerIndex * retrigger.intervalTicks;
+        const remainingTicks = Math.max(1, note.durationTicks - consumedTicks);
+
+        return {
+          id: retriggerIndex === 0 ? note.id : `${note.id}#r${retriggerIndex}`,
+          sourceNoteId: note.id,
+          trackId: note.trackId,
+          instrumentId: note.instrumentId,
+          pitch: note.pitch,
+          velocity: note.velocity,
+          voiceLane: voiceLaneOf(note),
+          sourceStartTickLocal: note.startTickLocal,
+          startTickLocal: effectiveTick,
+          delayTicks,
+          retriggerIndex,
+          sampleOffsetFrames,
+          offsetSeconds: effectiveTick * tickSeconds,
+          durationSeconds: remainingTicks * tickSeconds,
+        };
+      });
     })
     .sort((a, b) => (
-      a.effectiveTick - b.effectiveTick
-      || a.note.trackId.localeCompare(b.note.trackId)
-      || voiceLaneOf(a.note) - voiceLaneOf(b.note)
-      || a.note.id.localeCompare(b.note.id)
-    ))
-    .map(({ note, delayTicks, effectiveTick }) => ({
-      id: note.id,
-      trackId: note.trackId,
-      instrumentId: note.instrumentId,
-      pitch: note.pitch,
-      velocity: note.velocity,
-      voiceLane: voiceLaneOf(note),
-      sourceStartTickLocal: note.startTickLocal,
-      startTickLocal: effectiveTick,
-      delayTicks,
-      offsetSeconds: effectiveTick * tickSeconds,
-      durationSeconds: note.durationTicks * tickSeconds,
-    }));
+      a.startTickLocal - b.startTickLocal
+      || a.trackId.localeCompare(b.trackId)
+      || a.voiceLane - b.voiceLane
+      || a.sourceNoteId.localeCompare(b.sourceNoteId)
+      || a.retriggerIndex - b.retriggerIndex
+    ));
 }
 
 export function effectEventTemplates(pattern, tempo, ppq = PPQ) {
