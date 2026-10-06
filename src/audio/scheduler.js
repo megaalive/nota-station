@@ -200,6 +200,91 @@ export function createPatternScheduleCursor(pattern, tempo, {
   };
 }
 
+export function mixEffectEventTemplates(pattern, tempo, ppq = PPQ) {
+  const tickSeconds = secondsPerTick(tempo, ppq);
+  const effects = (pattern.effects ?? [])
+    .filter((effect) => effect.type === 'volume' || effect.type === 'pan')
+    .map((effect) => ({
+      id: effect.id,
+      kind: 'mix-effect',
+      trackId: effect.trackId,
+      type: effect.type,
+      value: structuredClone(effect.value),
+      startTickLocal: effect.tickLocal,
+      offsetSeconds: effect.tickLocal * tickSeconds,
+    }));
+
+  if (effects.length === 0) return [];
+
+  const trackIds = [...new Set(effects.map((effect) => effect.trackId))].sort();
+  return [
+    {
+      id: 'mix-reset',
+      kind: 'mix-reset',
+      trackIds,
+      startTickLocal: 0,
+      offsetSeconds: 0,
+    },
+    ...effects,
+  ].sort((a, b) => (
+    a.startTickLocal - b.startTickLocal
+    || mixEventPriority(a) - mixEventPriority(b)
+    || String(a.trackId ?? '').localeCompare(String(b.trackId ?? ''))
+    || String(a.type ?? '').localeCompare(String(b.type ?? ''))
+    || a.id.localeCompare(b.id)
+  ));
+}
+
+export function mixEffectStateBeforeTick(pattern, tickLocal) {
+  if (!Number.isFinite(tickLocal) || tickLocal < 0) {
+    throw new RangeError('tickLocal state mix harus angka >= 0.');
+  }
+
+  const state = new Map();
+  const effects = [...(pattern.effects ?? [])]
+    .filter((effect) => (
+      (effect.type === 'volume' || effect.type === 'pan')
+      && effect.tickLocal < tickLocal
+    ))
+    .sort((a, b) => (
+      a.tickLocal - b.tickLocal
+      || a.trackId.localeCompare(b.trackId)
+      || a.type.localeCompare(b.type)
+      || a.id.localeCompare(b.id)
+    ));
+
+  for (const effect of effects) {
+    const current = state.get(effect.trackId) ?? { volume: 127, pan: 0 };
+    state.set(effect.trackId, {
+      volume: effect.type === 'volume' ? effect.value.level : current.volume,
+      pan: effect.type === 'pan' ? effect.value.position : current.pan,
+    });
+  }
+
+  return [...state.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([trackId, value]) => ({ trackId, ...value }));
+}
+
+export function createMixEffectScheduleCursor(pattern, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  const events = mixEffectEventTemplates(pattern, tempo, ppq);
+  const cursor = createTickScheduleCursor(
+    events,
+    pattern.lengthTicks,
+    tempo,
+    { loop, startTick, ppq },
+  );
+  return {
+    ...cursor,
+    durationSeconds: patternDurationSeconds(pattern, tempo, ppq),
+    eventCount: events.length,
+  };
+}
+
 export function cutEffectEventTemplates(pattern, tempo, ppq = PPQ) {
   const tickSeconds = secondsPerTick(tempo, ppq);
   return (pattern.effects ?? [])
@@ -271,6 +356,10 @@ export function createMetronomeScheduleCursor(pattern, tempo, {
   );
 }
 
+
+function mixEventPriority(event) {
+  return event.kind === 'mix-reset' ? 0 : 1;
+}
 
 function voiceLaneOf(note) {
   return Number.isInteger(note?.voiceLane) ? note.voiceLane : 0;
