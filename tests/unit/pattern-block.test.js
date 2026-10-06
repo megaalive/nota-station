@@ -326,7 +326,7 @@ test('row operations mempertahankan voice lane Drum Track', () => {
 
   assert.deepEqual(
     afterInsert.map((note) => [note.startTickLocal / 120, note.voiceLane, note.pitch]),
-    [[3, undefined, 36], [3, 1, 38]],
+    [[3, 0, 36], [3, 1, 38]],
   );
 
   const deleted = deletePatternRows(inserted, {
@@ -341,7 +341,7 @@ test('row operations mempertahankan voice lane Drum Track', () => {
 
   assert.deepEqual(
     afterDelete.map((note) => [note.startTickLocal / 120, note.voiceLane, note.pitch]),
-    [[2, undefined, 36], [2, 1, 38]],
+    [[2, 0, 36], [2, 1, 38]],
   );
 });
 
