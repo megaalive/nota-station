@@ -5,6 +5,25 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S4 — Section + shared-pattern guard (CLOSED · PASS)
+
+- Model `Section` yang sejak awal tersedia di Project kini benar-benar dipakai: nama wajib **1..80 karakter setelah trim**, warna `#RRGGBB`, ID unik, dan `OrderEntry.sectionId` tervalidasi. Debug JSON menolak section yatim dengan `E_DEBUG_JSON_SECTION_REF`.
+- Primitive arrangement baru bersifat immutable: `addSection()`, `assignOrderEntrySection()`, dan `createSectionOccurrence()`. Assignment tidak mengubah isi Pattern.
+- Song Map menampilkan **section-run kontigu** sehingga batas Section terlihat tanpa pernah menyortir ulang `song.order[]`. Order List tetap urutan global yang sama dan menampilkan nama Section sebagai konteks.
+- Dialog **Tambah section** menyediakan preset Intro/Verse/Chorus/Bridge/Outro dengan nama tetap editable, serta tiga strategi Pattern: **Baru**, **Clone dari…**, dan **Pakai ulang…**.
+- Tambah Section + Pattern bila diperlukan + OrderEntry dilakukan sebagai **satu Project mutation / satu transaksi Undo**. Occurrence baru menjadi focus, tetapi tab tidak berpindah otomatis.
+- Pattern yang dipakai >1 occurrence diberi badge shared. Mutasi Pattern ditahan di **command layer**, bukan hanya UI, sampai keputusan sesi tersedia; jadi agent/command langsung tidak dapat melewati guard.
+- Edit pertama Pattern shared membuka popover non-modal: **Edit semua** atau **Jadikan unik untuk tempat ini**. Edit yang memicu warning disimpan sebagai pending operation dan baru diterapkan sesudah keputusan.
+- **Edit semua** disimpan di `sessionStorage` per Pattern dan pulih setelah reload. **Jadikan unik** memakai occurrence focus dari S3, clone Pattern + event ID, mempertahankan remap lyric anchor S1, lalu menerapkan edit tertunda ke clone.
+- Popover mendukung Escape/klik luar tanpa mutasi. Lifecycle dismiss diperbaiki agar listener dibersihkan; setelah keputusan fokus dikembalikan ke grid sehingga keyboard tracker langsung aktif lagi.
+- Gate S4-A run **37396653599**: unit **112/112 PASS**, check PASS, build **395,7 KiB**, browser Section/JSON/shell Chromium+Firefox **66/66 PASS**.
+- Gate S4-B run **37397136374**: unit **116/116 PASS**, check PASS, build **405,6 KiB**, browser dialog Section/focus/JSON **20/20 PASS**.
+- Gate S4-C awal run **37398044320** menemukan **50/54 browser PASS / 4 FAIL**: setelah keputusan fokus keyboard tertinggal pada tombol popover tersembunyi, dan CSS tombol membuat badge beratribut `hidden` tetap dianggap visible. Kedua bug UX diperbaiki tanpa mengubah semantik guard.
+- Gate S4-C koreksi run **37398301719** pada HEAD `b50bdb2…`: 0 vulnerability, unit **124/124 PASS**, check PASS, build **418,7 KiB**, targeted browser **54/54 PASS**.
+- Gate final run **37398469005** pada HEAD `c8f8da8…`: 0 vulnerability, unit **124/124 PASS**, check PASS, build **418,7 KiB**, full browser Chromium+Firefox **204/204 PASS**.
+- Catatan PLAN: keputusan shared sudah dapat dipilih dan dipersist selama sesi. **Kontrol Settings untuk mengubah/reset keputusan itu belum memiliki surface Settings saat ini** dan tetap backlog R3 sebelum exit milestone; tidak disamarkan sebagai fitur yang sudah ada.
+- Berikutnya: lanjutkan editing R3—seleksi blok/copy-paste/transpose dan generalisasi track polifonik + voice lane—dengan slice kecil dan gate terarah seperti S4.
+
 ### R3-S3 — occurrence Focus Store lintas Song/Pattern/transport (CLOSED · PASS)
 
 - Ditambahkan **Focus Store** untuk `orderEntryId` sebagai state UI terpisah dari Project. Memilih occurrence tidak memutasi lagu dan tidak menambah langkah Undo.
