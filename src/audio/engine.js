@@ -21,13 +21,19 @@ import {
   SCHEDULER_WAKE_MS,
   createCutScheduleCursor,
   createMetronomeScheduleCursor,
+  createMixEffectScheduleCursor,
   createPatternScheduleCursor,
   isLiveEditMutable,
   liveEditFreezeTime,
+  mixEffectStateBeforeTick,
   secondsPerTick,
   transportTickAtAudioTime,
 } from './scheduler.js';
 import { scheduleSourceCut } from './timing-effects.js';
+import {
+  scheduleTrackMixEffect,
+  scheduleTrackMixReset,
+} from './track-mix-effects.js';
 
 const ROOT_PITCH = FACTORY_BASIC_ROOT_PITCH;
 const PREVIEW_SECONDS = 0.18;
@@ -228,14 +234,27 @@ export function createAudioEngine({
     if (bus) return bus;
 
     const input = context.createGain();
+    const fxGain = context.createGain();
+    const fxPanner = typeof context.createStereoPanner === 'function'
+      ? context.createStereoPanner()
+      : null;
     const analyser = context.createAnalyser();
     analyser.fftSize = 64;
     analyser.smoothingTimeConstant = 0.55;
-    input.connect(analyser);
+
+    input.connect(fxGain);
+    if (fxPanner) {
+      fxGain.connect(fxPanner);
+      fxPanner.connect(analyser);
+    } else {
+      fxGain.connect(analyser);
+    }
     analyser.connect(context.destination);
 
     bus = {
       input,
+      fxGain,
+      fxPanner,
       analyser,
       samples: new Float32Array(analyser.fftSize),
     };
@@ -254,6 +273,8 @@ export function createAudioEngine({
       if (ids.has(trackId)) continue;
       try {
         bus.input.disconnect();
+        bus.fxGain.disconnect();
+        bus.fxPanner?.disconnect();
         bus.analyser.disconnect();
       } catch {
         // Node yang sudah putus aman diabaikan saat ganti project.
@@ -303,6 +324,54 @@ export function createAudioEngine({
     for (const sample of bus.samples) sum += sample * sample;
     const rms = Math.sqrt(sum / bus.samples.length);
     return Math.max(0, Math.min(1, rms * 3.5));
+  }
+
+  function mixEffectTrackIds(pattern) {
+    return [...new Set(
+      (pattern.effects ?? [])
+        .filter((effect) => effect.type === 'volume' || effect.type === 'pan')
+        .map((effect) => effect.trackId),
+    )];
+  }
+
+  function resetTrackMixEffects(trackIds, when) {
+    if (!context) return 0;
+    let count = 0;
+    for (const trackId of trackIds) {
+      const bus = ensureTrackBus(trackId);
+      if (!bus) continue;
+      scheduleTrackMixReset(bus, {
+        when,
+        currentTime: context.currentTime,
+      });
+      count += 1;
+    }
+    return count;
+  }
+
+  function applyTrackMixStateBeforeTick(pattern, tickLocal, when) {
+    if (!context) return 0;
+    let count = 0;
+    for (const state of mixEffectStateBeforeTick(pattern, tickLocal)) {
+      const bus = ensureTrackBus(state.trackId);
+      if (!bus) continue;
+      scheduleTrackMixEffect(bus, {
+        type: 'volume',
+        value: { level: state.volume },
+      }, {
+        when,
+        currentTime: context.currentTime,
+      });
+      scheduleTrackMixEffect(bus, {
+        type: 'pan',
+        value: { position: state.pan },
+      }, {
+        when,
+        currentTime: context.currentTime,
+      });
+      count += 1;
+    }
+    return count;
   }
 
   function trackMeterState() {
@@ -548,6 +617,13 @@ export function createAudioEngine({
     const normalizedTick = loopEnabled && startTick === pattern.lengthTicks ? 0 : startTick;
     const anchor = context.currentTime + 0.05;
 
+    const affectedMixTracks = new Set([
+      ...mixEffectTrackIds(playback?.pattern ?? pattern),
+      ...mixEffectTrackIds(pattern),
+    ]);
+    resetTrackMixEffects(affectedMixTracks, context.currentTime);
+    applyTrackMixStateBeforeTick(pattern, normalizedTick, anchor);
+
     playback = {
       project,
       pattern,
@@ -566,6 +642,11 @@ export function createAudioEngine({
         loop: loopEnabled,
         startTick: normalizedTick,
       }),
+      mixAnchor: anchor,
+      mixCursor: createMixEffectScheduleCursor(pattern, tempo, {
+        loop: loopEnabled,
+        startTick: normalizedTick,
+      }),
       metronomeCursor: metronomeEnabled
         ? createMetronomeScheduleCursor(pattern, tempo, {
           loop: loopEnabled,
@@ -579,6 +660,10 @@ export function createAudioEngine({
       delayedNotesScheduled: 0,
       cutEffectsScheduled: 0,
       cutStopsScheduled: 0,
+      mixEffectsScheduled: 0,
+      volumeEffectsScheduled: 0,
+      panEffectsScheduled: 0,
+      mixResetsScheduled: 0,
       clicksScheduled: 0,
       instrumentIdsScheduled: new Set(),
     };
@@ -654,6 +739,25 @@ export function createAudioEngine({
       playback.cutStopsScheduled += scheduleTrackCut(cut.trackId, when);
     }
 
+    const mixHorizon = now + Math.max(0, LIVE_EDIT_FREEZE_SECONDS - 0.000001);
+    for (const mixEvent of playback.mixCursor.drainUntil(playback.mixAnchor, mixHorizon)) {
+      const when = Math.max(mixEvent.when, now + 0.001);
+      if (mixEvent.kind === 'mix-reset') {
+        playback.mixResetsScheduled += resetTrackMixEffects(mixEvent.trackIds, when);
+        continue;
+      }
+
+      const bus = ensureTrackBus(mixEvent.trackId);
+      if (!bus) continue;
+      scheduleTrackMixEffect(bus, mixEvent, {
+        when,
+        currentTime: now,
+      });
+      playback.mixEffectsScheduled += 1;
+      if (mixEvent.type === 'volume') playback.volumeEffectsScheduled += 1;
+      if (mixEvent.type === 'pan') playback.panEffectsScheduled += 1;
+    }
+
     if (playback.metronomeCursor) {
       for (const click of playback.metronomeCursor.drainUntil(playback.anchor, horizon)) {
         scheduleClick({
@@ -712,6 +816,13 @@ export function createAudioEngine({
       canceledNotes += 1;
     }
 
+    const affectedMixTracks = new Set([
+      ...mixEffectTrackIds(playback.pattern),
+      ...mixEffectTrackIds(pattern),
+    ]);
+    resetTrackMixEffects(affectedMixTracks, rebuildAudioTime);
+    applyTrackMixStateBeforeTick(pattern, freezeTick, rebuildAudioTime);
+
     playback.pattern = pattern;
     playback.noteAnchor = rebuildAudioTime;
     playback.noteCursor = createPatternScheduleCursor(pattern, playback.tempo, {
@@ -720,6 +831,11 @@ export function createAudioEngine({
     });
     playback.cutAnchor = rebuildAudioTime;
     playback.cutCursor = createCutScheduleCursor(pattern, playback.tempo, {
+      loop: playback.loop,
+      startTick: freezeTick,
+    });
+    playback.mixAnchor = rebuildAudioTime;
+    playback.mixCursor = createMixEffectScheduleCursor(pattern, playback.tempo, {
       loop: playback.loop,
       startTick: freezeTick,
     });
@@ -823,8 +939,10 @@ export function createAudioEngine({
   }
 
   function stop() {
+    const affectedMixTracks = playback ? mixEffectTrackIds(playback.pattern) : [];
     clearScheduler();
     stopSources();
+    if (context) resetTrackMixEffects(affectedMixTracks, context.currentTime);
     playback = null;
     positionTick = 0;
     if (context) setState('ready');
@@ -857,6 +975,10 @@ export function createAudioEngine({
       delayedNotesScheduled: playback?.delayedNotesScheduled ?? 0,
       cutEffectsScheduled: playback?.cutEffectsScheduled ?? 0,
       cutStopsScheduled: playback?.cutStopsScheduled ?? 0,
+      mixEffectsScheduled: playback?.mixEffectsScheduled ?? 0,
+      volumeEffectsScheduled: playback?.volumeEffectsScheduled ?? 0,
+      panEffectsScheduled: playback?.panEffectsScheduled ?? 0,
+      mixResetsScheduled: playback?.mixResetsScheduled ?? 0,
       clicksScheduled: playback?.clicksScheduled ?? 0,
       scheduledInstrumentIds: playback
         ? [...playback.instrumentIdsScheduled].sort()
