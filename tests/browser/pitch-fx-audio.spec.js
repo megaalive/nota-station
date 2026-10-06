@@ -107,7 +107,7 @@ test.describe('Pitch slide + porta audio R3-S8F-A', () => {
       window.tracker.commands.execute('pattern.addEffect', {
         patternId,
         trackId,
-        tickLocal: 480,
+        tickLocal: 120,
         type: 'porta',
         value: { targetPitch: 55, durationTicks: 240 },
       });
@@ -165,7 +165,7 @@ test.describe('Pitch slide + porta audio R3-S8F-A', () => {
         },
         {
           type: 'porta',
-          tickLocal: 480,
+          tickLocal: 120,
           value: { targetPitch: 55, durationTicks: 240 },
         },
       ],
