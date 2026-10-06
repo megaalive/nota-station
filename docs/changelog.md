@@ -5,6 +5,23 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S7B — LPB projection + explicit quantize (CLOSED · PASS)
+
+- Pattern toolbar kini memiliki selector **LPB** sebagai **state proyeksi**, bukan mutasi Project. Mengganti LPB mempertahankan tick musik di bawah cursor dan tidak mengubah `NoteEvent.startTickLocal`.
+- Helper timing mendukung LPB yang membagi PPQ 480 secara bulat dan mengubahnya ke `rowTicks`; pencarian **Cocokkan LPB** memilih resolusi yang dapat menyelaraskan semua event pada cell tanpa mengkuantisasi data.
+- Saat LPB aktif berbeda dari `Pattern.rowTicks`, Pattern masuk **projection-only** untuk mutasi tracker biasa. Ini sengaja fail-safe: tampilan boleh berubah, tetapi NOTE/INST/VOL, block edit, row operation, dan edit langsung tidak boleh menghitung row dengan grid default lama secara diam-diam.
+- Tombol **Kuantisasi** adalah satu-satunya perubahan timing pada slice ini: event pada cell dipindahkan ke grid terdekat sebagai satu transaksi Undo dan tetap melewati shared-pattern guard S4.
+- Kuantisasi mempertahankan ID, pitch, velocity, Instrument, `voiceLane`, dan **durationTicks**. Bila target membuat collision atau sustain melewati akhir Pattern, seluruh operasi ditolak atomik; duration tidak pernah dipotong diam-diam.
+- Pada Pattern shared, **Jadikan unik untuk tempat ini** tetap bekerja untuk quantize pending: occurrence sumber mempertahankan tick lama, clone occurrence fokus menerima timing hasil quantize.
+- DLY tetap progressive disclosure: bila resolusi aktif membuat seluruh note aligned, kolom DLY hilang; kembali ke resolusi default mengembalikan DLY tanpa perubahan data.
+- Full gate awal run **37418995846** pada HEAD `e014ba3…`: unit **143/143 PASS**, check PASS, build **468,6 KiB**, full browser **230/230 PASS**.
+- Review setelah gate menemukan satu masalah semantik yang belum tertangkap test: quantize dekat akhir Pattern dapat memendekkan duration. Koreksi mengubahnya menjadi `E_PATTERN_QUANTIZE_DURATION` fail-closed dan menambah unit invariant.
+- Full gate sesudah koreksi duration run **37419790185**: unit **144/144 PASS**, tetapi browser **229/230 PASS**. Satu failure Chromium berasal dari race pada test observability lama: test sudah melihat playhead tepat di row target, lalu menunggu scroll secara terpisah sementara playback terus maju hingga row +2.
+- Test follow-playhead dikoreksi tanpa mengubah runtime: posisi dekat target dan `scrollTop > 0` diperiksa dalam satu kondisi atomik. Gate terarah run **37420218937**: unit **144/144 PASS**, check PASS, build **468,7 KiB**, LPB/off-grid/channel observability Chromium+Firefox **18/18 PASS**.
+- Gate final run **37420368555** pada HEAD `d0981f4…`: 0 vulnerability, unit **144/144 PASS**, check PASS, build **468,7 KiB**, full browser Chromium+Firefox **230/230 PASS**.
+- Direct arbitrary DLY editing belum dibuka. Perubahan timing selain explicit quantize tetap ditahan sampai semantik input DLY jelas.
+- Berikutnya: **R3-S8 typed FX v0.1** atau **generalisasi polyphonic voice lane**, setelah audit dependency singkat terhadap model EffectEvent dan header channel.
+
 ### R3-S7A — proyeksi off-grid + kolom DLY (CLOSED · PASS)
 
 - Ditambahkan helper proyeksi **tick-local → display row + DLY** tanpa mengubah `NoteEvent.startTickLocal`. Data kanonik tetap bebas grid; Pattern hanya memproyeksikannya.
