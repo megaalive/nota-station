@@ -29,22 +29,43 @@ export function patternDurationSeconds(pattern, tempo, ppq = PPQ) {
 
 export function patternEventTemplates(pattern, tempo, ppq = PPQ) {
   const tickSeconds = secondsPerTick(tempo, ppq);
+  const delayByCell = new Map(
+    (pattern.effects ?? [])
+      .filter((effect) => effect.type === 'delay')
+      .map((effect) => [
+        `${effect.trackId}|${effect.tickLocal}`,
+        effect.value.ticks,
+      ]),
+  );
+
   return [...pattern.notes]
+    .map((note) => {
+      const delayTicks = delayByCell.get(
+        `${note.trackId}|${note.startTickLocal}`,
+      ) ?? 0;
+      return {
+        note,
+        delayTicks,
+        effectiveTick: note.startTickLocal + delayTicks,
+      };
+    })
     .sort((a, b) => (
-      a.startTickLocal - b.startTickLocal
-      || a.trackId.localeCompare(b.trackId)
-      || voiceLaneOf(a) - voiceLaneOf(b)
-      || a.id.localeCompare(b.id)
+      a.effectiveTick - b.effectiveTick
+      || a.note.trackId.localeCompare(b.note.trackId)
+      || voiceLaneOf(a.note) - voiceLaneOf(b.note)
+      || a.note.id.localeCompare(b.note.id)
     ))
-    .map((note) => ({
+    .map(({ note, delayTicks, effectiveTick }) => ({
       id: note.id,
       trackId: note.trackId,
       instrumentId: note.instrumentId,
       pitch: note.pitch,
       velocity: note.velocity,
       voiceLane: voiceLaneOf(note),
-      startTickLocal: note.startTickLocal,
-      offsetSeconds: note.startTickLocal * tickSeconds,
+      sourceStartTickLocal: note.startTickLocal,
+      startTickLocal: effectiveTick,
+      delayTicks,
+      offsetSeconds: effectiveTick * tickSeconds,
       durationSeconds: note.durationTicks * tickSeconds,
     }));
 }
@@ -172,6 +193,45 @@ export function createPatternScheduleCursor(pattern, tempo, {
 } = {}) {
   const events = patternEventTemplates(pattern, tempo, ppq);
   const cursor = createTickScheduleCursor(events, pattern.lengthTicks, tempo, { loop, startTick, ppq });
+  return {
+    ...cursor,
+    durationSeconds: patternDurationSeconds(pattern, tempo, ppq),
+    eventCount: events.length,
+  };
+}
+
+export function cutEffectEventTemplates(pattern, tempo, ppq = PPQ) {
+  const tickSeconds = secondsPerTick(tempo, ppq);
+  return (pattern.effects ?? [])
+    .filter((effect) => effect.type === 'cut')
+    .map((effect) => ({
+      id: effect.id,
+      trackId: effect.trackId,
+      type: effect.type,
+      value: structuredClone(effect.value),
+      sourceTickLocal: effect.tickLocal,
+      startTickLocal: effect.tickLocal + effect.value.afterTicks,
+      offsetSeconds: (effect.tickLocal + effect.value.afterTicks) * tickSeconds,
+    }))
+    .sort((a, b) => (
+      a.startTickLocal - b.startTickLocal
+      || a.trackId.localeCompare(b.trackId)
+      || a.id.localeCompare(b.id)
+    ));
+}
+
+export function createCutScheduleCursor(pattern, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  const events = cutEffectEventTemplates(pattern, tempo, ppq);
+  const cursor = createTickScheduleCursor(
+    events,
+    pattern.lengthTicks,
+    tempo,
+    { loop, startTick, ppq },
+  );
   return {
     ...cursor,
     durationSeconds: patternDurationSeconds(pattern, tempo, ppq),
