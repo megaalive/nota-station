@@ -1444,6 +1444,10 @@
   white-space: nowrap;
 }
 
+.pattern-toolbar [data-action="pattern-shared-badge"][hidden] {
+  display: none;
+}
+
 .pattern-toolbar [data-action="pattern-shared-popover"] .popover {
   width: max-content;
   max-width: min(420px, 82vw);
