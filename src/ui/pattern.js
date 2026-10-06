@@ -818,6 +818,34 @@ export function createPatternView({
     });
   }
 
+  function projectedNotesAt(row = cursorRow, channel = cursorChannel) {
+    const { project, pattern, tracks } = projectInfo();
+    const track = tracks[channel];
+    if (!track) return [];
+    return notesAtDisplayCell(project, {
+      patternId: pattern.id,
+      trackId: track.id,
+      row,
+      rowTicks: pattern.rowTicks,
+    });
+  }
+
+  function projectedCellHasOffGrid(row = cursorRow, channel = cursorChannel) {
+    const { pattern } = projectInfo();
+    return projectedNotesAt(row, channel).some(
+      (note) => projectNoteToDisplayGrid(note, pattern.rowTicks).offGrid,
+    );
+  }
+
+  function rejectOffGridCellEdit() {
+    if (!projectedCellHasOffGrid()) return false;
+    pendingHex = null;
+    feedback = { key: 'pattern.offGridReadOnly' };
+    renderWindow();
+    syncStatus();
+    return true;
+  }
+
   function toggleMode() {
     clearInputState();
     mode = mode === 'edit' ? 'audition' : 'edit';
@@ -832,6 +860,7 @@ export function createPatternView({
     onAudition?.(pitch);
 
     if (mode !== 'edit') return;
+    if (rejectOffGridCellEdit()) return;
 
     runPatternCommand('pattern.enterNote', {
       patternId: pattern.id,
@@ -852,6 +881,7 @@ export function createPatternView({
 
     onInstrumentAudition?.(track.defaultInstrumentId, hit.pitch);
     if (mode !== 'edit') return true;
+    if (rejectOffGridCellEdit()) return true;
 
     const hits = notesAtCell(project, {
       patternId: pattern.id,
@@ -913,7 +943,8 @@ export function createPatternView({
   }
 
   function handleHexInput(digit) {
-    if (mode !== 'edit' || cursorField === 'note') return false;
+    if (mode !== 'edit' || cursorField === 'note' || cursorField === 'delay') return false;
+    if (rejectOffGridCellEdit()) return true;
 
     const { project, pattern, tracks } = projectInfo();
     const track = tracks[cursorChannel];
@@ -986,24 +1017,34 @@ export function createPatternView({
       && getActivePattern(project).notes.length === 0;
   }
 
-  function displayCellText(project, note, field, row, channel) {
+  function displayCellText(project, note, field, row, channel, projectedNotes = []) {
     const track = project.song.tracks[channel];
+    const pattern = getActivePattern(project);
+    const delays = projectedNotes.map(
+      (item) => projectNoteToDisplayGrid(item, pattern.rowTicks).delayTicks,
+    );
+    const hasOffGrid = delays.some((delay) => delay !== 0);
+
+    if (field === 'delay') {
+      if (projectedNotes.length === 0) return '··';
+      const unique = [...new Set(delays)].sort((a, b) => a - b);
+      if (unique.length === 1) return unique[0] === 0 ? '0t' : `+${unique[0]}t`;
+      return `+${unique[0]}…+${unique[unique.length - 1]}`;
+    }
+
     if (field === 'note' && track?.kind === 'drum') {
-      const hits = notesAtCell(project, {
-        patternId: getActivePattern(project).id,
-        trackId: track.id,
-        row,
-      });
-      if (hits.length > 0) {
-        return hits
+      if (projectedNotes.length > 0) {
+        const text = projectedNotes
           .map((hit) => DRUM_PITCH_LABELS.get(hit.pitch) ?? '•')
           .join('');
+        return hasOffGrid ? `${text}⌁` : text;
       }
       if (emptyFirstCell(project, note, field, row, channel)) {
         return t('pattern.emptyDrumCell');
       }
       return '···';
     }
+
     if (emptyFirstCell(project, note, field, row, channel)) {
       return t('pattern.emptyCell');
     }
@@ -1015,13 +1056,40 @@ export function createPatternView({
     ) {
       return `${pendingHex.first}_`;
     }
-    return cellText(project, note, field);
+
+    const text = cellText(project, note, field);
+    if (field !== 'note' || !note) return text;
+    const suffix = [
+      hasOffGrid ? '⌁' : '',
+      projectedNotes.length > 1 ? `×${projectedNotes.length}` : '',
+    ].join('');
+    return `${text}${suffix}`;
+  }
+
+  function cellTitle(project, note, field, row, channel, projectedNotes = []) {
+    if (emptyFirstCell(project, note, field, row, channel)) {
+      return t('pattern.emptyCellTitle');
+    }
+    if (projectedNotes.length === 0) return null;
+
+    const pattern = getActivePattern(project);
+    const delays = projectedNotes.map(
+      (item) => projectNoteToDisplayGrid(item, pattern.rowTicks).delayTicks,
+    );
+    const offGridCount = delays.filter((delay) => delay !== 0).length;
+    if (offGridCount === 0) return null;
+
+    return t('pattern.offGridCellTitle', {
+      count: projectedNotes.length,
+      delays: [...new Set(delays)].map((delay) => `+${delay}t`).join(', '),
+    });
   }
 
   function deleteCurrentEvent() {
     // Instrument dan velocity wajib ada pada NoteEvent, jadi Delete pada INST/VOL
     // tidak dimaknai "kosongkan field". Hanya NOTE yang menghapus seluruh event.
     if (mode !== 'edit' || cursorField !== 'note') return;
+    if (rejectOffGridCellEdit()) return;
 
     const { pattern, tracks } = projectInfo();
     const track = tracks[cursorChannel];
@@ -1062,6 +1130,8 @@ export function createPatternView({
       hint.textContent = t('pattern.hintInstrument', {
         max: formatHexByte(projectInfo().project.instruments.length),
       });
+    } else if (cursorField === 'delay') {
+      hint.textContent = t('pattern.hintDelay');
     } else {
       hint.textContent = t('pattern.hintVolume');
     }
@@ -1072,6 +1142,8 @@ export function createPatternView({
     // Refresh dari history/command eksternal harus membuang input dua-nibble yang
     // belum menjadi transaksi project.
     clearInputState();
+    const { fields } = projectInfo();
+    if (!fields.includes(cursorField)) cursorField = 'note';
     renderHeader();
     renderWindow();
     syncSharedPatternBadge();
