@@ -5,6 +5,24 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S8F-A — audible pitch slide + portamento (CLOSED · PASS)
+
+- Spike R1 `pitch-spike.js` diproduksikan menjadi primitive `pitch-effects.js` untuk automation finite pada `AudioParam`.
+- `pitchSlide` berjalan relatif dari pitch voice **saat EffectEvent mulai**, lalu menetap pada offset hasil slide.
+- `porta` bergerak dari pitch voice saat ini menuju `targetPitch` MIDI absolut, sambil mempertahankan tuning dasar Sample/Zone.
+- Chaining deterministic: EffectEvent berikutnya dapat memotong ramp yang sedang berlangsung; posisi semitone saat titik potong dihitung dari state automation sebelumnya, bukan di-reset ke pitch note.
+- Automation dipotong pada note-off dan tidak pernah memperpanjang usia voice. Effect setelah source selesai tidak membuat scheduling palsu.
+- Engine menyimpan `pitchParam`, base playback rate, note end, dan state automation hanya sebagai metadata runtime; `NoteEvent.pitch` tetap kanonik dan tidak dimutasi.
+- Pitch cursor memakai freeze window live-edit 30 ms seperti timing/mix FX. Effect hanya diterapkan ke voice note aktif pada Track dan cycle yang sama.
+- Sampler/factory memakai `AudioBufferSourceNode.playbackRate`. Instrument `demo.*` adalah fixture UAT khusus dengan pitch-envelope internal; automation pitch tidak dipaksakan ke jalur itu dan dihitung sebagai unsupported fail-soft bila memang ditarget.
+- Bukti audible lintas-browser memakai `OfflineAudioContext` dan zero-crossing frequency estimate: bagian akhir ramp harus memiliki frekuensi nyata lebih tinggi daripada bagian awal. Integrasi realtime engine diverifikasi pada Chromium tanpa mengubah NoteEvent.
+- Gate terarah awal run **37519436337**: unit/check/build PASS, audible offline PASS, tetapi realtime Chromium menemukan hanya satu voice automation karena fixture factory sudah selesai sebelum porta tick 480. Runtime tidak diubah.
+- Fixture diperbaiki agar porta masuk di tick 120 saat source masih aktif, sekaligus menguji pemotongan ramp slide oleh porta.
+- Gate terarah final run **37519683809** pada HEAD `3119b29…`: 0 vulnerability, unit **185/185 PASS**, check PASS, build **530,5 KiB**, browser pitch/audio regression **22 PASS + 4 skip**.
+- Gate final run **37519923777** pada HEAD `84c1b9d…`: 0 vulnerability, unit **185/185 PASS**, check PASS, build **530,5 KiB**, full browser **256 PASS + 4 skip**.
+- Empat skip adalah realtime AudioContext Firefox headless S8B/S8D/S8E/S8F-A; seluruh bukti audible OfflineAudioContext tetap berjalan di Firefox.
+- Berikutnya: **R3-S8F-B vibrato + arpeggio** sebagai automation cyclic/stepwise setelah finite ramp stabil.
+
 ### R3-S8E — audible retrigger + sample offset (CLOSED · PASS)
 
 - `retrigger.count` dikunci sebagai **jumlah pengulangan tambahan**; trigger note asli tetap trigger pertama. Contoh `count=2` menghasilkan trigger asli + dua restart.
