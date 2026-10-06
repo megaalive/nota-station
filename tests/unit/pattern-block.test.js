@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 
 import {
   copyPatternBlock,
+  deletePatternRows,
+  insertPatternRows,
+  interpolatePatternVelocity,
   pastePatternBlock,
   transposePatternBlock,
 } from '../../src/core/pattern-block.js';
@@ -232,4 +235,167 @@ test('transposePatternBlock fail-closed bila satu pitch keluar MIDI 0..127', () 
       .notes.find((note) => note.startTickLocal === 120).pitch,
     60,
   );
+});
+
+
+test('insertPatternRows menggeser event terpilih, memanjangkan sustain yang melintasi sisipan, dan mempertahankan channel lain', () => {
+  const { project, patternId, idFactory, now } = fixture();
+  const pattern = project.song.patterns.find((item) => item.id === patternId);
+  const trackA = project.song.tracks[0].id;
+  const trackB = project.song.tracks[1].id;
+
+  let seeded = enterNote(project, {
+    patternId,
+    trackId: trackA,
+    row: 4,
+    pitch: 67,
+    velocity: 70,
+  }, { idFactory, now });
+  seeded = enterNote(seeded, {
+    patternId,
+    trackId: trackA,
+    row: 63,
+    pitch: 72,
+    velocity: 60,
+  }, { idFactory, now });
+
+  const next = insertPatternRows(seeded, {
+    patternId,
+    row: 2,
+    count: 2,
+    channelStart: 0,
+    channelEnd: 0,
+  }, { now });
+
+  const notes = next.song.patterns.find((item) => item.id === patternId).notes;
+  const sustain = notes.find((note) => note.trackId === trackA && note.pitch === 60);
+  const shifted = notes.find((note) => note.trackId === trackA && note.pitch === 67);
+  const untouched = notes.find((note) => note.trackId === trackB && note.pitch === 64);
+
+  assert.equal(sustain.startTickLocal, pattern.rowTicks);
+  assert.equal(sustain.durationTicks, pattern.rowTicks * 4);
+  assert.equal(shifted.startTickLocal, pattern.rowTicks * 6);
+  assert.equal(untouched.startTickLocal, pattern.rowTicks * 2);
+  assert.equal(notes.some((note) => note.pitch === 72), false, 'event yang terdorong melewati akhir dipotong dari Pattern');
+});
+
+test('deletePatternRows menghapus note yang mulai pada area terhapus, menggeser sesudahnya, dan memendekkan sustain', () => {
+  const { project, patternId, idFactory, now } = fixture();
+  const trackA = project.song.tracks[0].id;
+  let seeded = enterNote(project, {
+    patternId,
+    trackId: trackA,
+    row: 4,
+    pitch: 67,
+    velocity: 70,
+  }, { idFactory, now });
+
+  const next = deletePatternRows(seeded, {
+    patternId,
+    row: 2,
+    count: 2,
+    channelStart: 0,
+    channelEnd: 0,
+  }, { now });
+
+  const pattern = next.song.patterns.find((item) => item.id === patternId);
+  const sustain = pattern.notes.find((note) => note.trackId === trackA && note.pitch === 60);
+  const shifted = pattern.notes.find((note) => note.trackId === trackA && note.pitch === 67);
+
+  assert.equal(sustain.startTickLocal, pattern.rowTicks);
+  assert.equal(sustain.durationTicks, pattern.rowTicks);
+  assert.equal(shifted.startTickLocal, pattern.rowTicks * 2);
+  assert.equal(
+    pattern.notes.some((note) => note.trackId === trackA && note.startTickLocal >= pattern.rowTicks * 2 && note.pitch === 60),
+    false,
+  );
+});
+
+test('row operations mempertahankan voice lane Drum Track', () => {
+  const { project, patternId, now } = fixture();
+
+  const inserted = insertPatternRows(project, {
+    patternId,
+    row: 1,
+    count: 1,
+    channelStart: 2,
+    channelEnd: 2,
+  }, { now });
+  const afterInsert = inserted.song.patterns.find((item) => item.id === patternId).notes
+    .filter((note) => note.trackId === project.song.tracks[2].id);
+
+  assert.deepEqual(
+    afterInsert.map((note) => [note.startTickLocal / 120, note.voiceLane, note.pitch]),
+    [[3, undefined, 36], [3, 1, 38]],
+  );
+
+  const deleted = deletePatternRows(inserted, {
+    patternId,
+    row: 1,
+    count: 1,
+    channelStart: 2,
+    channelEnd: 2,
+  }, { now });
+  const afterDelete = deleted.song.patterns.find((item) => item.id === patternId).notes
+    .filter((note) => note.trackId === project.song.tracks[2].id);
+
+  assert.deepEqual(
+    afterDelete.map((note) => [note.startTickLocal / 120, note.voiceLane, note.pitch]),
+    [[2, undefined, 36], [2, 1, 38]],
+  );
+});
+
+test('interpolatePatternVelocity menginterpolasi existing note per track/voice lane secara deterministik', () => {
+  const { project, patternId, idFactory, now } = fixture();
+  const trackA = project.song.tracks[0].id;
+  let seeded = enterNote(project, {
+    patternId,
+    trackId: trackA,
+    row: 0,
+    pitch: 58,
+    velocity: 20,
+  }, { idFactory, now });
+  seeded = enterNote(seeded, {
+    patternId,
+    trackId: trackA,
+    row: 2,
+    pitch: 61,
+    velocity: 100,
+  }, { idFactory, now });
+  seeded = enterNote(seeded, {
+    patternId,
+    trackId: trackA,
+    row: 4,
+    pitch: 65,
+    velocity: 80,
+  }, { idFactory, now });
+
+  const next = interpolatePatternVelocity(seeded, {
+    patternId,
+    rowStart: 0,
+    rowEnd: 4,
+    channelStart: 0,
+    channelEnd: 0,
+  }, { now });
+
+  const velocities = next.song.patterns.find((item) => item.id === patternId).notes
+    .filter((note) => note.trackId === trackA)
+    .sort((a, b) => a.startTickLocal - b.startTickLocal)
+    .map((note) => note.velocity);
+
+  assert.deepEqual(velocities, [20, 35, 50, 80]);
+  assert.notEqual(next, seeded);
+});
+
+test('interpolatePatternVelocity no-op bila tiap lane hanya punya satu titik', () => {
+  const { project, patternId, now } = fixture();
+  const next = interpolatePatternVelocity(project, {
+    patternId,
+    rowStart: 1,
+    rowEnd: 2,
+    channelStart: 0,
+    channelEnd: 2,
+  }, { now });
+
+  assert.equal(next, project);
 });
