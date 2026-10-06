@@ -6,6 +6,8 @@ import { commandError, createCommandRegistry } from './core/commands.js';
 import { createHistory } from './core/history.js';
 import { createFocusStore, patternForFocus } from './core/focus.js';
 import {
+  addSection,
+  assignOrderEntrySection,
   insertOrderEntry,
   makeOrderEntryUnique,
   moveOrderEntry,
@@ -454,6 +456,40 @@ function registerCommands() {
         audio.setTempo(project, focusedPattern(project));
         syncTransportUi();
         return { tempo: project.song.initial.tempo };
+      },
+    },
+    {
+      id: 'song.addSection',
+      group: 'Song',
+      labelKey: 'song.addSection',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('song.addSection', args);
+        const nextProject = addSection(project, {
+          name: args.name,
+          color: args.color,
+        });
+        const section = nextProject.song.sections[nextProject.song.sections.length - 1];
+        commitProject(nextProject, 'song.addSection');
+        return structuredClone(section);
+      },
+    },
+    {
+      id: 'song.assignSection',
+      group: 'Song',
+      labelKey: 'song.assignSection',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('song.assignSection', args);
+        const orderEntryId = String(args.orderEntryId ?? '');
+        const sectionId = args.sectionId === null ? null : String(args.sectionId ?? '');
+        const nextProject = assignOrderEntrySection(project, {
+          orderEntryId,
+          sectionId,
+        });
+        const changed = nextProject !== project;
+        commitProject(nextProject, 'song.assignSection');
+        return { orderEntryId, sectionId, changed };
       },
     },
     {
