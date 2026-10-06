@@ -772,8 +772,10 @@ export function createAudioEngine({
     notifyPosition();
 
     if (!playback.loop && playback.noteCursor.isExhausted() && now >= playback.endAt) {
+      const affectedMixTracks = mixEffectTrackIds(playback.pattern);
       clearScheduler();
       stopSources();
+      resetTrackMixEffects(affectedMixTracks, context.currentTime);
       playback = null;
       positionTick = 0;
       setState('ready');
