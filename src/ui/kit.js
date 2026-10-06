@@ -222,19 +222,31 @@ export function Dialog({ title, body, actions = [], onClose }) {
 /* ---------------------------------------------------------------- Popover */
 
 export function Popover({ content, anchor, placement = 'bottom' }) {
-  const box = el('div', { class: `popover popover--${placement}`, dataset: { action: 'popover' } }, [content]);
+  const box = el('div', {
+    class: `popover popover--${placement}`,
+    dataset: { action: 'popover' },
+    'aria-hidden': 'true',
+  }, [content]);
   const root = el('div', { class: 'popover-host' }, [anchor, box]);
+  let releaseDismiss = null;
 
   function open() {
+    if (root.classList.contains('is-open')) return close;
     root.classList.add('is-open');
     box.setAttribute('aria-hidden', 'false');
-    return onDismiss(box, {
+    box.addEventListener('request-close', close);
+    releaseDismiss = onDismiss(box, {
       onOutside: true,
-      onEscape: false,
+      onEscape: true,
     });
+    return close;
   }
 
   function close() {
+    if (!root.classList.contains('is-open')) return;
+    releaseDismiss?.();
+    releaseDismiss = null;
+    box.removeEventListener('request-close', close);
     root.classList.remove('is-open');
     box.setAttribute('aria-hidden', 'true');
   }
