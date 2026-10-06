@@ -7,6 +7,11 @@ import { createHistory } from './core/history.js';
 import { createFocusStore, patternForFocus } from './core/focus.js';
 import { createSharedPatternGuard } from './core/shared-pattern-guard.js';
 import {
+  copyPatternBlock,
+  pastePatternBlock,
+  transposePatternBlock,
+} from './core/pattern-block.js';
+import {
   addSection,
   assignOrderEntrySection,
   createSectionOccurrence,
@@ -124,6 +129,7 @@ let shell = null;
 let songView = null;
 let patternView = null;
 let soundView = null;
+let patternClipboard = null;
 const transportState = {
   loopPattern: true,
   metronome: false,
@@ -684,6 +690,62 @@ function registerCommands() {
         persistSessionSharedPatternGuardState();
         patternView?.refresh();
         return state;
+      },
+    },
+    {
+      id: 'pattern.copyBlock',
+      group: 'Pattern',
+      labelKey: 'pattern.copyBlock',
+      shortcut: 'Ctrl+C',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.copyBlock', args);
+        patternClipboard = copyPatternBlock(project, args);
+        return {
+          eventCount: patternClipboard.events.length,
+          rowCount: patternClipboard.rowCount,
+          channelCount: patternClipboard.channelCount,
+        };
+      },
+    },
+    {
+      id: 'pattern.pasteBlock',
+      group: 'Pattern',
+      labelKey: 'pattern.pasteBlock',
+      shortcut: 'Ctrl+V',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.pasteBlock', args);
+        if (!patternClipboard) {
+          throw commandError('E_PATTERN_CLIPBOARD_EMPTY', i18n.t('pattern.clipboardEmpty'));
+        }
+        requirePatternEditAllowed(args);
+        const nextProject = pastePatternBlock(project, {
+          ...args,
+          block: patternClipboard,
+        });
+        const changed = nextProject !== project;
+        commitPatternProject(nextProject, 'pattern.pasteBlock');
+        return {
+          changed,
+          eventCount: patternClipboard.events.length,
+          rowCount: patternClipboard.rowCount,
+          channelCount: patternClipboard.channelCount,
+        };
+      },
+    },
+    {
+      id: 'pattern.transposeBlock',
+      group: 'Pattern',
+      labelKey: 'pattern.transposeBlock',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.transposeBlock', args);
+        requirePatternEditAllowed(args);
+        const nextProject = transposePatternBlock(project, args);
+        const changed = nextProject !== project;
+        commitPatternProject(nextProject, 'pattern.transposeBlock');
+        return { changed, semitones: Number(args.semitones) };
       },
     },
     {
@@ -1448,6 +1510,14 @@ async function boot() {
       session: sessionProjectState,
       focus: focus.getState(),
       sharedPatternGuard: sharedPatternGuard.getState(),
+      patternClipboard: patternClipboard
+        ? {
+            eventCount: patternClipboard.events.length,
+            rowCount: patternClipboard.rowCount,
+            channelCount: patternClipboard.channelCount,
+          }
+        : null,
+      patternUi: patternView?.getUiState() ?? null,
       project: {
         id: project.id,
         patternId: focusedPattern(project).id,
