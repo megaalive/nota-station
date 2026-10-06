@@ -126,7 +126,7 @@ test('pastePatternBlock membuat ID baru, memetakan channel, dan mengganti collis
   const next = pastePatternBlock(project, {
     patternId,
     targetRow: 5,
-    targetChannel: 1,
+    targetChannel: 3,
     block,
   }, { idFactory, now });
 
@@ -134,13 +134,34 @@ test('pastePatternBlock membuat ID baru, memetakan channel, dan mengganti collis
   const pasted = pattern.notes.filter((note) => (
     note.startTickLocal >= 5 * pattern.rowTicks
     && note.startTickLocal < 7 * pattern.rowTicks
-    && [project.song.tracks[1].id, project.song.tracks[2].id].includes(note.trackId)
+    && [project.song.tracks[3].id, project.song.tracks[4].id].includes(note.trackId)
   ));
 
   assert.equal(pasted.length, 2);
   assert.ok(pasted.every((note) => !sourceIds.has(note.id)));
   assert.deepEqual(pasted.map((note) => note.pitch), [60, 64]);
   assert.equal(pasted[0].durationTicks, pattern.rowTicks * 2);
+});
+
+test('pastePatternBlock menolak mapping instrument ke Drum Track', () => {
+  const { project, patternId } = fixture();
+  const block = copyPatternBlock(project, {
+    patternId,
+    rowStart: 1,
+    rowEnd: 2,
+    channelStart: 0,
+    channelEnd: 1,
+  });
+
+  assert.throws(
+    () => pastePatternBlock(project, {
+      patternId,
+      targetRow: 5,
+      targetChannel: 1,
+      block,
+    }),
+    (error) => error.code === 'E_PATTERN_BLOCK_TRACK_KIND',
+  );
 });
 
 test('pastePatternBlock menolak overflow secara atomik', () => {
