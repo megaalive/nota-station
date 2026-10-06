@@ -1,7 +1,12 @@
-// Pattern editor R1: DOM windowed, 8 channel, kolom tracker NOTE | INST | VOL.
+// Pattern editor: DOM windowed, proyeksi NOTE | INST | VOL dan DLY bila ada event off-grid.
 // View tidak pernah menulis project langsung; semua mutasi lewat command registry.
 
 import { patternUsageCount } from '../core/arrangement.js';
+import {
+  notesAtDisplayCell,
+  patternHasOffGridNotes,
+  projectNoteToDisplayGrid,
+} from '../core/pattern-grid.js';
 import { activePattern, noteAtCell, notesAtCell } from '../core/project.js';
 import { isDrumKitInstrument } from '../core/sound-model.js';
 import { el } from './dom.js';
@@ -13,8 +18,14 @@ const ROW_NUMBER_WIDTH = 46;
 const NOTE_WIDTH = 64;
 const INST_WIDTH = 42;
 const VOL_WIDTH = 42;
-const CHANNEL_WIDTH = NOTE_WIDTH + INST_WIDTH + VOL_WIDTH;
-const FIELDS = ['note', 'instrument', 'volume'];
+const DLY_WIDTH = 58;
+const BASE_FIELDS = ['note', 'instrument', 'volume'];
+const FIELD_WIDTHS = Object.freeze({
+  note: NOTE_WIDTH,
+  instrument: INST_WIDTH,
+  volume: VOL_WIDTH,
+  delay: DLY_WIDTH,
+});
 const OVERSCAN = 4;
 
 const NOTE_CODES = new Map([
@@ -277,29 +288,37 @@ export function createPatternView({
   function projectInfo() {
     const project = getProject();
     const pattern = getActivePattern(project);
+    const fields = patternHasOffGridNotes(pattern, pattern.rowTicks)
+      ? [...BASE_FIELDS, 'delay']
+      : BASE_FIELDS;
     return {
       project,
       pattern,
       tracks: project.song.tracks,
+      fields,
       rowCount: pattern.lengthTicks / pattern.rowTicks,
     };
   }
 
-  function dataColumns(tracks) {
-    return tracks.flatMap(() => [NOTE_WIDTH, INST_WIDTH, VOL_WIDTH]);
+  function dataColumns(tracks, fields) {
+    return tracks.flatMap(() => fields.map((field) => FIELD_WIDTHS[field]));
   }
 
-  function rowTemplate(tracks) {
-    return `${ROW_NUMBER_WIDTH}px ${dataColumns(tracks).map((width) => `${width}px`).join(' ')}`;
+  function channelWidth(fields) {
+    return fields.reduce((sum, field) => sum + FIELD_WIDTHS[field], 0);
+  }
+
+  function rowTemplate(tracks, fields) {
+    return `${ROW_NUMBER_WIDTH}px ${dataColumns(tracks, fields).map((width) => `${width}px`).join(' ')}`;
   }
 
   function renderHeader() {
-    const { project, tracks } = projectInfo();
+    const { project, pattern, tracks, fields } = projectInfo();
     header.textContent = '';
 
     trackUi.clear();
     const channelRow = el('div', { class: 'pattern-grid__header-row pattern-grid__header-row--channel', role: 'row' });
-    channelRow.style.gridTemplateColumns = `${ROW_NUMBER_WIDTH}px repeat(${tracks.length}, ${CHANNEL_WIDTH}px)`;
+    channelRow.style.gridTemplateColumns = `${ROW_NUMBER_WIDTH}px repeat(${tracks.length}, ${channelWidth(fields)}px)`;
     channelRow.append(el('div', {
       class: 'pattern-grid__corner pattern-grid__corner--channel',
       'aria-hidden': 'true',
@@ -402,28 +421,32 @@ export function createPatternView({
       const channel = el('div', {
         class: `pattern-grid__channel${track.kind === 'drum' ? ' is-drum' : ''}`,
         role: 'columnheader',
-        'aria-colindex': String(index * FIELDS.length + 1),
-        'aria-colspan': String(FIELDS.length),
+        'aria-colindex': String(index * fields.length + 1),
+        'aria-colspan': String(fields.length),
       }, [label, instrumentSelect, controls]);
       channelRow.append(channel);
       trackUi.set(track.id, { channel, mute, solo, meter, meterFill });
     });
 
     const fieldRow = el('div', { class: 'pattern-grid__header-row pattern-grid__header-row--field', role: 'row' });
-    fieldRow.style.gridTemplateColumns = rowTemplate(tracks);
+    fieldRow.style.gridTemplateColumns = rowTemplate(tracks, fields);
     fieldRow.append(el('div', { class: 'pattern-grid__corner', 'aria-hidden': 'true' }));
 
     tracks.forEach((track, channel) => {
-      const labels = [
-        ['note', t('pattern.columnNote')],
-        ['instrument', t('pattern.columnInstrument')],
-        ['volume', t('pattern.columnVolume')],
-      ];
+      const labels = fields.map((field) => [
+        field,
+        t({
+          note: 'pattern.columnNote',
+          instrument: 'pattern.columnInstrument',
+          volume: 'pattern.columnVolume',
+          delay: 'pattern.columnDelay',
+        }[field]),
+      ]);
       labels.forEach(([field, label], fieldIndex) => {
         fieldRow.append(el('div', {
           class: `pattern-grid__field-header pattern-grid__field-header--${field}`,
           role: 'columnheader',
-          'aria-colindex': String(channel * FIELDS.length + fieldIndex + 1),
+          'aria-colindex': String(channel * fields.length + fieldIndex + 1),
           dataset: { channel: String(channel), field },
           text: label,
         }));
@@ -495,7 +518,7 @@ export function createPatternView({
           rowNode.append(el('div', {
             class: `pattern-grid__cell pattern-grid__cell--${field}${blockSelected ? ' is-block-selected' : ''}${selected ? ' is-cursor' : ''}`,
             role: 'gridcell',
-            'aria-colindex': String(channel * FIELDS.length + fieldIndex + 1),
+            'aria-colindex': String(channel * fields.length + fieldIndex + 1),
             'aria-selected': selected || blockSelected ? 'true' : 'false',
             dataset: {
               action: 'pattern-cell',
