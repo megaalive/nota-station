@@ -15,6 +15,92 @@ export function patternUsageCount(project, patternId) {
   );
 }
 
+const SECTION_COLORS = Object.freeze([
+  '#2563EB',
+  '#7C3AED',
+  '#DB2777',
+  '#EA580C',
+  '#16A34A',
+  '#0891B2',
+]);
+
+export function addSection(
+  project,
+  {
+    name,
+    color = SECTION_COLORS[project.song.sections.length % SECTION_COLORS.length],
+  },
+  { idFactory = makeId, now = isoNow } = {},
+) {
+  const normalizedName = String(name ?? '').trim();
+  if (normalizedName.length < 1 || normalizedName.length > 80) {
+    throw projectError(
+      'E_PROJECT_SECTION_NAME',
+      'Nama Section harus berisi 1..80 karakter.',
+    );
+  }
+  if (typeof color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(color)) {
+    throw projectError(
+      'E_PROJECT_SECTION_COLOR',
+      `Warna Section harus hex #RRGGBB: ${color}`,
+    );
+  }
+
+  const section = {
+    id: idFactory('section'),
+    name: normalizedName,
+    color: color.toUpperCase(),
+  };
+
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      sections: [...project.song.sections, section],
+    },
+  };
+}
+
+export function assignOrderEntrySection(
+  project,
+  { orderEntryId, sectionId },
+  { now = isoNow } = {},
+) {
+  const orderIndex = project.song.order.findIndex((entry) => entry.id === orderEntryId);
+  if (orderIndex < 0) {
+    throw projectError(
+      'E_PROJECT_ORDER_MISSING',
+      `OrderEntry tidak ditemukan: ${orderEntryId}`,
+    );
+  }
+  if (
+    sectionId !== null
+    && !project.song.sections.some((section) => section.id === sectionId)
+  ) {
+    throw projectError(
+      'E_PROJECT_SECTION_MISSING',
+      `Section tidak ditemukan: ${sectionId}`,
+    );
+  }
+
+  const current = project.song.order[orderIndex];
+  if ((current.sectionId ?? null) === sectionId) return project;
+
+  const order = project.song.order.map((entry, index) => (
+    index === orderIndex ? { ...entry, sectionId } : entry
+  ));
+
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      order,
+    },
+  };
+}
+
 export function insertOrderEntry(
   project,
   {
