@@ -3,11 +3,46 @@ import { test, expect } from '@playwright/test';
 import { gotoApp } from './helpers.js';
 
 test.describe('Timing FX audio R3-S8B', () => {
-  test('scheduleSourceCut benar-benar memotong sumber pada OfflineAudioContext', async ({ page }) => {
+  test('delay dan cut audible deterministik pada OfflineAudioContext', async ({ page }) => {
     await gotoApp(page);
 
     const result = await page.evaluate(async () => {
+      const {
+        cutEffectEventTemplates,
+        patternEventTemplates,
+      } = await import('./src/audio/scheduler.js');
       const { scheduleSourceCut } = await import('./src/audio/timing-effects.js');
+
+      const pattern = {
+        lengthTicks: 1920,
+        notes: [{
+          id: 'note-offline',
+          trackId: 'track-offline',
+          startTickLocal: 0,
+          durationTicks: 960,
+          pitch: 60,
+          velocity: 100,
+        }],
+        effects: [
+          {
+            id: 'fx-delay-offline',
+            trackId: 'track-offline',
+            tickLocal: 0,
+            type: 'delay',
+            value: { ticks: 60 },
+          },
+          {
+            id: 'fx-cut-offline',
+            trackId: 'track-offline',
+            tickLocal: 0,
+            type: 'cut',
+            value: { afterTicks: 180 },
+          },
+        ],
+      };
+
+      const [noteEvent] = patternEventTemplates(pattern, 120);
+      const [cutEvent] = cutEffectEventTemplates(pattern, 120);
       const sampleRate = 48000;
       const context = new OfflineAudioContext(1, sampleRate, sampleRate);
       const buffer = context.createBuffer(1, sampleRate, sampleRate);
@@ -16,15 +51,17 @@ test.describe('Timing FX audio R3-S8B', () => {
       const source = context.createBufferSource();
       source.buffer = buffer;
       source.connect(context.destination);
-      source.start(0);
+      source.start(noteEvent.offsetSeconds);
       scheduleSourceCut(source, {
-        when: 0.1,
+        when: cutEvent.offsetSeconds,
         currentTime: 0,
       });
 
       const rendered = await context.startRendering();
       const data = rendered.getChannelData(0);
-      const rms = (start, end) => {
+      const rms = (startSeconds, endSeconds) => {
+        const start = Math.floor(sampleRate * startSeconds);
+        const end = Math.floor(sampleRate * endSeconds);
         let sum = 0;
         let count = 0;
         for (let i = start; i < end; i += 1) {
@@ -35,16 +72,30 @@ test.describe('Timing FX audio R3-S8B', () => {
       };
 
       return {
-        before: rms(0, Math.floor(sampleRate * 0.08)),
-        after: rms(Math.floor(sampleRate * 0.2), Math.floor(sampleRate * 0.4)),
+        delayTicks: noteEvent.delayTicks,
+        noteOffset: noteEvent.offsetSeconds,
+        cutTick: cutEvent.startTickLocal,
+        cutOffset: cutEvent.offsetSeconds,
+        before: rms(0.0, 0.04),
+        sounding: rms(0.08, 0.15),
+        after: rms(0.25, 0.35),
       };
     });
 
-    expect(result.before).toBeGreaterThan(0.1);
+    expect(result.delayTicks).toBe(60);
+    expect(result.cutTick).toBe(180);
+    expect(result.noteOffset).toBeCloseTo(60 / 960, 6);
+    expect(result.cutOffset).toBeCloseTo(180 / 960, 6);
+    expect(result.before).toBeLessThan(0.001);
+    expect(result.sounding).toBeGreaterThan(0.1);
     expect(result.after).toBeLessThan(0.001);
   });
 
-  test('engine menerapkan delay onset dan cut pada playback nyata', async ({ page }) => {
+  test('engine realtime menerapkan delay onset dan cut saat audio clock running', async ({ page }, testInfo) => {
+    test.skip(
+      testInfo.project.name === 'firefox',
+      'Firefox headless GitHub Actions mempertahankan realtime AudioContext suspended; bukti audible lintas-browser ada pada OfflineAudioContext test.',
+    );
     await gotoApp(page);
 
     const setup = await page.evaluate(() => {
