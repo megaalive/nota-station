@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   LIVE_EDIT_FREEZE_SECONDS,
+  createCutScheduleCursor,
   createEffectScheduleCursor,
   createMetronomeScheduleCursor,
   createPatternScheduleCursor,
@@ -117,6 +118,58 @@ test('posisi transport berasal dari audio clock dan wrap saat loop', () => {
   assert.equal(transportTickAtAudioTime({ ...common, nowAudioTime: 5.5 }), 960);
   assert.equal(transportTickAtAudioTime({ ...common, nowAudioTime: 13.5, loop: true }), 960);
   assert.equal(transportTickAtAudioTime({ ...common, nowAudioTime: 30, loop: false }), 7680);
+});
+
+test('delay EffectEvent menggeser onset scheduler tanpa mengubah note kanonik', () => {
+  const pattern = {
+    ...patternFixture(),
+    effects: [{
+      id: 'fx-delay',
+      trackId: 't1',
+      tickLocal: 0,
+      type: 'delay',
+      value: { ticks: 30 },
+    }],
+  };
+  const original = structuredClone(pattern.notes);
+  const events = patternEventTemplates(pattern, 120);
+
+  assert.equal(events[0].id, 'n1');
+  assert.equal(events[0].sourceStartTickLocal, 0);
+  assert.equal(events[0].startTickLocal, 30);
+  assert.equal(events[0].delayTicks, 30);
+  assert.equal(events[0].offsetSeconds, 30 / 960);
+  assert.deepEqual(pattern.notes, original);
+});
+
+test('cut cursor memakai tick efektif effect.tickLocal + afterTicks', () => {
+  const pattern = {
+    ...patternFixture(),
+    effects: [
+      {
+        id: 'fx-cut-1',
+        trackId: 't1',
+        tickLocal: 120,
+        type: 'cut',
+        value: { afterTicks: 60 },
+      },
+      {
+        id: 'fx-volume',
+        trackId: 't1',
+        tickLocal: 100,
+        type: 'volume',
+        value: { level: 80 },
+      },
+    ],
+  };
+  const cursor = createCutScheduleCursor(pattern, 120);
+  const due = cursor.drainUntil(5, 5.3);
+
+  assert.equal(cursor.eventCount, 1);
+  assert.deepEqual(
+    due.map((event) => [event.id, event.startTickLocal, event.when]),
+    [['fx-cut-1', 180, 5.1875]],
+  );
 });
 
 test('EffectEvent timeline deterministik berdasarkan tick track type id', () => {
