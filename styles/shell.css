@@ -635,6 +635,7 @@
 
 .pattern-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   min-height: 40px;
@@ -672,6 +673,41 @@
 .pattern-toolbar__hint {
   margin-inline-start: auto;
   color: var(--text-2);
+}
+
+.pattern-fx-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 2px 4px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-1);
+  background: var(--surface-1);
+}
+
+.pattern-fx-editor[hidden] {
+  display: none;
+}
+
+.pattern-fx-editor__type {
+  width: 62px;
+}
+
+.pattern-fx-editor__param {
+  width: 150px;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border-1);
+  border-radius: 3px;
+  background: var(--surface-1);
+  color: var(--text-1);
+  font: 0.78rem/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.pattern-fx-editor__param:disabled,
+.pattern-fx-editor__type:disabled {
+  opacity: 0.6;
 }
 
 .pattern-grid {
@@ -830,8 +866,17 @@
 }
 
 .pattern-grid__field-header--volume,
-.pattern-grid__cell--volume {
+.pattern-grid__cell--volume,
+.pattern-grid__field-header--param,
+.pattern-grid__cell--param {
   border-right-width: 2px;
+}
+
+.pattern-grid__cell--effect,
+.pattern-grid__cell--param {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pattern-grid__rows {
