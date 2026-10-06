@@ -20,6 +20,7 @@ import {
   SCHEDULE_AHEAD_SECONDS,
   SCHEDULER_WAKE_MS,
   createCutScheduleCursor,
+  createEffectScheduleCursor,
   createMetronomeScheduleCursor,
   createMixEffectScheduleCursor,
   createPatternScheduleCursor,
@@ -29,6 +30,7 @@ import {
   secondsPerTick,
   transportTickAtAudioTime,
 } from './scheduler.js';
+import { scheduleFinitePitchEffect } from './pitch-effects.js';
 import { sampleOffsetSeconds } from './source-note-effects.js';
 import { scheduleSourceCut } from './timing-effects.js';
 import {
@@ -226,6 +228,51 @@ export function createAudioEngine({
       }
     }
     return stopped;
+  }
+
+  function scheduleTrackFinitePitchEffect(effect, when) {
+    if (!playback || !context) return { applied: 0, unsupported: 0 };
+
+    let applied = 0;
+    let unsupported = 0;
+    const tickSeconds = secondsPerTick(playback.tempo);
+
+    for (const [, scheduled] of activeSources) {
+      if (scheduled.kind !== 'note') continue;
+      if (scheduled.trackId !== effect.trackId) continue;
+      if (scheduled.cycle !== effect.cycle) continue;
+      if (scheduled.when > when) continue;
+      if (!Number.isFinite(scheduled.noteEndAt) || scheduled.noteEndAt <= when) continue;
+
+      if (
+        !scheduled.pitchParam
+        || !Number.isFinite(scheduled.pitchBaseRate)
+        || !Number.isFinite(scheduled.pitch)
+      ) {
+        unsupported += 1;
+        continue;
+      }
+
+      const result = scheduleFinitePitchEffect(
+        scheduled.pitchParam,
+        effect,
+        {
+          when,
+          currentTime: context.currentTime,
+          baseRate: scheduled.pitchBaseRate,
+          basePitch: scheduled.pitch,
+          voiceEndTime: scheduled.noteEndAt,
+          tickSeconds,
+          priorState: scheduled.pitchAutomation ?? null,
+        },
+      );
+      if (!result.applied) continue;
+
+      scheduled.pitchAutomation = result.state;
+      applied += 1;
+    }
+
+    return { applied, unsupported };
   }
 
   function chokeActiveGroup(chokeGroup, when) {
@@ -458,6 +505,10 @@ export function createAudioEngine({
         sourceNoteId,
         retriggerIndex,
         sampleOffsetFrames,
+        noteEndAt: when + Math.max(0.01, durationSeconds),
+        pitchParam: null,
+        pitchBaseRate: null,
+        pitchAutomation: null,
       });
       return true;
     }
@@ -486,7 +537,8 @@ export function createAudioEngine({
     const source = context.createBufferSource();
     const gain = context.createGain();
     source.buffer = buffer;
-    source.playbackRate.setValueAtTime(2 ** ((pitch - ROOT_PITCH) / 12), when);
+    const pitchBaseRate = 2 ** ((pitch - ROOT_PITCH) / 12);
+    source.playbackRate.setValueAtTime(pitchBaseRate, when);
 
     const level = Math.max(0.0001, Math.min(1, velocity / 127) * 0.75);
     gain.gain.setValueAtTime(level, when);
@@ -505,6 +557,10 @@ export function createAudioEngine({
       sourceNoteId,
       retriggerIndex,
       sampleOffsetFrames,
+      noteEndAt: when + Math.max(0.01, durationSeconds),
+      pitchParam: source.playbackRate,
+      pitchBaseRate,
+      pitchAutomation: null,
     });
     const offsetSeconds = sampleOffsetSeconds(
       sampleOffsetFrames,
@@ -598,6 +654,10 @@ export function createAudioEngine({
       sourceNoteId,
       retriggerIndex,
       sampleOffsetFrames,
+      noteEndAt: noteOff,
+      pitchParam: source.playbackRate,
+      pitchBaseRate: voiceProfile.playbackRate,
+      pitchAutomation: null,
     });
     const offsetSeconds = sampleOffsetSeconds(
       sampleOffsetFrames,
@@ -728,6 +788,11 @@ export function createAudioEngine({
         loop: loopEnabled,
         startTick: normalizedTick,
       }),
+      pitchAnchor: anchor,
+      pitchCursor: createEffectScheduleCursor(pattern, tempo, {
+        loop: loopEnabled,
+        startTick: normalizedTick,
+      }),
       metronomeCursor: metronomeEnabled
         ? createMetronomeScheduleCursor(pattern, tempo, {
           loop: loopEnabled,
@@ -749,6 +814,11 @@ export function createAudioEngine({
       retriggerStopsScheduled: 0,
       sampleOffsetNotesScheduled: 0,
       sampleOffsetSilenced: 0,
+      pitchEffectsScheduled: 0,
+      pitchSlideEffectsScheduled: 0,
+      portaEffectsScheduled: 0,
+      pitchVoicesAutomated: 0,
+      pitchUnsupportedVoices: 0,
       clicksScheduled: 0,
       instrumentIdsScheduled: new Set(),
     };
@@ -863,6 +933,19 @@ export function createAudioEngine({
       if (mixEvent.type === 'pan') playback.panEffectsScheduled += 1;
     }
 
+    const pitchHorizon = now + Math.max(0, LIVE_EDIT_FREEZE_SECONDS - 0.000001);
+    for (const pitchEvent of playback.pitchCursor.drainUntil(playback.pitchAnchor, pitchHorizon)) {
+      if (pitchEvent.type !== 'pitchSlide' && pitchEvent.type !== 'porta') continue;
+
+      const when = Math.max(pitchEvent.when, now + 0.001);
+      const result = scheduleTrackFinitePitchEffect(pitchEvent, when);
+      playback.pitchEffectsScheduled += 1;
+      playback.pitchVoicesAutomated += result.applied;
+      playback.pitchUnsupportedVoices += result.unsupported;
+      if (pitchEvent.type === 'pitchSlide') playback.pitchSlideEffectsScheduled += 1;
+      if (pitchEvent.type === 'porta') playback.portaEffectsScheduled += 1;
+    }
+
     if (playback.metronomeCursor) {
       for (const click of playback.metronomeCursor.drainUntil(playback.anchor, horizon)) {
         scheduleClick({
@@ -943,6 +1026,11 @@ export function createAudioEngine({
     });
     playback.mixAnchor = rebuildAudioTime;
     playback.mixCursor = createMixEffectScheduleCursor(pattern, playback.tempo, {
+      loop: playback.loop,
+      startTick: freezeTick,
+    });
+    playback.pitchAnchor = rebuildAudioTime;
+    playback.pitchCursor = createEffectScheduleCursor(pattern, playback.tempo, {
       loop: playback.loop,
       startTick: freezeTick,
     });
@@ -1090,6 +1178,11 @@ export function createAudioEngine({
       retriggerStopsScheduled: playback?.retriggerStopsScheduled ?? 0,
       sampleOffsetNotesScheduled: playback?.sampleOffsetNotesScheduled ?? 0,
       sampleOffsetSilenced: playback?.sampleOffsetSilenced ?? 0,
+      pitchEffectsScheduled: playback?.pitchEffectsScheduled ?? 0,
+      pitchSlideEffectsScheduled: playback?.pitchSlideEffectsScheduled ?? 0,
+      portaEffectsScheduled: playback?.portaEffectsScheduled ?? 0,
+      pitchVoicesAutomated: playback?.pitchVoicesAutomated ?? 0,
+      pitchUnsupportedVoices: playback?.pitchUnsupportedVoices ?? 0,
       clicksScheduled: playback?.clicksScheduled ?? 0,
       scheduledInstrumentIds: playback
         ? [...playback.instrumentIdsScheduled].sort()
