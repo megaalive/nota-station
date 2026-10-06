@@ -1517,6 +1517,7 @@ async function boot() {
             channelCount: patternClipboard.channelCount,
           }
         : null,
+      patternUi: patternView?.getUiState() ?? null,
       project: {
         id: project.id,
         patternId: focusedPattern(project).id,
