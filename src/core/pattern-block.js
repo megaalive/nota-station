@@ -154,6 +154,219 @@ export function pastePatternBlock(
   return replacePatternNotes(project, patternIndex, pattern, notes, now);
 }
 
+export function insertPatternRows(
+  project,
+  {
+    patternId,
+    row,
+    count = 1,
+    channelStart,
+    channelEnd,
+  },
+  { now = isoNow } = {},
+) {
+  const { pattern, patternIndex, tracks } = resolvePattern(project, patternId);
+  const rowCount = pattern.lengthTicks / pattern.rowTicks;
+  validateRowOperation(row, count, rowCount);
+  validateIndex(channelStart, 0, tracks.length - 1, 'channelStart');
+  validateIndex(channelEnd, 0, tracks.length - 1, 'channelEnd');
+
+  const firstChannel = Math.min(channelStart, channelEnd);
+  const lastChannel = Math.max(channelStart, channelEnd);
+  const selectedTrackIds = new Set(
+    tracks.slice(firstChannel, lastChannel + 1).map((track) => track.id),
+  );
+  const atTick = row * pattern.rowTicks;
+  const delta = count * pattern.rowTicks;
+
+  const notes = [];
+  let changed = false;
+
+  for (const note of pattern.notes) {
+    if (!selectedTrackIds.has(note.trackId)) {
+      notes.push(note);
+      continue;
+    }
+
+    const start = note.startTickLocal;
+    const end = start + note.durationTicks;
+    if (start >= atTick) {
+      const nextStart = start + delta;
+      if (nextStart >= pattern.lengthTicks) {
+        changed = true;
+        continue;
+      }
+      const nextEnd = Math.min(pattern.lengthTicks, end + delta);
+      notes.push({
+        ...note,
+        startTickLocal: nextStart,
+        durationTicks: nextEnd - nextStart,
+      });
+      changed = true;
+      continue;
+    }
+
+    if (end > atTick) {
+      const nextEnd = Math.min(pattern.lengthTicks, end + delta);
+      notes.push({
+        ...note,
+        durationTicks: nextEnd - start,
+      });
+      changed = true;
+      continue;
+    }
+
+    notes.push(note);
+  }
+
+  if (!changed) return project;
+  notes.sort(compareNotes);
+  return replacePatternNotes(project, patternIndex, pattern, notes, now);
+}
+
+export function deletePatternRows(
+  project,
+  {
+    patternId,
+    row,
+    count = 1,
+    channelStart,
+    channelEnd,
+  },
+  { now = isoNow } = {},
+) {
+  const { pattern, patternIndex, tracks } = resolvePattern(project, patternId);
+  const rowCount = pattern.lengthTicks / pattern.rowTicks;
+  validateRowOperation(row, count, rowCount);
+  validateIndex(channelStart, 0, tracks.length - 1, 'channelStart');
+  validateIndex(channelEnd, 0, tracks.length - 1, 'channelEnd');
+
+  const firstChannel = Math.min(channelStart, channelEnd);
+  const lastChannel = Math.max(channelStart, channelEnd);
+  const selectedTrackIds = new Set(
+    tracks.slice(firstChannel, lastChannel + 1).map((track) => track.id),
+  );
+  const atTick = row * pattern.rowTicks;
+  const delta = count * pattern.rowTicks;
+  const deleteEnd = atTick + delta;
+
+  const notes = [];
+  let changed = false;
+
+  for (const note of pattern.notes) {
+    if (!selectedTrackIds.has(note.trackId)) {
+      notes.push(note);
+      continue;
+    }
+
+    const start = note.startTickLocal;
+    const end = start + note.durationTicks;
+
+    if (start >= deleteEnd) {
+      notes.push({
+        ...note,
+        startTickLocal: start - delta,
+      });
+      changed = true;
+      continue;
+    }
+
+    if (start >= atTick) {
+      changed = true;
+      continue;
+    }
+
+    if (end > atTick) {
+      const nextEnd = end <= deleteEnd ? atTick : end - delta;
+      if (nextEnd > start) {
+        notes.push({
+          ...note,
+          durationTicks: nextEnd - start,
+        });
+      }
+      changed = true;
+      continue;
+    }
+
+    notes.push(note);
+  }
+
+  if (!changed) return project;
+  notes.sort(compareNotes);
+  return replacePatternNotes(project, patternIndex, pattern, notes, now);
+}
+
+export function interpolatePatternVelocity(
+  project,
+  {
+    patternId,
+    rowStart,
+    rowEnd,
+    channelStart,
+    channelEnd,
+  },
+  { now = isoNow } = {},
+) {
+  const { pattern, patternIndex, tracks, bounds } = resolveBlock(
+    project,
+    { patternId, rowStart, rowEnd, channelStart, channelEnd },
+  );
+  const startTick = bounds.rowStart * pattern.rowTicks;
+  const endTick = (bounds.rowEnd + 1) * pattern.rowTicks;
+  const selectedTrackIds = new Set(
+    tracks.slice(bounds.channelStart, bounds.channelEnd + 1).map((track) => track.id),
+  );
+
+  const groups = new Map();
+  for (const note of pattern.notes) {
+    if (
+      !selectedTrackIds.has(note.trackId)
+      || note.startTickLocal < startTick
+      || note.startTickLocal >= endTick
+    ) {
+      continue;
+    }
+    const key = `${note.trackId}|${voiceLaneOf(note)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(note);
+  }
+
+  const velocityById = new Map();
+  for (const group of groups.values()) {
+    group.sort((a, b) => a.startTickLocal - b.startTickLocal || a.id.localeCompare(b.id));
+    const first = group[0];
+    const last = group[group.length - 1];
+    if (!first || !last || first.startTickLocal === last.startTickLocal) continue;
+
+    const span = last.startTickLocal - first.startTickLocal;
+    for (const note of group) {
+      const ratio = (note.startTickLocal - first.startTickLocal) / span;
+      const velocity = Math.max(
+        0,
+        Math.min(
+          127,
+          Math.round(first.velocity + (last.velocity - first.velocity) * ratio),
+        ),
+      );
+      velocityById.set(note.id, velocity);
+    }
+  }
+
+  if (velocityById.size === 0) return project;
+
+  let changed = false;
+  const notes = pattern.notes.map((note) => {
+    if (!velocityById.has(note.id)) return note;
+    const velocity = velocityById.get(note.id);
+    if (velocity === note.velocity) return note;
+    changed = true;
+    return { ...note, velocity };
+  });
+
+  if (!changed) return project;
+  return replacePatternNotes(project, patternIndex, pattern, notes, now);
+}
+
 export function transposePatternBlock(
   project,
   {
@@ -212,6 +425,16 @@ export function transposePatternBlock(
   ));
 
   return replacePatternNotes(project, patternIndex, pattern, notes, now);
+}
+
+function validateRowOperation(row, count, rowCount) {
+  validateIndex(row, 0, rowCount - 1, 'row');
+  if (!Number.isInteger(count) || count < 1 || row + count > rowCount) {
+    throw projectError(
+      'E_PATTERN_ROW_RANGE',
+      `Jumlah row di luar Pattern: row=${row}, count=${count}`,
+    );
+  }
 }
 
 function resolveBlock(project, {
