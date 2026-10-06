@@ -246,6 +246,7 @@ export function createPatternView({
     if (pending) {
       runPatternCommand(pending.id, pending.args, pending.onSuccess);
     }
+    scroller.focus({ preventScroll: true });
   }
 
   function resolveSharedMakeUnique() {
@@ -268,6 +269,7 @@ export function createPatternView({
         pending.onSuccess,
       );
     }
+    scroller.focus({ preventScroll: true });
   }
 
   function projectInfo() {
