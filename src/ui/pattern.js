@@ -1276,7 +1276,7 @@ export function createPatternView({
     }
 
     const hexDigit = HEX_CODES.get(event.code);
-    if (hexDigit !== undefined && cursorField !== 'note') {
+    if (hexDigit !== undefined && ['instrument', 'volume'].includes(cursorField)) {
       event.preventDefault();
       handleHexInput(hexDigit);
       return;
