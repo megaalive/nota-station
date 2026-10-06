@@ -1160,7 +1160,12 @@ export function createPatternView({
     }
     if (event.code === 'Backspace') {
       event.preventDefault();
-      editRows('delete');
+      clearInputState();
+      if (cursorField === 'note' || blockSelection) {
+        editRows('delete');
+      } else {
+        syncStatus();
+      }
       return;
     }
     if (event.code === 'Delete') {
