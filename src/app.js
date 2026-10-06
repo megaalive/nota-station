@@ -8,6 +8,11 @@ import { createFocusStore, patternForFocus } from './core/focus.js';
 import { createSharedPatternGuard } from './core/shared-pattern-guard.js';
 import { quantizePatternCell } from './core/pattern-grid.js';
 import {
+  addPatternEffect,
+  deletePatternEffect,
+  updatePatternEffect,
+} from './core/effect-model.js';
+import {
   copyPatternBlock,
   deletePatternRows,
   insertPatternRows,
@@ -694,6 +699,53 @@ function registerCommands() {
         persistSessionSharedPatternGuardState();
         patternView?.refresh();
         return state;
+      },
+    },
+    {
+      id: 'pattern.addEffect',
+      group: 'Pattern',
+      labelKey: 'pattern.addEffect',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.addEffect', args);
+        requirePatternEditAllowed(args);
+        const nextProject = addPatternEffect(project, args);
+        const pattern = nextProject.song.patterns.find((item) => item.id === args.patternId);
+        const added = pattern.effects.find((effect) => (
+          effect.trackId === args.trackId
+          && effect.tickLocal === args.tickLocal
+          && effect.type === args.type
+        ));
+        commitPatternProject(nextProject, 'pattern.addEffect');
+        return { effect: structuredClone(added) };
+      },
+    },
+    {
+      id: 'pattern.updateEffect',
+      group: 'Pattern',
+      labelKey: 'pattern.updateEffect',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.updateEffect', args);
+        requirePatternEditAllowed(args);
+        const before = project;
+        const nextProject = updatePatternEffect(project, args);
+        commitPatternProject(nextProject, 'pattern.updateEffect');
+        return { changed: project !== before };
+      },
+    },
+    {
+      id: 'pattern.deleteEffect',
+      group: 'Pattern',
+      labelKey: 'pattern.deleteEffect',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.deleteEffect', args);
+        requirePatternEditAllowed(args);
+        const before = project;
+        const nextProject = deletePatternEffect(project, args);
+        commitPatternProject(nextProject, 'pattern.deleteEffect');
+        return { changed: project !== before };
       },
     },
     {
