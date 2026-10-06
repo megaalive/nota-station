@@ -3,6 +3,14 @@
 
 import { patternUsageCount } from '../core/arrangement.js';
 import {
+  EFFECT_UI,
+  effectCode,
+  formatEffectParam,
+  parseEffectParam,
+  summarizeEffects,
+} from '../core/effect-display.js';
+import { EFFECT_TYPES } from '../core/effect-model.js';
+import {
   findMatchingLpb,
   notesAtDisplayCell,
   patternHasOffGridNotes,
@@ -22,12 +30,16 @@ const NOTE_WIDTH = 64;
 const INST_WIDTH = 42;
 const VOL_WIDTH = 42;
 const DLY_WIDTH = 58;
+const FX_WIDTH = 72;
+const PARAM_WIDTH = 132;
 const BASE_FIELDS = ['note', 'instrument', 'volume'];
 const FIELD_WIDTHS = Object.freeze({
   note: NOTE_WIDTH,
   instrument: INST_WIDTH,
   volume: VOL_WIDTH,
   delay: DLY_WIDTH,
+  effect: FX_WIDTH,
+  param: PARAM_WIDTH,
 });
 const OVERSCAN = 4;
 
@@ -89,6 +101,8 @@ export function createPatternView({
   let blockSelection = null;
   let displayPatternId = null;
   let displayLpb = 4;
+  let fxColumnsPinned = false;
+  let selectedEffectType = 'volume';
   const trackUi = new Map();
 
   const modeButton = Button({
@@ -197,11 +211,80 @@ export function createPatternView({
     quantizeButton,
   ]);
 
+  const fxToggleButton = Button({
+    label: t('pattern.toggleFxColumns'),
+    variant: 'ghost',
+    onClick: () => toggleFxColumns(),
+  });
+  fxToggleButton.dataset.action = 'pattern-toggle-fx';
+
+  const effectTypeSelect = el('select', {
+    class: 'pattern-toolbar__select pattern-fx-editor__type',
+    'aria-label': t('pattern.effectType'),
+    dataset: { action: 'pattern-effect-type' },
+    on: {
+      change: () => {
+        selectedEffectType = effectTypeSelect.value;
+        syncEffectEditor();
+      },
+    },
+  }, EFFECT_TYPES.map((type) => el('option', {
+    value: type,
+    text: effectCode(type),
+  })));
+
+  const effectParamInput = el('input', {
+    class: 'pattern-fx-editor__param',
+    type: 'text',
+    spellcheck: 'false',
+    autocomplete: 'off',
+    'aria-label': t('pattern.effectParam'),
+    dataset: { action: 'pattern-effect-param' },
+    on: {
+      keydown: (event) => {
+        if (event.code === 'Enter') {
+          event.preventDefault();
+          applyEffectAtCursor();
+        } else if (event.code === 'Escape') {
+          event.preventDefault();
+          scroller.focus({ preventScroll: true });
+        }
+      },
+    },
+  });
+
+  const effectApplyButton = Button({
+    label: t('pattern.effectApply'),
+    variant: 'default',
+    onClick: () => applyEffectAtCursor(),
+  });
+  effectApplyButton.dataset.action = 'pattern-effect-apply';
+
+  const effectDeleteButton = Button({
+    label: t('pattern.effectDelete'),
+    variant: 'ghost',
+    onClick: () => deleteEffectAtCursor(),
+  });
+  effectDeleteButton.dataset.action = 'pattern-effect-delete';
+
+  const effectEditor = el('span', {
+    class: 'pattern-fx-editor',
+    dataset: { action: 'pattern-effect-editor' },
+  }, [
+    effectTypeSelect,
+    effectParamInput,
+    effectApplyButton,
+    effectDeleteButton,
+  ]);
+  effectEditor.hidden = true;
+
   const toolbar = el('div', { class: 'pattern-toolbar' }, [
     modeControl,
     octaveGroup,
     stepGroup,
     timingGroup,
+    fxToggleButton,
+    effectEditor,
     sharedPopover,
     hint,
   ]);
@@ -221,6 +304,182 @@ export function createPatternView({
   scroller.append(surface);
   root.textContent = '';
   root.append(toolbar, scroller);
+
+  function toggleFxColumns() {
+    const { pattern } = projectInfo();
+    fxColumnsPinned = !fxColumnsPinned;
+    if (!fxColumnsPinned && pattern.effects.length > 0) {
+      feedback = { key: 'pattern.fxDataVisible' };
+    } else {
+      feedback = null;
+    }
+    const { fields } = projectInfo();
+    if (!fields.includes(cursorField)) cursorField = 'note';
+    renderHeader();
+    renderWindow();
+    syncStatus();
+    syncEffectEditor();
+    scroller.focus({ preventScroll: true });
+  }
+
+  function effectsAtDisplayCell(pattern, { trackId, row, rowTicks }) {
+    const start = row * rowTicks;
+    const end = start + rowTicks;
+    return pattern.effects
+      .filter((effect) => (
+        effect.trackId === trackId
+        && effect.tickLocal >= start
+        && effect.tickLocal < end
+      ))
+      .sort((a, b) => (
+        a.tickLocal - b.tickLocal
+        || EFFECT_TYPES.indexOf(a.type) - EFFECT_TYPES.indexOf(b.type)
+        || a.id.localeCompare(b.id)
+      ));
+  }
+
+  function exactEffectsAtCursor() {
+    const { pattern, tracks, displayRowTicks } = projectInfo();
+    const track = tracks[cursorChannel];
+    if (!track) return [];
+    const tickLocal = cursorRow * displayRowTicks;
+    return pattern.effects.filter((effect) => (
+      effect.trackId === track.id && effect.tickLocal === tickLocal
+    ));
+  }
+
+  function selectedEffectAtCursor() {
+    return exactEffectsAtCursor().find((effect) => effect.type === selectedEffectType) ?? null;
+  }
+
+  function cursorHasOffGridEffect() {
+    const { pattern, tracks, displayRowTicks } = projectInfo();
+    const track = tracks[cursorChannel];
+    if (!track) return false;
+    return effectsAtDisplayCell(pattern, {
+      trackId: track.id,
+      row: cursorRow,
+      rowTicks: displayRowTicks,
+    }).some((effect) => effect.tickLocal % displayRowTicks !== 0);
+  }
+
+  function syncEffectEditor() {
+    const { pattern, showEffects, projectionOnly } = projectInfo();
+    effectEditor.hidden = !showEffects;
+    fxToggleButton.setAttribute('aria-pressed', showEffects ? 'true' : 'false');
+    if (!showEffects) return;
+
+    const cellEffects = exactEffectsAtCursor();
+    if (
+      cellEffects.length > 0
+      && !cellEffects.some((effect) => effect.type === selectedEffectType)
+    ) {
+      selectedEffectType = cellEffects[0].type;
+    }
+    effectTypeSelect.value = selectedEffectType;
+
+    const current = selectedEffectAtCursor();
+    effectParamInput.placeholder = EFFECT_UI[selectedEffectType]?.placeholder ?? '';
+    effectParamInput.value = current
+      ? formatEffectParam(current.type, current.value)
+      : '';
+
+    const readOnly = mode !== 'edit' || projectionOnly || cursorHasOffGridEffect();
+    effectTypeSelect.disabled = readOnly;
+    effectParamInput.disabled = readOnly;
+    effectApplyButton.disabled = readOnly;
+    effectDeleteButton.disabled = readOnly || !current;
+
+    effectEditor.dataset.patternId = pattern.id;
+    effectEditor.dataset.row = String(cursorRow);
+    effectEditor.dataset.channel = String(cursorChannel);
+  }
+
+  function applyEffectAtCursor() {
+    if (mode !== 'edit') return;
+    if (rejectProjectionMutation()) return;
+    if (cursorHasOffGridEffect()) {
+      feedback = { key: 'pattern.fxOffGridReadOnly' };
+      syncStatus();
+      return;
+    }
+
+    let value;
+    try {
+      value = parseEffectParam(selectedEffectType, effectParamInput.value);
+    } catch (error) {
+      feedback = {
+        key: 'pattern.effectParamInvalid',
+        vars: { message: error.message },
+      };
+      syncStatus();
+      return;
+    }
+
+    const { pattern, tracks, displayRowTicks } = projectInfo();
+    const track = tracks[cursorChannel];
+    const current = selectedEffectAtCursor();
+    const tickLocal = cursorRow * displayRowTicks;
+    const command = current ? 'pattern.updateEffect' : 'pattern.addEffect';
+    const args = current
+      ? {
+          patternId: pattern.id,
+          effectId: current.id,
+          value,
+        }
+      : {
+          patternId: pattern.id,
+          trackId: track.id,
+          tickLocal,
+          type: selectedEffectType,
+          value,
+        };
+
+    feedback = null;
+    runPatternCommand(command, args, () => {
+      fxColumnsPinned = true;
+      feedback = {
+        key: current ? 'pattern.effectUpdated' : 'pattern.effectAdded',
+        vars: { effect: effectCode(selectedEffectType) },
+      };
+      renderHeader();
+      renderWindow();
+      syncStatus();
+      syncEffectEditor();
+    });
+  }
+
+  function deleteEffectAtCursor() {
+    if (mode !== 'edit') return;
+    if (rejectProjectionMutation()) return;
+    if (cursorHasOffGridEffect()) {
+      feedback = { key: 'pattern.fxOffGridReadOnly' };
+      syncStatus();
+      return;
+    }
+
+    const current = selectedEffectAtCursor();
+    if (!current) {
+      feedback = { key: 'pattern.effectNothingToDelete' };
+      syncStatus();
+      return;
+    }
+
+    const { pattern } = projectInfo();
+    runPatternCommand('pattern.deleteEffect', {
+      patternId: pattern.id,
+      effectId: current.id,
+    }, () => {
+      feedback = {
+        key: 'pattern.effectDeleted',
+        vars: { effect: effectCode(current.type) },
+      };
+      renderHeader();
+      renderWindow();
+      syncStatus();
+      syncEffectEditor();
+    });
+  }
 
   function sharedPatternInfo() {
     const { project, pattern } = projectInfo();
@@ -337,15 +596,21 @@ export function createPatternView({
       blockSelection = null;
     }
     const displayRowTicks = rowTicksForLpb(displayLpb);
-    const fields = patternHasOffGridNotes(pattern, displayRowTicks)
-      ? [...BASE_FIELDS, 'delay']
-      : BASE_FIELDS;
+    const hasOffGrid = patternHasOffGridNotes(pattern, displayRowTicks)
+      || pattern.effects.some((effect) => effect.tickLocal % displayRowTicks !== 0);
+    const showEffects = fxColumnsPinned || pattern.effects.length > 0;
+    const fields = [
+      ...BASE_FIELDS,
+      ...(hasOffGrid ? ['delay'] : []),
+      ...(showEffects ? ['effect', 'param'] : []),
+    ];
     return {
       project,
       pattern,
       tracks: project.song.tracks,
       fields,
       displayRowTicks,
+      showEffects,
       projectionOnly: displayRowTicks !== pattern.rowTicks,
       rowCount: Math.ceil(pattern.lengthTicks / displayRowTicks),
     };
@@ -491,6 +756,8 @@ export function createPatternView({
           instrument: 'pattern.columnInstrument',
           volume: 'pattern.columnVolume',
           delay: 'pattern.columnDelay',
+          effect: 'pattern.columnEffect',
+          param: 'pattern.columnParam',
         }[field]),
       ]);
       labels.forEach(([field, label], fieldIndex) => {
@@ -568,6 +835,11 @@ export function createPatternView({
           row,
           rowTicks: displayRowTicks,
         });
+        const projectedEffects = effectsAtDisplayCell(pattern, {
+          trackId: track.id,
+          row,
+          rowTicks: displayRowTicks,
+        });
         const note = projectedNotes[0] ?? null;
         fields.forEach((field, fieldIndex) => {
           const selected = row === cursorRow && channel === cursorChannel && field === cursorField;
@@ -584,8 +856,24 @@ export function createPatternView({
               field,
               trackId: track.id,
             },
-            text: displayCellText(project, note, field, row, channel, projectedNotes),
-            title: cellTitle(project, note, field, row, channel, projectedNotes),
+            text: displayCellText(
+              project,
+              note,
+              field,
+              row,
+              channel,
+              projectedNotes,
+              projectedEffects,
+            ),
+            title: cellTitle(
+              project,
+              note,
+              field,
+              row,
+              channel,
+              projectedNotes,
+              projectedEffects,
+            ),
             on: {
               click: () => {
                 clearInputState();
@@ -596,6 +884,7 @@ export function createPatternView({
                 scroller.focus();
                 renderWindow();
                 syncStatus();
+                syncEffectEditor();
               },
             },
           }));
@@ -1190,19 +1479,36 @@ export function createPatternView({
       && getActivePattern(project).notes.length === 0;
   }
 
-  function displayCellText(project, note, field, row, channel, projectedNotes = []) {
+  function displayCellText(
+    project,
+    note,
+    field,
+    row,
+    channel,
+    projectedNotes = [],
+    projectedEffects = [],
+  ) {
     const track = project.song.tracks[channel];
     const pattern = getActivePattern(project);
-    const delays = projectedNotes.map(
-      (item) => projectNoteToDisplayGrid(item, projectInfo().displayRowTicks).delayTicks,
-    );
+    const displayRowTicks = projectInfo().displayRowTicks;
+    const delays = [
+      ...projectedNotes.map(
+        (item) => projectNoteToDisplayGrid(item, displayRowTicks).delayTicks,
+      ),
+      ...projectedEffects.map((effect) => effect.tickLocal % displayRowTicks),
+    ];
     const hasOffGrid = delays.some((delay) => delay !== 0);
 
     if (field === 'delay') {
-      if (projectedNotes.length === 0) return '··';
+      if (projectedNotes.length === 0 && projectedEffects.length === 0) return '··';
       const unique = [...new Set(delays)].sort((a, b) => a - b);
       if (unique.length === 1) return unique[0] === 0 ? '0t' : `+${unique[0]}t`;
       return `+${unique[0]}…+${unique[unique.length - 1]}`;
+    }
+
+    if (field === 'effect' || field === 'param') {
+      const summary = summarizeEffects(projectedEffects);
+      return field === 'effect' ? summary.fx : summary.param;
     }
 
     if (field === 'note' && track?.kind === 'drum') {
@@ -1239,16 +1545,30 @@ export function createPatternView({
     return `${text}${suffix}`;
   }
 
-  function cellTitle(project, note, field, row, channel, projectedNotes = []) {
+  function cellTitle(
+    project,
+    note,
+    field,
+    row,
+    channel,
+    projectedNotes = [],
+    projectedEffects = [],
+  ) {
     if (emptyFirstCell(project, note, field, row, channel)) {
       return t('pattern.emptyCellTitle');
     }
-    if (projectedNotes.length === 0) return null;
+    if (field === 'effect' || field === 'param') {
+      return summarizeEffects(projectedEffects).title;
+    }
+    if (projectedNotes.length === 0 && projectedEffects.length === 0) return null;
 
-    const pattern = getActivePattern(project);
-    const delays = projectedNotes.map(
-      (item) => projectNoteToDisplayGrid(item, projectInfo().displayRowTicks).delayTicks,
-    );
+    const displayRowTicks = projectInfo().displayRowTicks;
+    const delays = [
+      ...projectedNotes.map(
+        (item) => projectNoteToDisplayGrid(item, displayRowTicks).delayTicks,
+      ),
+      ...projectedEffects.map((effect) => effect.tickLocal % displayRowTicks),
+    ];
     const offGridCount = delays.filter((delay) => delay !== 0).length;
     if (offGridCount === 0) return null;
 
@@ -1259,9 +1579,14 @@ export function createPatternView({
   }
 
   function deleteCurrentEvent() {
+    if (mode !== 'edit') return;
+    if (cursorField === 'effect' || cursorField === 'param') {
+      deleteEffectAtCursor();
+      return;
+    }
     // Instrument dan velocity wajib ada pada NoteEvent, jadi Delete pada INST/VOL
     // tidak dimaknai "kosongkan field". Hanya NOTE yang menghapus seluruh event.
-    if (mode !== 'edit' || cursorField !== 'note') return;
+    if (cursorField !== 'note') return;
     if (rejectOffGridCellEdit()) return;
 
     const { pattern, tracks } = projectInfo();
@@ -1308,10 +1633,13 @@ export function createPatternView({
       });
     } else if (cursorField === 'delay') {
       hint.textContent = t('pattern.hintDelay');
+    } else if (cursorField === 'effect' || cursorField === 'param') {
+      hint.textContent = t('pattern.hintEffect');
     } else {
       hint.textContent = t('pattern.hintVolume');
     }
     syncTimingControls();
+    syncEffectEditor();
     onStatus?.({
       mode,
       octave,
@@ -1333,6 +1661,7 @@ export function createPatternView({
     syncSharedPatternBadge();
     syncTimingControls();
     syncStatus();
+    syncEffectEditor();
   }
 
   scroller.addEventListener('scroll', () => renderWindow());
@@ -1459,6 +1788,17 @@ export function createPatternView({
       deleteCurrentEvent();
       return;
     }
+    if (
+      event.code === 'Enter'
+      && (cursorField === 'effect' || cursorField === 'param')
+      && !effectEditor.hidden
+    ) {
+      event.preventDefault();
+      syncEffectEditor();
+      effectParamInput.focus();
+      effectParamInput.select();
+      return;
+    }
 
     const hexDigit = HEX_CODES.get(event.code);
     if (hexDigit !== undefined && ['instrument', 'volume'].includes(cursorField)) {
@@ -1504,6 +1844,8 @@ export function createPatternView({
       displayLpb,
       displayRowTicks: projectInfo().displayRowTicks,
       projectionOnly: projectInfo().projectionOnly,
+      fxColumnsVisible: projectInfo().showEffects,
+      selectedEffectType,
       selection: blockSelection ? { ...blockSelection } : null,
     }),
   };
