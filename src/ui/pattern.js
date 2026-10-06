@@ -479,13 +479,13 @@ export function createPatternView({
   }
 
   function renderWindow() {
-    const { project, pattern, tracks, rowCount } = projectInfo();
-    const width = ROW_NUMBER_WIDTH + tracks.length * CHANNEL_WIDTH;
+    const { project, pattern, tracks, fields, rowCount } = projectInfo();
+    const width = ROW_NUMBER_WIDTH + tracks.length * channelWidth(fields);
     const height = HEADER_HEIGHT + rowCount * ROW_HEIGHT;
     surface.style.width = `${width}px`;
     surface.style.height = `${height}px`;
     scroller.setAttribute('aria-rowcount', String(rowCount));
-    scroller.setAttribute('aria-colcount', String(tracks.length * FIELDS.length));
+    scroller.setAttribute('aria-colcount', String(tracks.length * fields.length));
 
     const viewportRows = Math.ceil((scroller.clientHeight || 420) / ROW_HEIGHT);
     const first = Math.max(0, Math.floor(Math.max(0, scroller.scrollTop - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN);
@@ -502,7 +502,7 @@ export function createPatternView({
         dataset: { row: String(row) },
       });
       rowNode.style.top = `${HEADER_HEIGHT + row * ROW_HEIGHT}px`;
-      rowNode.style.gridTemplateColumns = rowTemplate(tracks);
+      rowNode.style.gridTemplateColumns = rowTemplate(tracks, fields);
 
       rowNode.append(el('div', {
         class: 'pattern-grid__row-number',
@@ -511,8 +511,14 @@ export function createPatternView({
       }));
 
       tracks.forEach((track, channel) => {
-        const note = noteAtCell(project, { patternId: pattern.id, trackId: track.id, row });
-        FIELDS.forEach((field, fieldIndex) => {
+        const projectedNotes = notesAtDisplayCell(project, {
+          patternId: pattern.id,
+          trackId: track.id,
+          row,
+          rowTicks: pattern.rowTicks,
+        });
+        const note = projectedNotes[0] ?? null;
+        fields.forEach((field, fieldIndex) => {
           const selected = row === cursorRow && channel === cursorChannel && field === cursorField;
           const blockSelected = isBlockSelected(row, channel);
           rowNode.append(el('div', {
@@ -527,10 +533,8 @@ export function createPatternView({
               field,
               trackId: track.id,
             },
-            text: displayCellText(project, note, field, row, channel),
-            title: emptyFirstCell(project, note, field, row, channel)
-              ? t('pattern.emptyCellTitle')
-              : null,
+            text: displayCellText(project, note, field, row, channel, projectedNotes),
+            title: cellTitle(project, note, field, row, channel, projectedNotes),
             on: {
               click: () => {
                 clearInputState();
@@ -581,6 +585,7 @@ export function createPatternView({
   }
 
   function ensureCursorVisible() {
+    const { fields } = projectInfo();
     const top = HEADER_HEIGHT + cursorRow * ROW_HEIGHT;
     const bottom = top + ROW_HEIGHT;
     if (top < scroller.scrollTop + HEADER_HEIGHT) {
@@ -589,11 +594,11 @@ export function createPatternView({
       scroller.scrollTop = bottom - scroller.clientHeight;
     }
 
-    const fieldIndex = FIELDS.indexOf(cursorField);
-    const widths = [NOTE_WIDTH, INST_WIDTH, VOL_WIDTH];
+    const fieldIndex = Math.max(0, fields.indexOf(cursorField));
+    const widths = fields.map((field) => FIELD_WIDTHS[field]);
     const fieldOffset = widths.slice(0, fieldIndex).reduce((sum, width) => sum + width, 0);
     const fieldWidth = widths[fieldIndex];
-    const left = ROW_NUMBER_WIDTH + cursorChannel * CHANNEL_WIDTH + fieldOffset;
+    const left = ROW_NUMBER_WIDTH + cursorChannel * channelWidth(fields) + fieldOffset;
     const right = left + fieldWidth;
     const visibleLeft = scroller.scrollLeft + ROW_NUMBER_WIDTH;
     const visibleRight = scroller.scrollLeft + scroller.clientWidth;
@@ -660,14 +665,14 @@ export function createPatternView({
   function moveHorizontal(delta) {
     clearInputState();
     clearBlockSelection();
-    const { tracks } = projectInfo();
-    const fieldIndex = FIELDS.indexOf(cursorField);
+    const { tracks, fields } = projectInfo();
+    const fieldIndex = Math.max(0, fields.indexOf(cursorField));
     const flat = Math.max(
       0,
-      Math.min(tracks.length * FIELDS.length - 1, cursorChannel * FIELDS.length + fieldIndex + delta),
+      Math.min(tracks.length * fields.length - 1, cursorChannel * fields.length + fieldIndex + delta),
     );
-    cursorChannel = Math.floor(flat / FIELDS.length);
-    cursorField = FIELDS[flat % FIELDS.length];
+    cursorChannel = Math.floor(flat / fields.length);
+    cursorField = fields[flat % fields.length];
     renderWindow();
     ensureCursorVisible();
     syncStatus();
