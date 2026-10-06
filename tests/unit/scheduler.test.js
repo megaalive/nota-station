@@ -192,6 +192,7 @@ test('EffectEvent cursor mendukung seek dan loop tanpa duplikasi', () => {
     [
       ['fx-2', 0, 10],
       ['fx-1', 1, 17.625],
+      ['fx-2', 1, 18],
     ],
   );
 });
