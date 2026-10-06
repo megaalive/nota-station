@@ -741,6 +741,55 @@ export function createPatternView({
     });
   }
 
+  function rowOperationArgs({ allChannels = false } = {}) {
+    const { pattern, tracks } = projectInfo();
+    const bounds = selectionBoundsOrCursor();
+    return {
+      patternId: pattern.id,
+      row: bounds.rowStart,
+      count: bounds.rowEnd - bounds.rowStart + 1,
+      channelStart: allChannels ? 0 : bounds.channelStart,
+      channelEnd: allChannels ? tracks.length - 1 : bounds.channelEnd,
+    };
+  }
+
+  function editRows(action, { allChannels = false } = {}) {
+    if (mode !== 'edit') return;
+    const args = rowOperationArgs({ allChannels });
+    const id = action === 'insert' ? 'pattern.insertRows' : 'pattern.deleteRows';
+    runPatternCommand(id, args, () => {
+      feedback = {
+        key: action === 'insert' ? 'pattern.rowsInserted' : 'pattern.rowsDeleted',
+        vars: { count: args.count },
+      };
+      renderWindow();
+      syncStatus();
+    });
+  }
+
+  function interpolateVelocity() {
+    if (mode !== 'edit') return;
+    if (!blockSelection) {
+      feedback = { key: 'pattern.interpolateNeedsSelection' };
+      syncStatus();
+      return;
+    }
+
+    const { pattern } = projectInfo();
+    runPatternCommand('pattern.interpolateVelocity', {
+      patternId: pattern.id,
+      ...blockSelection,
+    }, (result) => {
+      feedback = {
+        key: result.changed
+          ? 'pattern.velocityInterpolated'
+          : 'pattern.velocityInterpolationNoop',
+      };
+      renderWindow();
+      syncStatus();
+    });
+  }
+
   function toggleMode() {
     clearInputState();
     mode = mode === 'edit' ? 'audition' : 'edit';
@@ -1023,6 +1072,21 @@ export function createPatternView({
       pasteBlock();
       return;
     }
+    if (event.ctrlKey && event.code === 'KeyJ') {
+      event.preventDefault();
+      interpolateVelocity();
+      return;
+    }
+    if (event.ctrlKey && event.code === 'Insert') {
+      event.preventDefault();
+      editRows('insert', { allChannels: true });
+      return;
+    }
+    if (event.ctrlKey && event.code === 'Backspace') {
+      event.preventDefault();
+      editRows('delete', { allChannels: true });
+      return;
+    }
     if (event.ctrlKey && event.code === 'ArrowUp') {
       event.preventDefault();
       transposeBlock(event.shiftKey ? 12 : 1);
@@ -1089,7 +1153,17 @@ export function createPatternView({
       moveHorizontal(1);
       return;
     }
-    if (event.code === 'Delete' || event.code === 'Backspace') {
+    if (event.code === 'Insert') {
+      event.preventDefault();
+      editRows('insert');
+      return;
+    }
+    if (event.code === 'Backspace') {
+      event.preventDefault();
+      editRows('delete');
+      return;
+    }
+    if (event.code === 'Delete') {
       event.preventDefault();
       clearInputState();
       deleteCurrentEvent();
