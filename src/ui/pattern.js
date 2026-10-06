@@ -3,9 +3,12 @@
 
 import { patternUsageCount } from '../core/arrangement.js';
 import {
+  findMatchingLpb,
   notesAtDisplayCell,
   patternHasOffGridNotes,
   projectNoteToDisplayGrid,
+  rowTicksForLpb,
+  SUPPORTED_LPB,
 } from '../core/pattern-grid.js';
 import { activePattern, noteAtCell, notesAtCell } from '../core/project.js';
 import { isDrumKitInstrument } from '../core/sound-model.js';
@@ -84,6 +87,8 @@ export function createPatternView({
   let sharedWarningDetails = null;
   let blockAnchor = null;
   let blockSelection = null;
+  let displayPatternId = null;
+  let displayLpb = 4;
   const trackUi = new Map();
 
   const modeButton = Button({
@@ -156,10 +161,47 @@ export function createPatternView({
   });
   sharedPopover.dataset.action = 'pattern-shared-popover';
 
+  const lpbSelect = el('select', {
+    class: 'pattern-toolbar__select',
+    'aria-label': t('pattern.resolution'),
+    dataset: { action: 'pattern-lpb' },
+    on: {
+      change: () => setDisplayLpb(Number(lpbSelect.value)),
+    },
+  }, SUPPORTED_LPB.map((lpb) => el('option', {
+    value: String(lpb),
+    text: `LPB ${lpb}`,
+  })));
+
+  const matchLpbButton = Button({
+    label: t('pattern.matchResolution'),
+    variant: 'ghost',
+    onClick: matchCurrentCellResolution,
+  });
+  matchLpbButton.dataset.action = 'pattern-match-lpb';
+
+  const quantizeButton = Button({
+    label: t('pattern.quantize'),
+    variant: 'ghost',
+    onClick: quantizeCurrentCell,
+  });
+  quantizeButton.dataset.action = 'pattern-quantize';
+
+  const timingGroup = el('span', {
+    class: 'pattern-toolbar__timing',
+    dataset: { action: 'pattern-timing-tools' },
+  }, [
+    el('span', { class: 'pattern-toolbar__timing-label', text: t('pattern.resolution') }),
+    lpbSelect,
+    matchLpbButton,
+    quantizeButton,
+  ]);
+
   const toolbar = el('div', { class: 'pattern-toolbar' }, [
     modeControl,
     octaveGroup,
     stepGroup,
+    timingGroup,
     sharedPopover,
     hint,
   ]);
@@ -288,7 +330,14 @@ export function createPatternView({
   function projectInfo() {
     const project = getProject();
     const pattern = getActivePattern(project);
-    const fields = patternHasOffGridNotes(pattern, pattern.rowTicks)
+    if (displayPatternId !== pattern.id) {
+      displayPatternId = pattern.id;
+      displayLpb = defaultLpbForPattern(pattern);
+      blockAnchor = null;
+      blockSelection = null;
+    }
+    const displayRowTicks = rowTicksForLpb(displayLpb);
+    const fields = patternHasOffGridNotes(pattern, displayRowTicks)
       ? [...BASE_FIELDS, 'delay']
       : BASE_FIELDS;
     return {
@@ -296,7 +345,9 @@ export function createPatternView({
       pattern,
       tracks: project.song.tracks,
       fields,
-      rowCount: pattern.lengthTicks / pattern.rowTicks,
+      displayRowTicks,
+      projectionOnly: displayRowTicks !== pattern.rowTicks,
+      rowCount: Math.ceil(pattern.lengthTicks / displayRowTicks),
     };
   }
 
@@ -479,7 +530,7 @@ export function createPatternView({
   }
 
   function renderWindow() {
-    const { project, pattern, tracks, fields, rowCount } = projectInfo();
+    const { project, pattern, tracks, fields, displayRowTicks, rowCount } = projectInfo();
     const width = ROW_NUMBER_WIDTH + tracks.length * channelWidth(fields);
     const height = HEADER_HEIGHT + rowCount * ROW_HEIGHT;
     surface.style.width = `${width}px`;
@@ -515,7 +566,7 @@ export function createPatternView({
           patternId: pattern.id,
           trackId: track.id,
           row,
-          rowTicks: pattern.rowTicks,
+          rowTicks: displayRowTicks,
         });
         const note = projectedNotes[0] ?? null;
         fields.forEach((field, fieldIndex) => {
@@ -572,9 +623,9 @@ export function createPatternView({
     latestTrackMeters = Array.isArray(audioState?.trackMeters) ? audioState.trackMeters : [];
     applyTrackMeters();
 
-    const { pattern, rowCount } = projectInfo();
+    const { displayRowTicks, rowCount } = projectInfo();
     const tick = Number(audioState?.positionTick) || 0;
-    const nextRow = Math.max(0, Math.min(rowCount - 1, Math.floor(tick / pattern.rowTicks)));
+    const nextRow = Math.max(0, Math.min(rowCount - 1, Math.floor(tick / displayRowTicks)));
     const nextState = audioState?.state ?? 'ready';
     const changed = nextRow !== playbackRow || nextState !== playbackState;
 
@@ -720,6 +771,7 @@ export function createPatternView({
   }
 
   function copyBlock() {
+    if (rejectProjectionMutation()) return;
     const { pattern } = projectInfo();
     const bounds = selectionBoundsOrCursor();
     const result = registry.execute('pattern.copyBlock', {
@@ -731,6 +783,7 @@ export function createPatternView({
   }
 
   function pasteBlock() {
+    if (rejectProjectionMutation()) return;
     if (mode !== 'edit') return;
     const { pattern, rowCount, tracks } = projectInfo();
     runPatternCommand('pattern.pasteBlock', {
@@ -752,6 +805,7 @@ export function createPatternView({
   }
 
   function transposeBlock(semitones) {
+    if (rejectProjectionMutation()) return;
     if (mode !== 'edit') return;
     const { pattern } = projectInfo();
     const bounds = selectionBoundsOrCursor();
@@ -782,6 +836,7 @@ export function createPatternView({
   }
 
   function editRows(action, { allChannels = false } = {}) {
+    if (rejectProjectionMutation()) return;
     if (mode !== 'edit') return;
     const args = rowOperationArgs({ allChannels });
     const id = action === 'insert' ? 'pattern.insertRows' : 'pattern.deleteRows';
@@ -796,6 +851,7 @@ export function createPatternView({
   }
 
   function interpolateVelocity() {
+    if (rejectProjectionMutation()) return;
     if (mode !== 'edit') return;
     if (!blockSelection) {
       feedback = { key: 'pattern.interpolateNeedsSelection' };
@@ -819,31 +875,148 @@ export function createPatternView({
   }
 
   function projectedNotesAt(row = cursorRow, channel = cursorChannel) {
-    const { project, pattern, tracks } = projectInfo();
+    const { project, pattern, tracks, displayRowTicks } = projectInfo();
     const track = tracks[channel];
     if (!track) return [];
     return notesAtDisplayCell(project, {
       patternId: pattern.id,
       trackId: track.id,
       row,
-      rowTicks: pattern.rowTicks,
+      rowTicks: displayRowTicks,
     });
   }
 
   function projectedCellHasOffGrid(row = cursorRow, channel = cursorChannel) {
-    const { pattern } = projectInfo();
+    const { displayRowTicks } = projectInfo();
     return projectedNotesAt(row, channel).some(
-      (note) => projectNoteToDisplayGrid(note, pattern.rowTicks).offGrid,
+      (note) => projectNoteToDisplayGrid(note, displayRowTicks).offGrid,
     );
   }
 
+  function rejectProjectionMutation() {
+    const { projectionOnly } = projectInfo();
+    if (!projectionOnly) return false;
+    pendingHex = null;
+    feedback = { key: 'pattern.projectionReadOnly' };
+    renderWindow();
+    syncStatus();
+    return true;
+  }
+
   function rejectOffGridCellEdit() {
+    if (rejectProjectionMutation()) return true;
     if (!projectedCellHasOffGrid()) return false;
     pendingHex = null;
     feedback = { key: 'pattern.offGridReadOnly' };
     renderWindow();
     syncStatus();
     return true;
+  }
+
+  function setDisplayLpb(nextLpb, { focusTick = null } = {}) {
+    if (!SUPPORTED_LPB.includes(nextLpb) || nextLpb === displayLpb) {
+      lpbSelect.value = String(displayLpb);
+      return;
+    }
+
+    const before = projectInfo();
+    const anchorTick = Number.isInteger(focusTick)
+      ? focusTick
+      : cursorRow * before.displayRowTicks;
+
+    displayLpb = nextLpb;
+    clearInputState();
+    clearBlockSelection();
+
+    const after = projectInfo();
+    cursorRow = Math.max(
+      0,
+      Math.min(after.rowCount - 1, Math.floor(anchorTick / after.displayRowTicks)),
+    );
+    if (!after.fields.includes(cursorField)) cursorField = 'note';
+
+    renderHeader();
+    renderWindow();
+    syncStatus();
+    ensureCursorVisible();
+  }
+
+  function matchCurrentCellResolution() {
+    const notes = projectedNotesAt();
+    if (notes.length === 0) {
+      feedback = { key: 'pattern.matchResolutionEmpty' };
+      syncStatus();
+      return;
+    }
+
+    const nextLpb = findMatchingLpb(
+      notes.map((note) => note.startTickLocal),
+      { currentLpb: displayLpb },
+    );
+    if (nextLpb === null) {
+      feedback = { key: 'pattern.matchResolutionUnavailable' };
+      syncStatus();
+      return;
+    }
+    if (nextLpb === displayLpb) {
+      feedback = { key: 'pattern.matchResolutionCurrent', vars: { lpb: displayLpb } };
+      syncStatus();
+      return;
+    }
+
+    const focusTick = notes[0].startTickLocal;
+    setDisplayLpb(nextLpb, { focusTick });
+    feedback = { key: 'pattern.matchResolutionApplied', vars: { lpb: nextLpb } };
+    syncStatus();
+  }
+
+  function quantizeCurrentCell() {
+    const { pattern, tracks, displayRowTicks } = projectInfo();
+    const track = tracks[cursorChannel];
+    const notes = projectedNotesAt().filter(
+      (note) => projectNoteToDisplayGrid(note, displayRowTicks).offGrid,
+    );
+    if (!track || notes.length === 0) {
+      feedback = { key: 'pattern.quantizeNothing' };
+      syncStatus();
+      return;
+    }
+
+    runPatternCommand('pattern.quantizeCell', {
+      patternId: pattern.id,
+      trackId: track.id,
+      row: cursorRow,
+      rowTicks: displayRowTicks,
+    }, (result) => {
+      feedback = {
+        key: result.changed ? 'pattern.quantized' : 'pattern.quantizeNothing',
+      };
+      const info = projectInfo();
+      if (!info.fields.includes(cursorField)) cursorField = 'note';
+      renderHeader();
+      renderWindow();
+      syncStatus();
+    });
+  }
+
+  function syncTimingControls() {
+    const { displayRowTicks, pattern, projectionOnly } = projectInfo();
+    lpbSelect.value = String(displayLpb);
+    timingGroup.dataset.projectionOnly = projectionOnly ? 'true' : 'false';
+
+    const notes = projectedNotesAt();
+    const hasOffGrid = notes.some(
+      (note) => projectNoteToDisplayGrid(note, displayRowTicks).offGrid,
+    );
+    matchLpbButton.disabled = !hasOffGrid;
+    quantizeButton.disabled = !hasOffGrid;
+
+    lpbSelect.title = projectionOnly
+      ? t('pattern.projectionOnlyTitle', {
+          lpb: displayLpb,
+          defaultLpb: defaultLpbForPattern(pattern),
+        })
+      : t('pattern.resolutionDefaultTitle', { lpb: displayLpb });
   }
 
   function toggleMode() {
@@ -1021,7 +1194,7 @@ export function createPatternView({
     const track = project.song.tracks[channel];
     const pattern = getActivePattern(project);
     const delays = projectedNotes.map(
-      (item) => projectNoteToDisplayGrid(item, pattern.rowTicks).delayTicks,
+      (item) => projectNoteToDisplayGrid(item, projectInfo().displayRowTicks).delayTicks,
     );
     const hasOffGrid = delays.some((delay) => delay !== 0);
 
@@ -1074,7 +1247,7 @@ export function createPatternView({
 
     const pattern = getActivePattern(project);
     const delays = projectedNotes.map(
-      (item) => projectNoteToDisplayGrid(item, pattern.rowTicks).delayTicks,
+      (item) => projectNoteToDisplayGrid(item, projectInfo().displayRowTicks).delayTicks,
     );
     const offGridCount = delays.filter((delay) => delay !== 0).length;
     if (offGridCount === 0) return null;
@@ -1112,7 +1285,8 @@ export function createPatternView({
     scroller.classList.toggle('is-audition', mode !== 'edit');
     octaveText.textContent = `${t('status.octave')} ${octave}`;
     stepText.textContent = `${t('status.step')} ${step}`;
-    const currentTrack = projectInfo().tracks[cursorChannel];
+    const currentInfo = projectInfo();
+    const currentTrack = currentInfo.tracks[cursorChannel];
     if (feedback) {
       hint.textContent = t(feedback.key, feedback.vars);
     } else if (blockSelection) {
@@ -1120,6 +1294,8 @@ export function createPatternView({
         rows: blockSelection.rowEnd - blockSelection.rowStart + 1,
         channels: blockSelection.channelEnd - blockSelection.channelStart + 1,
       });
+    } else if (currentInfo.projectionOnly) {
+      hint.textContent = t('pattern.projectionReadOnly');
     } else if (cursorField === 'note' && currentTrack?.kind === 'drum') {
       hint.textContent = t(mode === 'edit' ? 'pattern.hintDrum' : 'pattern.hintDrumAudition');
     } else if (mode !== 'edit') {
@@ -1135,7 +1311,15 @@ export function createPatternView({
     } else {
       hint.textContent = t('pattern.hintVolume');
     }
-    onStatus?.({ mode, octave, step, row: cursorRow });
+    syncTimingControls();
+    onStatus?.({
+      mode,
+      octave,
+      step,
+      row: cursorRow,
+      displayLpb,
+      displayRowTicks: currentInfo.displayRowTicks,
+    });
   }
 
   function refresh() {
@@ -1147,6 +1331,7 @@ export function createPatternView({
     renderHeader();
     renderWindow();
     syncSharedPatternBadge();
+    syncTimingControls();
     syncStatus();
   }
 
@@ -1316,6 +1501,9 @@ export function createPatternView({
       row: cursorRow,
       channel: cursorChannel,
       field: cursorField,
+      displayLpb,
+      displayRowTicks: projectInfo().displayRowTicks,
+      projectionOnly: projectInfo().projectionOnly,
       selection: blockSelection ? { ...blockSelection } : null,
     }),
   };
