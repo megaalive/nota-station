@@ -6,8 +6,11 @@ import {
   createCutScheduleCursor,
   createEffectScheduleCursor,
   createMetronomeScheduleCursor,
+  createMixEffectScheduleCursor,
   createPatternScheduleCursor,
   effectEventTemplates,
+  mixEffectEventTemplates,
+  mixEffectStateBeforeTick,
   isLiveEditMutable,
   liveEditFreezeTime,
   metronomeEventTemplates,
@@ -285,4 +288,111 @@ test('live-edit freeze window tepat 30 ms: di bawahnya beku, batasnya mutable', 
   assert.equal(isLiveEditMutable(10.029999, now), false);
   assert.equal(isLiveEditMutable(10.03, now), true);
   assert.equal(isLiveEditMutable(10.12, now), true);
+});
+
+
+test('mix FX cursor menaruh reset sebelum volume/pan tick 0 dan mengulang reset tiap cycle', () => {
+  const pattern = {
+    ...patternFixture(),
+    effects: [
+      {
+        id: 'fx-pan',
+        trackId: 't1',
+        tickLocal: 0,
+        type: 'pan',
+        value: { position: -32 },
+      },
+      {
+        id: 'fx-volume',
+        trackId: 't1',
+        tickLocal: 240,
+        type: 'volume',
+        value: { level: 64 },
+      },
+    ],
+  };
+
+  const templates = mixEffectEventTemplates(pattern, 120);
+  assert.deepEqual(
+    templates.map((event) => [event.kind, event.id, event.startTickLocal]),
+    [
+      ['mix-reset', 'mix-reset', 0],
+      ['mix-effect', 'fx-pan', 0],
+      ['mix-effect', 'fx-volume', 240],
+    ],
+  );
+
+  const cursor = createMixEffectScheduleCursor(pattern, 120, { loop: true });
+  const due = cursor.drainUntil(10, 18.01);
+  assert.deepEqual(
+    due.map((event) => [event.kind, event.id, event.cycle]),
+    [
+      ['mix-reset', 'mix-reset', 0],
+      ['mix-effect', 'fx-pan', 0],
+      ['mix-effect', 'fx-volume', 0],
+      ['mix-reset', 'mix-reset', 1],
+      ['mix-effect', 'fx-pan', 1],
+      ['mix-effect', 'fx-volume', 1],
+    ],
+  );
+});
+
+test('mixEffectStateBeforeTick merekonstruksi state terakhir sebelum seek tanpa mengambil event pada tick seek', () => {
+  const pattern = {
+    ...patternFixture(),
+    effects: [
+      {
+        id: 'v1',
+        trackId: 't1',
+        tickLocal: 120,
+        type: 'volume',
+        value: { level: 100 },
+      },
+      {
+        id: 'p1',
+        trackId: 't1',
+        tickLocal: 180,
+        type: 'pan',
+        value: { position: 24 },
+      },
+      {
+        id: 'v2',
+        trackId: 't1',
+        tickLocal: 480,
+        type: 'volume',
+        value: { level: 40 },
+      },
+      {
+        id: 'other',
+        trackId: 't2',
+        tickLocal: 200,
+        type: 'volume',
+        value: { level: 70 },
+      },
+    ],
+  };
+
+  assert.deepEqual(mixEffectStateBeforeTick(pattern, 480), [
+    { trackId: 't1', volume: 100, pan: 24 },
+    { trackId: 't2', volume: 70, pan: 0 },
+  ]);
+  assert.deepEqual(mixEffectStateBeforeTick(pattern, 481), [
+    { trackId: 't1', volume: 40, pan: 24 },
+    { trackId: 't2', volume: 70, pan: 0 },
+  ]);
+});
+
+test('mix FX tanpa volume/pan tidak membuat synthetic reset', () => {
+  const pattern = {
+    ...patternFixture(),
+    effects: [{
+      id: 'cut-only',
+      trackId: 't1',
+      tickLocal: 120,
+      type: 'cut',
+      value: { afterTicks: 60 },
+    }],
+  };
+  assert.deepEqual(mixEffectEventTemplates(pattern, 120), []);
+  assert.equal(createMixEffectScheduleCursor(pattern, 120).eventCount, 0);
 });
