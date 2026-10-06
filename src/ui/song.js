@@ -1,6 +1,6 @@
 import { patternUsageCount } from '../core/arrangement.js';
 import { el } from './dom.js';
-import { Button } from './kit.js';
+import { Button, Dialog } from './kit.js';
 
 export function createSongView({
   root,
@@ -21,6 +21,90 @@ export function createSongView({
     class: 'song-workspace__summary',
     dataset: { action: 'song-summary' },
   });
+
+  const sectionPreset = el('select', {
+    dataset: { action: 'song-section-preset' },
+    'aria-label': t('song.sectionPreset'),
+  }, [
+    ['Intro', 'song.sectionPresetIntro'],
+    ['Verse', 'song.sectionPresetVerse'],
+    ['Chorus', 'song.sectionPresetChorus'],
+    ['Bridge', 'song.sectionPresetBridge'],
+    ['Outro', 'song.sectionPresetOutro'],
+  ].map(([value, labelKey]) => el('option', {
+    value,
+    text: t(labelKey),
+  })));
+  sectionPreset.value = 'Verse';
+
+  const sectionName = el('input', {
+    type: 'text',
+    maxlength: '80',
+    dataset: { action: 'song-section-name' },
+    'aria-label': t('song.sectionName'),
+  });
+  sectionName.value = 'Verse';
+  sectionPreset.addEventListener('change', () => {
+    sectionName.value = sectionPreset.value;
+  });
+
+  const patternMode = el('select', {
+    dataset: { action: 'song-section-pattern-mode' },
+    'aria-label': t('song.sectionPatternAction'),
+  }, [
+    el('option', { value: 'new', text: t('song.sectionPatternNew') }),
+    el('option', { value: 'clone', text: t('song.sectionPatternClone') }),
+    el('option', { value: 'reuse', text: t('song.sectionPatternReuse') }),
+  ]);
+  patternMode.value = 'reuse';
+
+  const sourcePattern = el('select', {
+    dataset: { action: 'song-section-source-pattern' },
+    'aria-label': t('song.sectionSourcePattern'),
+  });
+
+  const sectionFeedback = el('div', {
+    class: 'song-section-dialog__feedback',
+    role: 'alert',
+    dataset: { action: 'song-section-feedback' },
+  });
+
+  const sectionDialogBody = el('div', {
+    class: 'song-section-dialog',
+  }, [
+    dialogField(t('song.sectionPreset'), sectionPreset),
+    dialogField(t('song.sectionName'), sectionName),
+    dialogField(t('song.sectionPatternAction'), patternMode),
+    dialogField(t('song.sectionSourcePattern'), sourcePattern),
+    sectionFeedback,
+  ]);
+
+  let sectionDialog;
+  const sectionCancel = Button({
+    label: t('song.sectionCancel'),
+    variant: 'ghost',
+    onClick: () => sectionDialog.close(),
+  });
+  sectionCancel.dataset.action = 'song-section-cancel';
+
+  const sectionCreate = Button({
+    label: t('song.sectionCreate'),
+    onClick: createSectionFromDialog,
+  });
+  sectionCreate.dataset.action = 'song-section-create';
+
+  sectionDialog = Dialog({
+    title: t('song.addSectionDialogTitle'),
+    body: sectionDialogBody,
+    actions: [sectionCancel, sectionCreate],
+  });
+  sectionDialog.dataset.action = 'song-section-dialog';
+
+  const addSectionButton = Button({
+    label: t('song.addSection'),
+    onClick: openSectionDialog,
+  });
+  addSectionButton.dataset.action = 'song-add-section';
 
   const mapButton = Button({
     label: t('song.viewMap'),
@@ -74,7 +158,7 @@ export function createSongView({
     class: 'song-workspace__actions',
     role: 'group',
     'aria-label': t('song.actions'),
-  }, [reuseButton, uniqueButton, earlierButton, laterButton]);
+  }, [addSectionButton, reuseButton, uniqueButton, earlierButton, laterButton]);
 
   const toolbar = el('div', { class: 'song-workspace__toolbar' }, [
     heading,
@@ -101,6 +185,46 @@ export function createSongView({
 
   root.append(workspace);
   refresh();
+
+  function openSectionDialog() {
+    const project = projectInfo();
+    sourcePattern.textContent = '';
+    for (const pattern of project.song.patterns) {
+      sourcePattern.append(el('option', {
+        value: pattern.id,
+        text: pattern.name,
+      }));
+    }
+
+    const selected = project.song.order.find((entry) => entry.id === selectedOrderId);
+    sourcePattern.value = selected?.patternId ?? project.song.patterns[0]?.id ?? '';
+    sectionPreset.value = 'Verse';
+    sectionName.value = 'Verse';
+    patternMode.value = 'reuse';
+    sectionFeedback.textContent = '';
+    sectionDialog.open(addSectionButton);
+  }
+
+  function createSectionFromDialog() {
+    try {
+      const result = registry.execute('song.createSectionOccurrence', {
+        name: sectionName.value,
+        patternMode: patternMode.value,
+        sourcePatternId: sourcePattern.value,
+        afterOrderEntryId: selectedOrderId,
+      });
+      selectedOrderId = result.orderEntryId;
+      registry.execute('focus.setOrderEntry', {
+        orderEntryId: result.orderEntryId,
+      });
+      sectionDialog.close();
+      refresh();
+      focusSelected();
+    } catch (error) {
+      sectionFeedback.textContent = t('song.sectionCreateFailed')
+        + ' (' + (error?.code ?? 'E_UNKNOWN') + ')';
+    }
+  }
 
   function projectInfo() {
     const project = getProject();
@@ -338,4 +462,11 @@ export function createSongView({
     getSelectedOrderEntryId: () => selectedOrderId,
     getMode: () => mode,
   });
+}
+
+function dialogField(label, control) {
+  return el('label', { class: 'song-section-dialog__field' }, [
+    el('span', { class: 'song-section-dialog__label', text: label }),
+    control,
+  ]);
 }
