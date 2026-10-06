@@ -22,6 +22,7 @@ import { activePattern, noteAtCell, notesAtCell } from '../core/project.js';
 import { isDrumKitInstrument } from '../core/sound-model.js';
 import { el } from './dom.js';
 import { Button, Popover, Tooltip } from './kit.js';
+import { playheadFollowScrollTop } from './playhead-follow.js';
 
 const ROW_HEIGHT = 28;
 const HEADER_HEIGHT = 92;
@@ -903,16 +904,16 @@ export function createPatternView({
 
   function ensurePlaybackVisible(row) {
     if (playbackState !== 'playing') return;
-    const viewport = Math.max(ROW_HEIGHT, scroller.clientHeight - HEADER_HEIGHT);
-    const rowTop = HEADER_HEIGHT + row * ROW_HEIGHT;
-    const visibleTop = scroller.scrollTop + HEADER_HEIGHT;
-    const visibleBottom = scroller.scrollTop + scroller.clientHeight;
-    const margin = ROW_HEIGHT * 3;
+    if (scroller.clientHeight <= HEADER_HEIGHT) return;
 
-    if (rowTop < visibleTop + margin || rowTop + ROW_HEIGHT > visibleBottom - margin) {
-      const target = rowTop - HEADER_HEIGHT - Math.floor(viewport * 0.42);
-      scroller.scrollTop = Math.max(0, target);
-    }
+    const { rowCount } = projectInfo();
+    scroller.scrollTop = playheadFollowScrollTop({
+      row,
+      rowCount,
+      rowHeight: ROW_HEIGHT,
+      headerHeight: HEADER_HEIGHT,
+      clientHeight: scroller.clientHeight,
+    });
   }
 
   function setPlaybackState(audioState) {
