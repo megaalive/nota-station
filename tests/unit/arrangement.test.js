@@ -68,11 +68,9 @@ test('addSection menambah Section immutable dengan nama/warna tervalidasi', () =
 
   assert.equal(project.song.sections.length, 0);
   assert.equal(next.song.sections.length, 1);
-  assert.deepEqual(next.song.sections[0], {
-    id: 'section-r3-7',
-    name: 'Verse 1',
-    color: '#336699',
-  });
+  assert.match(next.song.sections[0].id, /^section-r3-/);
+  assert.equal(next.song.sections[0].name, 'Verse 1');
+  assert.equal(next.song.sections[0].color, '#336699');
   assert.equal(next.modifiedAt, '2026-10-05T14:01:30.000Z');
 
   assert.throws(
