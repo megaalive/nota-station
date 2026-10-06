@@ -113,6 +113,7 @@ export function validateEffectEvent(effect, {
   patternLengthTicks = null,
 } = {}) {
   assertPlainObject(effect, 'EffectEvent');
+  assertEffectKeys(effect);
   if (typeof effect.id !== 'string' || effect.id.length === 0) {
     throw effectError('E_EFFECT_ID', 'EffectEvent.id harus string non-kosong.');
   }
@@ -298,6 +299,21 @@ function sameEffect(a, b) {
     && a.tickLocal === b.tickLocal
     && a.type === b.type
     && JSON.stringify(a.value) === JSON.stringify(b.value);
+}
+
+function assertEffectKeys(effect) {
+  const expected = ['id', 'trackId', 'tickLocal', 'type', 'value'];
+  const actual = Object.keys(effect).sort();
+  const sortedExpected = [...expected].sort();
+  if (
+    actual.length !== sortedExpected.length
+    || actual.some((key, index) => key !== sortedExpected[index])
+  ) {
+    throw effectError(
+      'E_EFFECT_SHAPE',
+      'EffectEvent harus tepat berisi id, trackId, tickLocal, type, value.',
+    );
+  }
 }
 
 function assertPlainObject(value, label) {
