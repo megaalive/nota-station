@@ -1509,6 +1509,10 @@ export function createPatternView({
   };
 }
 
+function defaultLpbForPattern(pattern) {
+  return SUPPORTED_LPB.find((lpb) => rowTicksForLpb(lpb) === pattern.rowTicks) ?? 4;
+}
+
 function cellText(project, note, field) {
   if (!note) return field === 'note' ? '···' : '··';
   if (field === 'note') return formatPitch(note.pitch);
