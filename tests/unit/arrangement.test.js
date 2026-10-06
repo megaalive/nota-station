@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  addSection,
+  assignOrderEntrySection,
   insertOrderEntry,
   makeOrderEntryUnique,
   moveOrderEntry,
@@ -53,6 +55,96 @@ function fixture() {
   };
   return { project, idFactory, patternId };
 }
+
+test('addSection menambah Section immutable dengan nama/warna tervalidasi', () => {
+  const { project, idFactory } = fixture();
+  const next = addSection(project, {
+    name: ' Verse 1 ',
+    color: '#336699',
+  }, {
+    idFactory,
+    now: () => '2026-10-05T14:01:30.000Z',
+  });
+
+  assert.equal(project.song.sections.length, 0);
+  assert.equal(next.song.sections.length, 1);
+  assert.deepEqual(next.song.sections[0], {
+    id: 'section-r3-7',
+    name: 'Verse 1',
+    color: '#336699',
+  });
+  assert.equal(next.modifiedAt, '2026-10-05T14:01:30.000Z');
+
+  assert.throws(
+    () => addSection(project, { name: '   ' }),
+    (error) => error.code === 'E_PROJECT_SECTION_NAME',
+  );
+  assert.throws(
+    () => addSection(project, { name: 'Verse', color: 'red' }),
+    (error) => error.code === 'E_PROJECT_SECTION_COLOR',
+  );
+});
+
+test('assignOrderEntrySection memasang/melepas section tanpa mengubah Pattern', () => {
+  const { project, idFactory, patternId } = fixture();
+  const withSection = addSection(project, {
+    name: 'Verse',
+    color: '#336699',
+  }, {
+    idFactory,
+    now: () => '2026-10-05T14:01:30.000Z',
+  });
+  const sectionId = withSection.song.sections[0].id;
+  const orderEntryId = withSection.song.order[0].id;
+  const patternsBefore = structuredClone(withSection.song.patterns);
+
+  const assigned = assignOrderEntrySection(withSection, {
+    orderEntryId,
+    sectionId,
+  }, {
+    now: () => '2026-10-05T14:01:40.000Z',
+  });
+  assert.equal(assigned.song.order[0].sectionId, sectionId);
+  assert.deepEqual(assigned.song.patterns, patternsBefore);
+
+  const unassigned = assignOrderEntrySection(assigned, {
+    orderEntryId,
+    sectionId: null,
+  }, {
+    now: () => '2026-10-05T14:01:50.000Z',
+  });
+  assert.equal(unassigned.song.order[0].sectionId, null);
+
+  assert.throws(
+    () => assignOrderEntrySection(withSection, { orderEntryId, sectionId: 'missing' }),
+    (error) => error.code === 'E_PROJECT_SECTION_MISSING',
+  );
+  assert.throws(
+    () => assignOrderEntrySection(withSection, { orderEntryId: 'missing', sectionId }),
+    (error) => error.code === 'E_PROJECT_ORDER_MISSING',
+  );
+});
+
+test('Section + assignment round-trip lewat debug JSON dan sectionId yatim ditolak', () => {
+  const { project, idFactory } = fixture();
+  let next = addSection(project, {
+    name: 'Chorus',
+    color: '#7C3AED',
+  }, { idFactory });
+  next = assignOrderEntrySection(next, {
+    orderEntryId: next.song.order[0].id,
+    sectionId: next.song.sections[0].id,
+  });
+
+  assert.deepEqual(parseDebugProject(serializeDebugProject(next)), next);
+
+  const invalid = structuredClone(next);
+  invalid.song.order[0].sectionId = 'section-yatim';
+  assert.throws(
+    () => serializeDebugProject(invalid),
+    (error) => error.code === 'E_DEBUG_JSON_SECTION_REF',
+  );
+});
 
 test('insertOrderEntry memakai ulang Pattern tanpa menduplikasi definisi', () => {
   const { project, idFactory, patternId } = fixture();
