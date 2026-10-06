@@ -5,6 +5,19 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S7A — proyeksi off-grid + kolom DLY (CLOSED · PASS)
+
+- Ditambahkan helper proyeksi **tick-local → display row + DLY** tanpa mengubah `NoteEvent.startTickLocal`. Data kanonik tetap bebas grid; Pattern hanya memproyeksikannya.
+- Kolom **DLY** muncul otomatis hanya bila Pattern memiliki note yang tidak sejajar dengan `rowTicks`; Pattern aligned tetap memakai tiga kolom `NOTE | INST | VOL`.
+- Note off-grid diberi penanda `⌁`; DLY menampilkan offset tick seperti `+23t`. Bila beberapa event jatuh pada row tampilan yang sama, semuanya tetap dipertahankan dan diproyeksikan deterministik—tidak ada kuantisasi atau event yang dibuang diam-diam.
+- Layout Pattern, lebar channel, `aria-colcount`, header, cursor horizontal, dan virtualized rows kini mengikuti daftar field aktif secara dinamis.
+- S7A sengaja **visibility + safety**: direct per-cell NOTE/INST/VOL/Delete ditahan bila row berisi event off-grid agar ketikan tracker tidak membuat event aligned kedua atau mengubah timing secara implisit. Block operation tetap bekerja pada data tick kanonik.
+- Tidak ada schema bump dan tidak ada perubahan audio scheduler; scheduler memang sudah memakai `startTickLocal` langsung.
+- Gate terarah run **37417661473** pada HEAD `d4fed98…`: 0 vulnerability, unit **139/139 PASS**, check PASS, build **455,2 KiB**, DLY/Pattern/block/row Chromium+Firefox **52/52 PASS**.
+- Gate final run **37417834138** pada HEAD `ee93107…`: 0 vulnerability, unit **139/139 PASS**, check PASS, build **455,2 KiB**, full browser Chromium+Firefox **222/222 PASS**.
+- Audit dependency menempatkan DLY sebelum FX typed: proyeksi off-grid merupakan prasyarat langsung Piano Roll R5a, sementara EffectEvent typed masih perlu membuka model efek.
+- Berikutnya: **R3-S7B LPB + explicit timing actions** — pemilih resolusi tampilan LPB, pencarian resolusi yang cocok, dan kuantisasi eksplisit/Undo; direct edit DLY baru dibuka bila semantiknya sudah jelas.
+
 ### R3-S6 — row operations + velocity interpolation (CLOSED · PASS)
 
 - Pattern editor kini mendukung **Insert row** dan **Delete row** pada data channel terpilih tanpa mengubah panjang Pattern. Shortcut tracker: `Insert` menyisipkan row dan `Backspace` menghapus row pada NOTE/block selection; `Ctrl+Insert` / `Ctrl+Backspace` menjalankan operasi yang sama untuk seluruh channel.

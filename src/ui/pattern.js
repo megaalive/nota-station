@@ -1,7 +1,12 @@
-// Pattern editor R1: DOM windowed, 8 channel, kolom tracker NOTE | INST | VOL.
+// Pattern editor: DOM windowed, proyeksi NOTE | INST | VOL dan DLY bila ada event off-grid.
 // View tidak pernah menulis project langsung; semua mutasi lewat command registry.
 
 import { patternUsageCount } from '../core/arrangement.js';
+import {
+  notesAtDisplayCell,
+  patternHasOffGridNotes,
+  projectNoteToDisplayGrid,
+} from '../core/pattern-grid.js';
 import { activePattern, noteAtCell, notesAtCell } from '../core/project.js';
 import { isDrumKitInstrument } from '../core/sound-model.js';
 import { el } from './dom.js';
@@ -13,8 +18,14 @@ const ROW_NUMBER_WIDTH = 46;
 const NOTE_WIDTH = 64;
 const INST_WIDTH = 42;
 const VOL_WIDTH = 42;
-const CHANNEL_WIDTH = NOTE_WIDTH + INST_WIDTH + VOL_WIDTH;
-const FIELDS = ['note', 'instrument', 'volume'];
+const DLY_WIDTH = 58;
+const BASE_FIELDS = ['note', 'instrument', 'volume'];
+const FIELD_WIDTHS = Object.freeze({
+  note: NOTE_WIDTH,
+  instrument: INST_WIDTH,
+  volume: VOL_WIDTH,
+  delay: DLY_WIDTH,
+});
 const OVERSCAN = 4;
 
 const NOTE_CODES = new Map([
@@ -277,29 +288,37 @@ export function createPatternView({
   function projectInfo() {
     const project = getProject();
     const pattern = getActivePattern(project);
+    const fields = patternHasOffGridNotes(pattern, pattern.rowTicks)
+      ? [...BASE_FIELDS, 'delay']
+      : BASE_FIELDS;
     return {
       project,
       pattern,
       tracks: project.song.tracks,
+      fields,
       rowCount: pattern.lengthTicks / pattern.rowTicks,
     };
   }
 
-  function dataColumns(tracks) {
-    return tracks.flatMap(() => [NOTE_WIDTH, INST_WIDTH, VOL_WIDTH]);
+  function dataColumns(tracks, fields) {
+    return tracks.flatMap(() => fields.map((field) => FIELD_WIDTHS[field]));
   }
 
-  function rowTemplate(tracks) {
-    return `${ROW_NUMBER_WIDTH}px ${dataColumns(tracks).map((width) => `${width}px`).join(' ')}`;
+  function channelWidth(fields) {
+    return fields.reduce((sum, field) => sum + FIELD_WIDTHS[field], 0);
+  }
+
+  function rowTemplate(tracks, fields) {
+    return `${ROW_NUMBER_WIDTH}px ${dataColumns(tracks, fields).map((width) => `${width}px`).join(' ')}`;
   }
 
   function renderHeader() {
-    const { project, tracks } = projectInfo();
+    const { project, pattern, tracks, fields } = projectInfo();
     header.textContent = '';
 
     trackUi.clear();
     const channelRow = el('div', { class: 'pattern-grid__header-row pattern-grid__header-row--channel', role: 'row' });
-    channelRow.style.gridTemplateColumns = `${ROW_NUMBER_WIDTH}px repeat(${tracks.length}, ${CHANNEL_WIDTH}px)`;
+    channelRow.style.gridTemplateColumns = `${ROW_NUMBER_WIDTH}px repeat(${tracks.length}, ${channelWidth(fields)}px)`;
     channelRow.append(el('div', {
       class: 'pattern-grid__corner pattern-grid__corner--channel',
       'aria-hidden': 'true',
@@ -402,28 +421,32 @@ export function createPatternView({
       const channel = el('div', {
         class: `pattern-grid__channel${track.kind === 'drum' ? ' is-drum' : ''}`,
         role: 'columnheader',
-        'aria-colindex': String(index * FIELDS.length + 1),
-        'aria-colspan': String(FIELDS.length),
+        'aria-colindex': String(index * fields.length + 1),
+        'aria-colspan': String(fields.length),
       }, [label, instrumentSelect, controls]);
       channelRow.append(channel);
       trackUi.set(track.id, { channel, mute, solo, meter, meterFill });
     });
 
     const fieldRow = el('div', { class: 'pattern-grid__header-row pattern-grid__header-row--field', role: 'row' });
-    fieldRow.style.gridTemplateColumns = rowTemplate(tracks);
+    fieldRow.style.gridTemplateColumns = rowTemplate(tracks, fields);
     fieldRow.append(el('div', { class: 'pattern-grid__corner', 'aria-hidden': 'true' }));
 
     tracks.forEach((track, channel) => {
-      const labels = [
-        ['note', t('pattern.columnNote')],
-        ['instrument', t('pattern.columnInstrument')],
-        ['volume', t('pattern.columnVolume')],
-      ];
+      const labels = fields.map((field) => [
+        field,
+        t({
+          note: 'pattern.columnNote',
+          instrument: 'pattern.columnInstrument',
+          volume: 'pattern.columnVolume',
+          delay: 'pattern.columnDelay',
+        }[field]),
+      ]);
       labels.forEach(([field, label], fieldIndex) => {
         fieldRow.append(el('div', {
           class: `pattern-grid__field-header pattern-grid__field-header--${field}`,
           role: 'columnheader',
-          'aria-colindex': String(channel * FIELDS.length + fieldIndex + 1),
+          'aria-colindex': String(channel * fields.length + fieldIndex + 1),
           dataset: { channel: String(channel), field },
           text: label,
         }));
@@ -456,13 +479,13 @@ export function createPatternView({
   }
 
   function renderWindow() {
-    const { project, pattern, tracks, rowCount } = projectInfo();
-    const width = ROW_NUMBER_WIDTH + tracks.length * CHANNEL_WIDTH;
+    const { project, pattern, tracks, fields, rowCount } = projectInfo();
+    const width = ROW_NUMBER_WIDTH + tracks.length * channelWidth(fields);
     const height = HEADER_HEIGHT + rowCount * ROW_HEIGHT;
     surface.style.width = `${width}px`;
     surface.style.height = `${height}px`;
     scroller.setAttribute('aria-rowcount', String(rowCount));
-    scroller.setAttribute('aria-colcount', String(tracks.length * FIELDS.length));
+    scroller.setAttribute('aria-colcount', String(tracks.length * fields.length));
 
     const viewportRows = Math.ceil((scroller.clientHeight || 420) / ROW_HEIGHT);
     const first = Math.max(0, Math.floor(Math.max(0, scroller.scrollTop - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN);
@@ -479,7 +502,7 @@ export function createPatternView({
         dataset: { row: String(row) },
       });
       rowNode.style.top = `${HEADER_HEIGHT + row * ROW_HEIGHT}px`;
-      rowNode.style.gridTemplateColumns = rowTemplate(tracks);
+      rowNode.style.gridTemplateColumns = rowTemplate(tracks, fields);
 
       rowNode.append(el('div', {
         class: 'pattern-grid__row-number',
@@ -488,14 +511,20 @@ export function createPatternView({
       }));
 
       tracks.forEach((track, channel) => {
-        const note = noteAtCell(project, { patternId: pattern.id, trackId: track.id, row });
-        FIELDS.forEach((field, fieldIndex) => {
+        const projectedNotes = notesAtDisplayCell(project, {
+          patternId: pattern.id,
+          trackId: track.id,
+          row,
+          rowTicks: pattern.rowTicks,
+        });
+        const note = projectedNotes[0] ?? null;
+        fields.forEach((field, fieldIndex) => {
           const selected = row === cursorRow && channel === cursorChannel && field === cursorField;
           const blockSelected = isBlockSelected(row, channel);
           rowNode.append(el('div', {
             class: `pattern-grid__cell pattern-grid__cell--${field}${blockSelected ? ' is-block-selected' : ''}${selected ? ' is-cursor' : ''}`,
             role: 'gridcell',
-            'aria-colindex': String(channel * FIELDS.length + fieldIndex + 1),
+            'aria-colindex': String(channel * fields.length + fieldIndex + 1),
             'aria-selected': selected || blockSelected ? 'true' : 'false',
             dataset: {
               action: 'pattern-cell',
@@ -504,10 +533,8 @@ export function createPatternView({
               field,
               trackId: track.id,
             },
-            text: displayCellText(project, note, field, row, channel),
-            title: emptyFirstCell(project, note, field, row, channel)
-              ? t('pattern.emptyCellTitle')
-              : null,
+            text: displayCellText(project, note, field, row, channel, projectedNotes),
+            title: cellTitle(project, note, field, row, channel, projectedNotes),
             on: {
               click: () => {
                 clearInputState();
@@ -558,6 +585,7 @@ export function createPatternView({
   }
 
   function ensureCursorVisible() {
+    const { fields } = projectInfo();
     const top = HEADER_HEIGHT + cursorRow * ROW_HEIGHT;
     const bottom = top + ROW_HEIGHT;
     if (top < scroller.scrollTop + HEADER_HEIGHT) {
@@ -566,11 +594,11 @@ export function createPatternView({
       scroller.scrollTop = bottom - scroller.clientHeight;
     }
 
-    const fieldIndex = FIELDS.indexOf(cursorField);
-    const widths = [NOTE_WIDTH, INST_WIDTH, VOL_WIDTH];
+    const fieldIndex = Math.max(0, fields.indexOf(cursorField));
+    const widths = fields.map((field) => FIELD_WIDTHS[field]);
     const fieldOffset = widths.slice(0, fieldIndex).reduce((sum, width) => sum + width, 0);
     const fieldWidth = widths[fieldIndex];
-    const left = ROW_NUMBER_WIDTH + cursorChannel * CHANNEL_WIDTH + fieldOffset;
+    const left = ROW_NUMBER_WIDTH + cursorChannel * channelWidth(fields) + fieldOffset;
     const right = left + fieldWidth;
     const visibleLeft = scroller.scrollLeft + ROW_NUMBER_WIDTH;
     const visibleRight = scroller.scrollLeft + scroller.clientWidth;
@@ -637,14 +665,14 @@ export function createPatternView({
   function moveHorizontal(delta) {
     clearInputState();
     clearBlockSelection();
-    const { tracks } = projectInfo();
-    const fieldIndex = FIELDS.indexOf(cursorField);
+    const { tracks, fields } = projectInfo();
+    const fieldIndex = Math.max(0, fields.indexOf(cursorField));
     const flat = Math.max(
       0,
-      Math.min(tracks.length * FIELDS.length - 1, cursorChannel * FIELDS.length + fieldIndex + delta),
+      Math.min(tracks.length * fields.length - 1, cursorChannel * fields.length + fieldIndex + delta),
     );
-    cursorChannel = Math.floor(flat / FIELDS.length);
-    cursorField = FIELDS[flat % FIELDS.length];
+    cursorChannel = Math.floor(flat / fields.length);
+    cursorField = fields[flat % fields.length];
     renderWindow();
     ensureCursorVisible();
     syncStatus();
@@ -790,6 +818,34 @@ export function createPatternView({
     });
   }
 
+  function projectedNotesAt(row = cursorRow, channel = cursorChannel) {
+    const { project, pattern, tracks } = projectInfo();
+    const track = tracks[channel];
+    if (!track) return [];
+    return notesAtDisplayCell(project, {
+      patternId: pattern.id,
+      trackId: track.id,
+      row,
+      rowTicks: pattern.rowTicks,
+    });
+  }
+
+  function projectedCellHasOffGrid(row = cursorRow, channel = cursorChannel) {
+    const { pattern } = projectInfo();
+    return projectedNotesAt(row, channel).some(
+      (note) => projectNoteToDisplayGrid(note, pattern.rowTicks).offGrid,
+    );
+  }
+
+  function rejectOffGridCellEdit() {
+    if (!projectedCellHasOffGrid()) return false;
+    pendingHex = null;
+    feedback = { key: 'pattern.offGridReadOnly' };
+    renderWindow();
+    syncStatus();
+    return true;
+  }
+
   function toggleMode() {
     clearInputState();
     mode = mode === 'edit' ? 'audition' : 'edit';
@@ -804,6 +860,7 @@ export function createPatternView({
     onAudition?.(pitch);
 
     if (mode !== 'edit') return;
+    if (rejectOffGridCellEdit()) return;
 
     runPatternCommand('pattern.enterNote', {
       patternId: pattern.id,
@@ -824,6 +881,7 @@ export function createPatternView({
 
     onInstrumentAudition?.(track.defaultInstrumentId, hit.pitch);
     if (mode !== 'edit') return true;
+    if (rejectOffGridCellEdit()) return true;
 
     const hits = notesAtCell(project, {
       patternId: pattern.id,
@@ -885,7 +943,8 @@ export function createPatternView({
   }
 
   function handleHexInput(digit) {
-    if (mode !== 'edit' || cursorField === 'note') return false;
+    if (mode !== 'edit' || cursorField === 'note' || cursorField === 'delay') return false;
+    if (rejectOffGridCellEdit()) return true;
 
     const { project, pattern, tracks } = projectInfo();
     const track = tracks[cursorChannel];
@@ -958,24 +1017,34 @@ export function createPatternView({
       && getActivePattern(project).notes.length === 0;
   }
 
-  function displayCellText(project, note, field, row, channel) {
+  function displayCellText(project, note, field, row, channel, projectedNotes = []) {
     const track = project.song.tracks[channel];
+    const pattern = getActivePattern(project);
+    const delays = projectedNotes.map(
+      (item) => projectNoteToDisplayGrid(item, pattern.rowTicks).delayTicks,
+    );
+    const hasOffGrid = delays.some((delay) => delay !== 0);
+
+    if (field === 'delay') {
+      if (projectedNotes.length === 0) return '··';
+      const unique = [...new Set(delays)].sort((a, b) => a - b);
+      if (unique.length === 1) return unique[0] === 0 ? '0t' : `+${unique[0]}t`;
+      return `+${unique[0]}…+${unique[unique.length - 1]}`;
+    }
+
     if (field === 'note' && track?.kind === 'drum') {
-      const hits = notesAtCell(project, {
-        patternId: getActivePattern(project).id,
-        trackId: track.id,
-        row,
-      });
-      if (hits.length > 0) {
-        return hits
+      if (projectedNotes.length > 0) {
+        const text = projectedNotes
           .map((hit) => DRUM_PITCH_LABELS.get(hit.pitch) ?? '•')
           .join('');
+        return hasOffGrid ? `${text}⌁` : text;
       }
       if (emptyFirstCell(project, note, field, row, channel)) {
         return t('pattern.emptyDrumCell');
       }
       return '···';
     }
+
     if (emptyFirstCell(project, note, field, row, channel)) {
       return t('pattern.emptyCell');
     }
@@ -987,13 +1056,40 @@ export function createPatternView({
     ) {
       return `${pendingHex.first}_`;
     }
-    return cellText(project, note, field);
+
+    const text = cellText(project, note, field);
+    if (field !== 'note' || !note) return text;
+    const suffix = [
+      hasOffGrid ? '⌁' : '',
+      projectedNotes.length > 1 ? `×${projectedNotes.length}` : '',
+    ].join('');
+    return `${text}${suffix}`;
+  }
+
+  function cellTitle(project, note, field, row, channel, projectedNotes = []) {
+    if (emptyFirstCell(project, note, field, row, channel)) {
+      return t('pattern.emptyCellTitle');
+    }
+    if (projectedNotes.length === 0) return null;
+
+    const pattern = getActivePattern(project);
+    const delays = projectedNotes.map(
+      (item) => projectNoteToDisplayGrid(item, pattern.rowTicks).delayTicks,
+    );
+    const offGridCount = delays.filter((delay) => delay !== 0).length;
+    if (offGridCount === 0) return null;
+
+    return t('pattern.offGridCellTitle', {
+      count: projectedNotes.length,
+      delays: [...new Set(delays)].map((delay) => `+${delay}t`).join(', '),
+    });
   }
 
   function deleteCurrentEvent() {
     // Instrument dan velocity wajib ada pada NoteEvent, jadi Delete pada INST/VOL
     // tidak dimaknai "kosongkan field". Hanya NOTE yang menghapus seluruh event.
     if (mode !== 'edit' || cursorField !== 'note') return;
+    if (rejectOffGridCellEdit()) return;
 
     const { pattern, tracks } = projectInfo();
     const track = tracks[cursorChannel];
@@ -1034,6 +1130,8 @@ export function createPatternView({
       hint.textContent = t('pattern.hintInstrument', {
         max: formatHexByte(projectInfo().project.instruments.length),
       });
+    } else if (cursorField === 'delay') {
+      hint.textContent = t('pattern.hintDelay');
     } else {
       hint.textContent = t('pattern.hintVolume');
     }
@@ -1044,6 +1142,8 @@ export function createPatternView({
     // Refresh dari history/command eksternal harus membuang input dua-nibble yang
     // belum menjadi transaksi project.
     clearInputState();
+    const { fields } = projectInfo();
+    if (!fields.includes(cursorField)) cursorField = 'note';
     renderHeader();
     renderWindow();
     syncSharedPatternBadge();
@@ -1176,7 +1276,7 @@ export function createPatternView({
     }
 
     const hexDigit = HEX_CODES.get(event.code);
-    if (hexDigit !== undefined && cursorField !== 'note') {
+    if (hexDigit !== undefined && ['instrument', 'volume'].includes(cursorField)) {
       event.preventDefault();
       handleHexInput(hexDigit);
       return;
