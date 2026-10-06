@@ -5,6 +5,22 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S8C — progressive FX | PARAM Pattern (CLOSED · PASS)
+
+- Pattern kini memakai **progressive disclosure** untuk kolom `FX | PARAM`: Pattern tanpa EffectEvent tetap ringkas; tombol **FX** membuka kolom secara eksplisit, dan Pattern yang sudah memiliki EffectEvent membukanya otomatis agar data tidak pernah tersembunyi.
+- Sepuluh EffectEvent v0.1 memiliki mnemonic UI stabil dan tetap typed: `VOL`, `PAN`, `SLD`, `PRT`, `VIB`, `RTR`, `OFF`, `CUT`, `DLY`, `ARP`. PARAM memakai representasi terbaca, bukan hex opaque.
+- Helper `effect-display.js` mengunci format/parser typed untuk seluruh effect. Contoh: `SLD +2/120t`, `VIB 0.5/5Hz`, `RTR 60t×4`, `ARP 0,+4,+7/120t`.
+- Beberapa effect pada Track/tick yang sama tidak disembunyikan: FX dan PARAM diringkas deterministik, sementara editor tetap memilih satu type spesifik untuk add/update/delete.
+- Editor FX per-cell memakai command layer S8A, sehingga add/update/delete masing-masing satu transaksi history, ikut live-reschedule, dan tetap melewati shared-pattern guard S4. `Enter` dari cell FX/PARAM memindahkan fokus ke editor; `Delete` menghapus hanya type effect yang sedang dipilih.
+- EffectEvent off-grid kini ikut memicu kolom **DLY** walaupun note semuanya aligned. FX off-grid tetap terlihat tetapi direct edit ditahan agar timing tidak berubah diam-diam.
+- Grid geometry, `aria-colcount`, header, horizontal cursor, dan virtualized row mengikuti kolom dinamis FX/PARAM tanpa schema bump.
+- i18n timing S7 yang sebelumnya salah menempatkan beberapa string English di blok Indonesia dikoreksi; S7/S8 kini memiliki label ID/EN yang benar dan browser acceptance English mencegah fallback silang bahasa.
+- Gate terarah awal run **37441696366**: unit/check/build PASS tetapi browser **22/24 PASS**; dropdown PAN di-reset kembali ke VOL oleh auto-selection editor.
+- Koreksi pertama run **37441949157** masih **22/24 PASS** karena bergantung `document.activeElement`, yang tidak stabil untuk synthetic `selectOption`. Mekanisme itu dibuang.
+- Gate terarah final run **37442195658** pada HEAD `bf47942…`: 0 vulnerability, unit **163/163 PASS**, check PASS, build **508,4 KiB**, FX/EffectEvent/off-grid/shared-guard Chromium+Firefox **24/24 PASS**.
+- Gate final run **37442431681** pada HEAD `2f812d7…`: 0 vulnerability, unit **163/163 PASS**, check PASS, build **508,4 KiB**, full browser **245 PASS + 1 skip**. Satu skip adalah limitation realtime AudioContext Firefox headless yang sudah didokumentasikan sejak S8B; bukan test S8C yang dilewati.
+- Slice ini tidak menambah DSP baru. Berikutnya: **R3-S8D audible FX non-pitch** (volume, pan, retrigger, sample offset) sebelum masuk keluarga pitch automation yang lebih sensitif.
+
 ### R3-S8B — audible note delay + note cut (CLOSED · PASS)
 
 - Dua timing FX pertama kini benar-benar terdengar: `delay` menggeser onset scheduler tanpa memutasi `NoteEvent.startTickLocal` atau `durationTicks`; `cut` menjadwalkan stop voice pada audio clock.
