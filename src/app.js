@@ -6,6 +6,7 @@ import { commandError, createCommandRegistry } from './core/commands.js';
 import { createHistory } from './core/history.js';
 import { createFocusStore, patternForFocus } from './core/focus.js';
 import { createSharedPatternGuard } from './core/shared-pattern-guard.js';
+import { quantizePatternCell } from './core/pattern-grid.js';
 import {
   copyPatternBlock,
   deletePatternRows,
@@ -693,6 +694,20 @@ function registerCommands() {
         persistSessionSharedPatternGuardState();
         patternView?.refresh();
         return state;
+      },
+    },
+    {
+      id: 'pattern.quantizeCell',
+      group: 'Pattern',
+      labelKey: 'pattern.quantize',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('pattern.quantizeCell', args);
+        requirePatternEditAllowed(args);
+        const nextProject = quantizePatternCell(project, args);
+        const changed = nextProject !== project;
+        commitPatternProject(nextProject, 'pattern.quantizeCell');
+        return { changed };
       },
     },
     {

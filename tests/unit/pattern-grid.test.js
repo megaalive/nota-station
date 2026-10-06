@@ -2,9 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  findMatchingLpb,
   notesAtDisplayCell,
   patternHasOffGridNotes,
   projectNoteToDisplayGrid,
+  quantizePatternNotes,
+  rowTicksForLpb,
+  SUPPORTED_LPB,
 } from '../../src/core/pattern-grid.js';
 import { createBlankProject, enterNote } from '../../src/core/project.js';
 
@@ -113,4 +117,98 @@ test('rowTicks tampilan invalid ditolak eksplisit', () => {
     () => projectNoteToDisplayGrid(note, 0),
     (error) => error.code === 'E_PATTERN_GRID_ROW_TICKS',
   );
+});
+
+
+test('rowTicksForLpb mengikuti PPQ 480 dan hanya menerima LPB yang didukung', () => {
+  assert.deepEqual(SUPPORTED_LPB, [1, 2, 3, 4, 5, 6, 8, 12]);
+  assert.equal(rowTicksForLpb(4), 120);
+  assert.equal(rowTicksForLpb(6), 80);
+  assert.equal(rowTicksForLpb(12), 40);
+
+  assert.throws(
+    () => rowTicksForLpb(7),
+    (error) => error.code === 'E_PATTERN_GRID_LPB',
+  );
+});
+
+test('findMatchingLpb memilih resolusi >= current paling dekat yang menyelaraskan semua tick', () => {
+  assert.equal(findMatchingLpb([160, 320], { currentLpb: 4 }), 6);
+  assert.equal(findMatchingLpb([160, 320], { currentLpb: 6 }), 6);
+  assert.equal(findMatchingLpb([143], { currentLpb: 4 }), null);
+  assert.equal(findMatchingLpb([], { currentLpb: 4 }), 4);
+});
+
+test('quantizePatternNotes memindahkan note ke grid terdekat, mempertahankan duration, dan immutable', () => {
+  const { project, patternId, note } = fixture();
+  const before = structuredClone(project);
+
+  const next = quantizePatternNotes(project, {
+    patternId,
+    noteIds: [note.id],
+    rowTicks: 120,
+  }, { now: () => '2026-10-06T06:10:00.000Z' });
+
+  const quantized = next.song.patterns
+    .find((item) => item.id === patternId)
+    .notes.find((item) => item.id === note.id);
+
+  assert.equal(quantized.startTickLocal, 120);
+  assert.equal(quantized.durationTicks, note.durationTicks);
+  assert.deepEqual(project, before);
+});
+
+test('quantizePatternNotes menolak bila start baru membuat duration melewati akhir Pattern', () => {
+  const { project, patternId, note } = fixture();
+  const patternIndex = project.song.patterns.findIndex((item) => item.id === patternId);
+  const pattern = project.song.patterns[patternIndex];
+  const nearEnd = {
+    ...note,
+    startTickLocal: pattern.lengthTicks - 179,
+    durationTicks: 179,
+  };
+  const patterns = [...project.song.patterns];
+  patterns[patternIndex] = {
+    ...pattern,
+    notes: [nearEnd],
+  };
+  const nextProject = { ...project, song: { ...project.song, patterns } };
+  const before = structuredClone(nextProject);
+
+  assert.throws(
+    () => quantizePatternNotes(nextProject, {
+      patternId,
+      noteIds: [nearEnd.id],
+      rowTicks: 120,
+    }),
+    (error) => error.code === 'E_PATTERN_QUANTIZE_DURATION',
+  );
+  assert.deepEqual(nextProject, before);
+});
+
+test('quantizePatternNotes menolak collision target secara atomik', () => {
+  const { project, patternId, trackId, note } = fixture();
+  const patternIndex = project.song.patterns.findIndex((item) => item.id === patternId);
+  const collision = {
+    ...note,
+    id: 'note-grid-collision',
+    startTickLocal: 120,
+  };
+  const patterns = [...project.song.patterns];
+  patterns[patternIndex] = {
+    ...patterns[patternIndex],
+    notes: [note, collision],
+  };
+  const nextProject = { ...project, song: { ...project.song, patterns } };
+  const before = structuredClone(nextProject);
+
+  assert.throws(
+    () => quantizePatternNotes(nextProject, {
+      patternId,
+      noteIds: [note.id],
+      rowTicks: 120,
+    }),
+    (error) => error.code === 'E_PATTERN_QUANTIZE_COLLISION',
+  );
+  assert.deepEqual(nextProject, before);
 });

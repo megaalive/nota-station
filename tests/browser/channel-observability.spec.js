@@ -69,17 +69,15 @@ test.describe('channel observability UAT', () => {
     }, targetRow);
 
     await expect.poll(
-      () => page.locator('.pattern-grid__row.is-playhead').getAttribute('data-row'),
+      async () => {
+        const uiRow = Number(
+          await page.locator('.pattern-grid__row.is-playhead').getAttribute('data-row'),
+        );
+        const scrollTop = await grid.evaluate((node) => node.scrollTop);
+        return Math.abs(uiRow - targetRow) <= 1 && scrollTop > 0;
+      },
       { timeout: 3000 },
-    ).toBe(String(targetRow));
-
-    await expect.poll(
-      () => grid.evaluate((node) => node.scrollTop),
-      { timeout: 3000 },
-    ).toBeGreaterThan(0);
-
-    const uiRow = Number(await page.locator('.pattern-grid__row.is-playhead').getAttribute('data-row'));
-    expect(Math.abs(uiRow - targetRow)).toBeLessThanOrEqual(1);
+    ).toBe(true);
 
     await page.getByRole('button', { name: 'Berhenti' }).click();
   });
