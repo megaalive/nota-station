@@ -3,6 +3,10 @@ import {
   validateInstrumentModel,
   validateSampleModel,
 } from '../core/sound-model.js';
+import {
+  effectCellKey,
+  validateEffectEvent,
+} from '../core/effect-model.js';
 
 // JSON debug R1. Ini bukan format portable final .webtrack ZIP (R4);
 // tujuannya fixture/test dan round-trip proyek tanpa sample binary.
@@ -183,6 +187,45 @@ export function validateDebugProject(project) {
         );
       }
       cells.add(cell);
+    }
+
+    assertArray(pattern.effects, `pattern ${pattern.id}.effects`, 0, 4096);
+    const effectIds = new Set();
+    const effectCells = new Set();
+    for (const effect of pattern.effects) {
+      let validated;
+      try {
+        validated = validateEffectEvent(effect, {
+          trackIds,
+          patternLengthTicks: pattern.lengthTicks,
+        });
+      } catch (error) {
+        const code = error.code === 'E_EFFECT_TRACK_REF'
+          ? 'E_DEBUG_JSON_TRACK_REF'
+          : error.code === 'E_EFFECT_TICK_RANGE'
+            ? 'E_DEBUG_JSON_EFFECT_TICK'
+            : error.code === 'E_EFFECT_TYPE'
+              ? 'E_DEBUG_JSON_EFFECT_TYPE'
+              : 'E_DEBUG_JSON_EFFECT_VALUE';
+        throw debugJsonError(code, error.message);
+      }
+
+      if (effectIds.has(validated.id)) {
+        throw debugJsonError(
+          'E_DEBUG_JSON_DUPLICATE_ID',
+          `ID effect duplikat: ${validated.id}`,
+        );
+      }
+      effectIds.add(validated.id);
+
+      const cell = effectCellKey(validated);
+      if (effectCells.has(cell)) {
+        throw debugJsonError(
+          'E_DEBUG_JSON_DUPLICATE_EFFECT_CELL',
+          `Effect type yang sama duplikat pada track/tick: ${cell}`,
+        );
+      }
+      effectCells.add(cell);
     }
   }
 

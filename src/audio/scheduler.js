@@ -49,6 +49,25 @@ export function patternEventTemplates(pattern, tempo, ppq = PPQ) {
     }));
 }
 
+export function effectEventTemplates(pattern, tempo, ppq = PPQ) {
+  const tickSeconds = secondsPerTick(tempo, ppq);
+  return [...(pattern.effects ?? [])]
+    .sort((a, b) => (
+      a.tickLocal - b.tickLocal
+      || a.trackId.localeCompare(b.trackId)
+      || a.type.localeCompare(b.type)
+      || a.id.localeCompare(b.id)
+    ))
+    .map((effect) => ({
+      id: effect.id,
+      trackId: effect.trackId,
+      type: effect.type,
+      value: structuredClone(effect.value),
+      startTickLocal: effect.tickLocal,
+      offsetSeconds: effect.tickLocal * tickSeconds,
+    }));
+}
+
 export function metronomeEventTemplates(pattern, ppq = PPQ) {
   const meter = pattern.meter ?? { num: 4, den: 4 };
   const beatTicks = ppq * (4 / meter.den);
@@ -153,6 +172,25 @@ export function createPatternScheduleCursor(pattern, tempo, {
 } = {}) {
   const events = patternEventTemplates(pattern, tempo, ppq);
   const cursor = createTickScheduleCursor(events, pattern.lengthTicks, tempo, { loop, startTick, ppq });
+  return {
+    ...cursor,
+    durationSeconds: patternDurationSeconds(pattern, tempo, ppq),
+    eventCount: events.length,
+  };
+}
+
+export function createEffectScheduleCursor(pattern, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  const events = effectEventTemplates(pattern, tempo, ppq);
+  const cursor = createTickScheduleCursor(
+    events,
+    pattern.lengthTicks,
+    tempo,
+    { loop, startTick, ppq },
+  );
   return {
     ...cursor,
     durationSeconds: patternDurationSeconds(pattern, tempo, ppq),

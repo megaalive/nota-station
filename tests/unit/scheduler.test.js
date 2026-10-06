@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 
 import {
   LIVE_EDIT_FREEZE_SECONDS,
+  createEffectScheduleCursor,
   createMetronomeScheduleCursor,
   createPatternScheduleCursor,
+  effectEventTemplates,
   isLiveEditMutable,
   liveEditFreezeTime,
   metronomeEventTemplates,
@@ -115,6 +117,84 @@ test('posisi transport berasal dari audio clock dan wrap saat loop', () => {
   assert.equal(transportTickAtAudioTime({ ...common, nowAudioTime: 5.5 }), 960);
   assert.equal(transportTickAtAudioTime({ ...common, nowAudioTime: 13.5, loop: true }), 960);
   assert.equal(transportTickAtAudioTime({ ...common, nowAudioTime: 30, loop: false }), 7680);
+});
+
+test('EffectEvent timeline deterministik berdasarkan tick track type id', () => {
+  const pattern = {
+    ...patternFixture(),
+    effects: [
+      {
+        id: 'fx-pan',
+        trackId: 't2',
+        tickLocal: 240,
+        type: 'pan',
+        value: { position: -32 },
+      },
+      {
+        id: 'fx-volume',
+        trackId: 't1',
+        tickLocal: 120,
+        type: 'volume',
+        value: { level: 80 },
+      },
+      {
+        id: 'fx-vibrato',
+        trackId: 't1',
+        tickLocal: 240,
+        type: 'vibrato',
+        value: { depthSemitones: 0.5, rateHz: 5 },
+      },
+    ],
+  };
+
+  const events = effectEventTemplates(pattern, 120);
+  assert.deepEqual(
+    events.map((event) => [event.id, event.startTickLocal, event.offsetSeconds]),
+    [
+      ['fx-volume', 120, 0.125],
+      ['fx-vibrato', 240, 0.25],
+      ['fx-pan', 240, 0.25],
+    ],
+  );
+  assert.deepEqual(events[0].value, { level: 80 });
+  assert.notEqual(events[0].value, pattern.effects[1].value);
+});
+
+test('EffectEvent cursor mendukung seek dan loop tanpa duplikasi', () => {
+  const pattern = {
+    ...patternFixture(),
+    effects: [
+      {
+        id: 'fx-1',
+        trackId: 't1',
+        tickLocal: 120,
+        type: 'volume',
+        value: { level: 100 },
+      },
+      {
+        id: 'fx-2',
+        trackId: 't1',
+        tickLocal: 480,
+        type: 'pan',
+        value: { position: 32 },
+      },
+    ],
+  };
+  const cursor = createEffectScheduleCursor(pattern, 120, {
+    loop: true,
+    startTick: 480,
+  });
+
+  assert.equal(cursor.eventCount, 2);
+  const due = cursor.drainUntil(10, 18.01);
+  assert.deepEqual(
+    due.map((event) => [event.id, event.cycle, event.when]),
+    [
+      ['fx-2', 0, 10],
+      ['fx-1', 1, 17.625],
+      ['fx-2', 1, 18],
+    ],
+  );
 });
 
 test('metronome mengikuti meter Pattern dan accent pada awal bar', () => {
