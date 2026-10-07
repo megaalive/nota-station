@@ -5,11 +5,29 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
-### R3-S9B — perbaikan input regression CI
+### R3-S10A — runtime keymap + shortcut overlay (CLOSED · PASS)
 
-- Tes chord memakai Shift+C untuk E pada oktaf yang sama sesuai §8.14; Shift+E adalah E pada oktaf atas. Assertion pitch 60/64, voice lane, dan row tetap utuh.
-- Workflow gate mengunci checkout/setup-node v4 ke SHA dari repository resmi sesuai §13.3.
-- Unit 196/196, check, dan build lokal PASS. Tes polyphonic 4/4 PASS; browser penuh 265 PASS, 3 FAIL, 4 skip. Isolasi satu worker: 9 PASS, 1 FAIL (budget input channel Chromium). Push ditolak GitHub HTTP 500; perbaikan masih lokal.
+- Preset **Songwriter** dan **OpenMPT-like** kini menjadi binding runtime nyata berbasis `KeyboardEvent.code`, bukan sekadar preferensi onboarding. Pengguna dapat mengganti preset setelah first-run dari overlay bantuan.
+- `?` membuka overlay shortcut kontekstual untuk view aktif dari registry command yang sama dengan Command Palette/agent. Command Palette juga menampilkan shortcut dinamis sesuai preset aktif.
+- Songwriter mempertahankan `Space` untuk Play/Stop Pattern. Shortcut umum tetap mencakup `Ctrl+K` Palette, Undo/Redo, dan `Alt+1…7`; sesuai §8.14, shortcut tidak membajak input teks.
+- Subset OpenMPT-like diverifikasi terhadap manual OpenMPT dan hanya memetakan aksi yang sudah memiliki padanan nyata: `F7` Play Pattern dari awal, `Ctrl+F7` dari kursor, `F10` mute channel aktif, `Ctrl+F10` solo, `Shift+F11` loop Pattern, `Ctrl+Space` EDIT/AUDISI, serta `Tab/Shift+Tab` pindah channel.
+- Aksi OpenMPT yang belum memiliki semantik NotaStation tidak dipalsukan. Khusus Songwriter `Shift+Space = mulai dari awal section` **belum ditutup** karena transport masih Pattern-local; gap ini harus diselesaikan bersama Song/Section transport.
+- Topbar menampilkan tombol bantuan `?` dan tooltip shortcut mengikuti preset aktif. Layout header M/S/P/meter juga dikoreksi menjadi empat slot yang benar.
+- Workflow CI sementara S9B yang sempat tertinggal di `main` dihapus agar PR berikutnya tidak menjalankan full gate ganda.
+- Gate source final run **37648007658** pada HEAD `68a7f98…`: 0 vulnerability, unit **201/201 PASS**, `npm run check` PASS, build **559,0 KiB**, full browser Chromium + Firefox **276 PASS + 4 skip**.
+- Run tambahan **37648438288** juga PASS setelah audit kompatibilitas shortcut; source kemudian dikembalikan byte-identik ke kontrak §8.14 yang sudah digate pada `68a7f98…`.
+- Empat skip tetap limitation realtime `AudioContext` Firefox headless dari slice audio sebelumnya; S10A tidak menambah skip.
+
+### R3-S9B — polyphonic instrument tracks (CLOSED · PASS)
+
+- Fondasi voice lane R2 digeneralisasi ke seluruh instrument track tanpa schema bump; Drum Track tetap wajib `poly`.
+- Header Pattern menambah toggle **P** per channel. Instrument track dapat berpindah mono ↔ poly; kembali ke mono ditolak selama masih ada voice lane tambahan agar chord tidak hilang diam-diam.
+- `Shift+note` pada track poly menambah note ke voice lane kosong pertama pada row yang sama. `Delete` membersihkan seluruh chord row; data tetap `NoteEvent` kanonik pattern-local.
+- Scheduler membawa beberapa voice lane instrument pada tick yang sama tanpa source duplication palsu di model.
+- Input regression chord memakai **Shift+C** sesuai posisi fisik keymap §8.14 dan memverifikasi pitch 60/64, lane 0/1, serta cursor row tetap.
+- Gate final run **37645427242** pada HEAD `c13500f…`: unit **196/196 PASS**, `npm run check` PASS, build PASS, browser Chromium + Firefox **268 PASS + 4 skip**.
+- Empat skip tetap limitation realtime `AudioContext` Firefox headless dari slice audio sebelumnya; S9B tidak menambah skip.
+- Actions gate dikunci ke SHA resmi `actions/checkout` dan `actions/setup-node` sesuai kebijakan supply-chain §13.3.
 
 ### R3-S9A — kapasitas 32 channel logis (CLOSED · PASS)
 

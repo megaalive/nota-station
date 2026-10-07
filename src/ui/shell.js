@@ -22,6 +22,8 @@ export function createShell({
   t,
   registry,
   palette,
+  shortcutOverlay = null,
+  shortcutForCommand = () => null,
   store,
   build,
   renderView = null,
@@ -77,6 +79,14 @@ export function createShell({
     variant: 'ghost',
     onClick: () => palette.open(),
   });
+  const shortcutButton = Button({
+    label: t('shortcut.title'),
+    icon: '?',
+    iconOnly: true,
+    variant: 'ghost',
+    onClick: () => shortcutOverlay?.open(),
+  });
+  shortcutButton.dataset.action = 'shortcut-help-button';
   const loopButton = Button({
     label: t('transport.loopPattern'),
     icon: '↻',
@@ -169,17 +179,18 @@ export function createShell({
     role: 'group',
     'aria-label': t('topbar.transport'),
   }, [
-    Tooltip({ text: t('transport.play'), shortcut: 'Space', child: playButton }),
+    Tooltip({ text: t('transport.play'), shortcut: shortcutForCommand('playback.togglePlayStop'), child: playButton }),
     Tooltip({ text: t('transport.pause'), child: pauseButton }),
-    Tooltip({ text: t('transport.stop'), shortcut: 'Space', child: stopButton }),
-    Tooltip({ text: t('transport.loopPattern'), child: loopButton }),
+    Tooltip({ text: t('transport.stop'), shortcut: shortcutForCommand('playback.togglePlayStop'), child: stopButton }),
+    Tooltip({ text: t('transport.loopPattern'), shortcut: shortcutForCommand('playback.toggleLoop'), child: loopButton }),
     Tooltip({ text: t('transport.metronome'), child: metronomeButton }),
     tempoControl,
     meterDisplay,
     Tooltip({ text: t('transport.seek'), child: seekInput }),
     el('span', { class: 'topbar__saved', role: 'status', dataset: { action: 'save-status' }, text: t('status.notSaved') }),
     buildId,
-    Tooltip({ text: t('cmd.palette'), shortcut: 'Ctrl+K', child: paletteButton }),
+    Tooltip({ text: t('cmd.palette'), shortcut: shortcutForCommand('ui.openPalette') ?? 'Ctrl+K', child: paletteButton }),
+    Tooltip({ text: t('shortcut.title'), shortcut: shortcutForCommand('ui.showShortcuts') ?? '?', child: shortcutButton }),
   ]);
 
   const topbar = el('header', { class: 'topbar', dataset: { action: 'topbar' } }, [transportBar]);

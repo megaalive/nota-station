@@ -28,6 +28,23 @@ test('listCommands mengembalikan descriptor serializable dengan status aktif', (
   assert.deepEqual(JSON.parse(JSON.stringify(list)), list);
 });
 
+test('shortcut descriptor boleh dinamis tetapi hasil listCommands tetap serializable', () => {
+  let preset = 'songwriter';
+  const registry = createCommandRegistry();
+  registry.register({
+    id: 'playback.toggle',
+    group: 'Playback',
+    labelKey: 'cmd.play',
+    shortcut: () => preset === 'songwriter' ? 'Space' : 'F7',
+    run: () => {},
+  });
+
+  assert.equal(registry.listCommands()[0].shortcut, 'Space');
+  preset = 'openmpt';
+  assert.equal(registry.listCommands()[0].shortcut, 'F7');
+  assert.deepEqual(JSON.parse(JSON.stringify(registry.listCommands())), registry.listCommands());
+});
+
 test('command nonaktif melaporkan alasan, dan execute menolak', () => {
   const registry = createCommandRegistry();
   registry.register({

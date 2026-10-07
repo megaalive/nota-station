@@ -4,6 +4,11 @@
 import { createI18n, DEFAULT_LOCALE } from './i18n/messages.js';
 import { commandError, createCommandRegistry } from './core/commands.js';
 import { createHistory } from './core/history.js';
+import {
+  KEYMAP_PRESETS,
+  matchKeyBinding,
+  shortcutFor,
+} from './core/keymap.js';
 import { createFocusStore, patternForFocus } from './core/focus.js';
 import { createSharedPatternGuard } from './core/shared-pattern-guard.js';
 import { quantizePatternCell } from './core/pattern-grid.js';
@@ -82,13 +87,14 @@ import { createPatternView } from './ui/pattern.js';
 import { createSoundView } from './ui/sound.js';
 import { createSongView } from './ui/song.js';
 import { createShell } from './ui/shell.js';
+import { createShortcutOverlay } from './ui/shortcut-overlay.js';
 import { createWelcome } from './ui/welcome.js';
 
 const i18n = createI18n(readInitialLocale());
 const registry = createCommandRegistry();
 const store = window.localStorage;
 const THEMES = ['light', 'dark', 'high-contrast'];
-const KEYMAPS = ['songwriter', 'openmpt'];
+const KEYMAPS = KEYMAP_PRESETS;
 const WELCOME_COMPLETED_KEY = 'notastation.welcome.completed';
 const KEYMAP_STORAGE_KEY = 'notastation.keymapPreset';
 let sampleStorePromise = null;
@@ -192,6 +198,29 @@ function setLocale(next) {
 function readInitialKeymap() {
   const stored = store?.getItem(KEYMAP_STORAGE_KEY);
   return KEYMAPS.includes(stored) ? stored : 'songwriter';
+}
+
+function setKeymapPreset(next) {
+  if (!KEYMAPS.includes(next)) {
+    throw commandError('E_KEYMAP_UNKNOWN', `Preset keymap tidak dikenal: ${next}`);
+  }
+  if (project.settings.keymapPreset === next) return next;
+
+  project = {
+    ...project,
+    settings: {
+      ...project.settings,
+      keymapPreset: next,
+    },
+  };
+  store?.setItem(KEYMAP_STORAGE_KEY, next);
+  persistSessionProjectSnapshot();
+
+  if (shell) {
+    const activeTab = shell.getActiveTab();
+    mountShell(activeTab);
+  }
+  return next;
 }
 
 function applyProjectPreferences(nextProject, {
@@ -400,16 +429,71 @@ const palette = createPalette({
   t: (key, vars) => i18n.t(key, vars),
 });
 
+const shortcutOverlay = createShortcutOverlay({
+  registry,
+  t: (key, vars) => i18n.t(key, vars),
+  getPreset: () => project.settings.keymapPreset,
+  getActiveView: () => shell?.getActiveTab() ?? 'pattern',
+  onSelectPreset: (preset) => registry.execute('ui.setKeymap', { preset }),
+});
+
+function activeShortcut(commandId) {
+  return shortcutFor(commandId, project.settings.keymapPreset, {
+    context: shell?.getActiveTab() === 'pattern' ? 'pattern' : 'global',
+  });
+}
+
 function registerCommands() {
   registry.registerAll([
     {
       id: 'playback.play',
       group: 'Playback',
       labelKey: 'transport.play',
-      shortcut: 'Space',
       run: () => {
         void playActivePattern();
         return 'play';
+      },
+    },
+    {
+      id: 'playback.togglePlayStop',
+      group: 'Playback',
+      labelKey: 'transport.playStop',
+      shortcut: () => activeShortcut('playback.togglePlayStop'),
+      run: () => {
+        if (audio.getState().state === 'playing') {
+          audio.stop();
+          return 'stop';
+        }
+        void playActivePattern();
+        return 'play';
+      },
+    },
+    {
+      id: 'playback.playPatternStart',
+      group: 'Playback',
+      labelKey: 'transport.playPatternStart',
+      shortcut: () => activeShortcut('playback.playPatternStart'),
+      run: () => {
+        audio.stop();
+        void playActivePattern();
+        return 0;
+      },
+    },
+    {
+      id: 'playback.playPatternCursor',
+      group: 'Playback',
+      labelKey: 'transport.playPatternCursor',
+      shortcut: () => activeShortcut('playback.playPatternCursor'),
+      isEnabled: () => Boolean(patternView && shell?.getActiveTab() === 'pattern'),
+      disabledReason: () => i18n.t('shortcut.patternContextRequired'),
+      run: () => {
+        const ui = patternView?.getUiState();
+        if (!ui) throw commandError('E_PATTERN_CONTEXT', i18n.t('shortcut.patternContextRequired'));
+        const tick = ui.row * ui.displayRowTicks;
+        audio.stop();
+        audio.seek(project, focusedPattern(project), tick);
+        void playActivePattern();
+        return tick;
       },
     },
     {
@@ -437,6 +521,7 @@ function registerCommands() {
       id: 'playback.toggleLoop',
       group: 'Playback',
       labelKey: 'transport.loopPattern',
+      shortcut: () => activeShortcut('playback.toggleLoop'),
       run: () => {
         transportState.loopPattern = !transportState.loopPattern;
         audio.setLoop(project, focusedPattern(project), transportState.loopPattern);
@@ -486,6 +571,45 @@ function registerCommands() {
         syncTransportUi();
         return result;
       },
+    },
+    {
+      id: 'audio.toggleActiveTrackMute',
+      group: 'Mixer',
+      labelKey: 'audio.activeTrackMute',
+      shortcut: () => activeShortcut('audio.toggleActiveTrackMute'),
+      isEnabled: () => Boolean(patternView?.getActiveTrackId()),
+      disabledReason: () => i18n.t('shortcut.patternContextRequired'),
+      run: () => {
+        const trackId = patternView?.getActiveTrackId();
+        if (!trackId) throw commandError('E_PATTERN_CONTEXT', i18n.t('shortcut.patternContextRequired'));
+        const result = audio.toggleTrackMute(trackId);
+        syncTransportUi();
+        return result;
+      },
+    },
+    {
+      id: 'audio.toggleActiveTrackSolo',
+      group: 'Mixer',
+      labelKey: 'audio.activeTrackSolo',
+      shortcut: () => activeShortcut('audio.toggleActiveTrackSolo'),
+      isEnabled: () => Boolean(patternView?.getActiveTrackId()),
+      disabledReason: () => i18n.t('shortcut.patternContextRequired'),
+      run: () => {
+        const trackId = patternView?.getActiveTrackId();
+        if (!trackId) throw commandError('E_PATTERN_CONTEXT', i18n.t('shortcut.patternContextRequired'));
+        const result = audio.toggleTrackSolo(trackId);
+        syncTransportUi();
+        return result;
+      },
+    },
+    {
+      id: 'pattern.toggleEditMode',
+      group: 'Pattern',
+      labelKey: 'pattern.toggleMode',
+      shortcut: () => activeShortcut('pattern.toggleEditMode'),
+      isEnabled: () => Boolean(patternView && shell?.getActiveTab() === 'pattern'),
+      disabledReason: () => i18n.t('shortcut.patternContextRequired'),
+      run: () => patternView?.toggleMode(),
     },
     {
       id: 'playback.seek',
@@ -1005,6 +1129,26 @@ function registerCommands() {
       },
     },
     {
+      id: 'ui.showShortcuts',
+      group: 'Tampilan',
+      labelKey: 'shortcut.title',
+      shortcut: () => activeShortcut('ui.showShortcuts') ?? '?',
+      run: () => {
+        shortcutOverlay.open();
+        return 'shortcuts';
+      },
+    },
+    {
+      id: 'ui.setKeymap',
+      group: 'Tampilan',
+      labelKey: 'shortcut.keymap',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('ui.setKeymap', args);
+        return setKeymapPreset(String(args.preset ?? ''));
+      },
+    },
+    {
       id: 'ui.cycleTheme',
       group: 'Tampilan',
       labelKey: 'palette.toggleTheme',
@@ -1419,6 +1563,7 @@ function renderWorkspace(tab, root) {
       onAudition: auditionPitch,
       onInstrumentAudition: auditionInstrument,
       onStatus: (status) => shell?.setPatternStatus(status),
+      keymapPreset: project.settings.keymapPreset,
       initialMode: project.settings.keymapPreset === 'openmpt' ? 'edit' : 'audition',
     });
     return true;
@@ -1446,6 +1591,10 @@ function mountShell(activeTab = 'pattern') {
     t: (key, vars) => i18n.t(key, vars),
     registry,
     palette,
+    shortcutOverlay,
+    shortcutForCommand: (id) => shortcutFor(id, project.settings.keymapPreset, {
+      context: activeTab === 'pattern' ? 'pattern' : 'global',
+    }),
     store,
     build: buildInfo,
     renderView: renderWorkspace,
@@ -1577,11 +1726,7 @@ function bindShortcuts() {
         return;
       }
     }
-    if (event.ctrlKey && event.code === 'KeyK') {
-      event.preventDefault();
-      registry.execute('ui.openPalette');
-      return;
-    }
+
     if (event.altKey && /^Digit[1-7]$/.test(event.code)) {
       event.preventDefault();
       const index = Number(event.code.slice(5)) - 1;
@@ -1589,11 +1734,17 @@ function bindShortcuts() {
       shell?.selectTab(ids[index]);
       return;
     }
-    if (event.code === 'Space' && !event.ctrlKey && !event.altKey && !event.metaKey) {
-      if (event.target.closest?.('input, textarea, button, [role="tab"], [contenteditable="true"]')) return;
-      event.preventDefault();
-      registry.execute(audio.getState().state === 'playing' ? 'playback.stop' : 'playback.play');
-    }
+
+    if (isTextInputTarget(event.target)) return;
+    if (event.target.closest?.('button, [role="tab"]')) return;
+
+    const context = shell?.getActiveTab() === 'pattern' ? 'pattern' : 'global';
+    const binding = matchKeyBinding(event, project.settings.keymapPreset, { context });
+    if (!binding) return;
+    if (!registry.canRun(binding.commandId)) return;
+
+    event.preventDefault();
+    registry.execute(binding.commandId);
   });
 }
 
@@ -1648,6 +1799,7 @@ async function boot() {
       ready: true,
       locale: i18n.getLocale(),
       theme,
+      keymap: project.settings.keymapPreset,
       build: buildInfo,
       activeTab: shell.getActiveTab(),
       audio: audio.getState(),

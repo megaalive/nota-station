@@ -6,7 +6,7 @@
  * @property {string} id
  * @property {string} group
  * @property {string} labelKey   // key i18n, bukan teks langsung
- * @property {string} [shortcut] // hanya untuk display; pemetaan key asli ada di §8.14
+ * @property {string|(() => string|null)} [shortcut] // display; boleh dinamis mengikuti preset keymap
  * @property {boolean} [requiresArgs] // tetap discoverable, tetapi palette tidak mengeksekusi tanpa konteks
  * @property {() => boolean} [isEnabled]
  * @property {() => string} [disabledReason]
@@ -58,7 +58,9 @@ export function createCommandRegistry(initialCommands = []) {
         id: def.id,
         group: def.group,
         labelKey: def.labelKey,
-        shortcut: def.shortcut ?? null,
+        shortcut: typeof def.shortcut === 'function'
+          ? (def.shortcut() ?? null)
+          : (def.shortcut ?? null),
         requiresArgs: def.requiresArgs ?? false,
         enabled,
         disabledReason: enabled ? null : (def.disabledReason?.() ?? null),
