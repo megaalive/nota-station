@@ -162,6 +162,14 @@ test('parser menormalisasi sound model R1 lama ke kontrak R2', () => {
   assert.equal(restored.instruments[0].zones[0].sampleId, 'factory.basic');
 });
 
+test('parser menormalisasi Track schema-1 lama tanpa color ke null', () => {
+  const legacy = fixture();
+  delete legacy.song.tracks[0].color;
+
+  const restored = parseDebugProject(JSON.stringify(legacy));
+  assert.equal(restored.song.tracks[0].color, null);
+});
+
 test('JSON debug menjaga warna Track dan menolak warna invalid', () => {
   const project = fixture();
   project.song.tracks[0].color = '#336699';
