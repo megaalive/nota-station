@@ -2,7 +2,7 @@ name: R3 S8F-B targeted
 
 on:
   pull_request:
-    types: [opened]
+    types: [synchronize]
     branches: [main]
 
 permissions:
@@ -12,6 +12,10 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      CI: 1
+      PW_PROJECTS: chromium,firefox
+      PW_REPORTER: list
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
