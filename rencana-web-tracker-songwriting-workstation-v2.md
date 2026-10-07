@@ -996,7 +996,6 @@ Setiap milestone memuat **Deliverable UX** di samping deliverable teknis.
 
 ### R3 — Kematangan editing tracker + struktur lagu
 
-
 **Teknis:** 32 channel logis; Order List; reuse & clone pattern; seleksi blok; salin/tempel; transpose; sisip/hapus baris; interpolasi volume; kolom instrumen/volume/FX bertipe; efek v0.1; follow playback; mute/solo/volume channel; **generalisasi track polifonik + voice lane dari fondasi Drum Track R2 ke semua track**; resolusi LPB + kolom DLY.
 **UX:** **Song Map + Order List (dua pandangan, data sama)**; peringatan *pattern bersama* + "Jadikan unik"; **Command Palette penuh + overlay `?`**; **dua preset keymap** (Songwriter, OpenMPT-like — diverifikasi terhadap OpenMPT); seleksi bertahap `Ctrl+A`; header channel lengkap; progressive disclosure FX.
 **Exit:** lagu 8 pattern dapat disusun tanpa mouse untuk operasi dasar; pattern reuse berubah serentak, clone menghasilkan definisi baru; efek v0.1 punya tes deterministik; 32 channel tetap responsif; reorder Order tidak menggeser chord/tempo (tes properti terhadap §5.1). **T4 ≤ 20 dtk, T5 ≤ 3 mnt.**
