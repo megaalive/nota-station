@@ -5,6 +5,19 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S10A — runtime keymap + shortcut overlay (CLOSED · PASS)
+
+- Preset **Songwriter** dan **OpenMPT-like** kini menjadi binding runtime nyata berbasis `KeyboardEvent.code`, bukan sekadar preferensi onboarding. Pengguna dapat mengganti preset setelah first-run dari overlay bantuan.
+- `?` membuka overlay shortcut kontekstual untuk view aktif dari registry command yang sama dengan Command Palette/agent. Command Palette juga menampilkan shortcut dinamis sesuai preset aktif.
+- Songwriter mempertahankan `Space` untuk Play/Stop Pattern. Shortcut umum tetap mencakup `Ctrl+K` Palette, Undo/Redo, dan `Alt+1…7`; sesuai §8.14, shortcut tidak membajak input teks.
+- Subset OpenMPT-like diverifikasi terhadap manual OpenMPT dan hanya memetakan aksi yang sudah memiliki padanan nyata: `F7` Play Pattern dari awal, `Ctrl+F7` dari kursor, `F10` mute channel aktif, `Ctrl+F10` solo, `Shift+F11` loop Pattern, `Ctrl+Space` EDIT/AUDISI, serta `Tab/Shift+Tab` pindah channel.
+- Aksi OpenMPT yang belum memiliki semantik NotaStation tidak dipalsukan. Khusus Songwriter `Shift+Space = mulai dari awal section` **belum ditutup** karena transport masih Pattern-local; gap ini harus diselesaikan bersama Song/Section transport.
+- Topbar menampilkan tombol bantuan `?` dan tooltip shortcut mengikuti preset aktif. Layout header M/S/P/meter juga dikoreksi menjadi empat slot yang benar.
+- Workflow CI sementara S9B yang sempat tertinggal di `main` dihapus agar PR berikutnya tidak menjalankan full gate ganda.
+- Gate source final run **37648007658** pada HEAD `68a7f98…`: 0 vulnerability, unit **201/201 PASS**, `npm run check` PASS, build **559,0 KiB**, full browser Chromium + Firefox **276 PASS + 4 skip**.
+- Run tambahan **37648438288** juga PASS setelah audit kompatibilitas shortcut; source kemudian dikembalikan byte-identik ke kontrak §8.14 yang sudah digate pada `68a7f98…`.
+- Empat skip tetap limitation realtime `AudioContext` Firefox headless dari slice audio sebelumnya; S10A tidak menambah skip.
+
 ### R3-S9B — polyphonic instrument tracks (CLOSED · PASS)
 
 - Fondasi voice lane R2 digeneralisasi ke seluruh instrument track tanpa schema bump; Drum Track tetap wajib `poly`.
