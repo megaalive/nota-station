@@ -30,7 +30,10 @@ import {
   secondsPerTick,
   transportTickAtAudioTime,
 } from './scheduler.js';
-import {\n  scheduleFinitePitchEffect,\n  scheduleRepeatingPitchEffect,\n} from './pitch-effects.js';
+import {
+  scheduleFinitePitchEffect,
+  scheduleRepeatingPitchEffect,
+} from './pitch-effects.js';
 import { sampleOffsetSeconds } from './source-note-effects.js';
 import { scheduleSourceCut } from './timing-effects.js';
 import {
