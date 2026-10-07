@@ -149,6 +149,34 @@ export function notesAtCell(project, { patternId, trackId, row }) {
     .sort((a, b) => voiceLaneOf(a) - voiceLaneOf(b));
 }
 
+export function setTrackColor(
+  project,
+  { trackId, color },
+  { now = isoNow } = {},
+) {
+  const trackIndex = project.song.tracks.findIndex((item) => item.id === trackId);
+  if (trackIndex < 0) {
+    throw projectError('E_PROJECT_TRACK_MISSING', `Track tidak ditemukan: ${trackId}`);
+  }
+
+  const normalized = color === null ? null : String(color).toUpperCase();
+  if (normalized !== null && !/^#[0-9A-F]{6}$/.test(normalized)) {
+    throw projectError('E_PROJECT_TRACK_COLOR', `Warna Track harus hex #RRGGBB: ${color}`);
+  }
+  if (project.song.tracks[trackIndex].color === normalized) return project;
+
+  const tracks = [...project.song.tracks];
+  tracks[trackIndex] = { ...tracks[trackIndex], color: normalized };
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      tracks,
+    },
+  };
+}
+
 export function setTrackPolyphony(
   project,
   { trackId, polyphony },
