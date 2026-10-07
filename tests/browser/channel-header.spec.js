@@ -52,6 +52,7 @@ test.describe('R3-S10C header channel lengkap', () => {
 
     await expect(color).toBeVisible();
     await color.fill('#336699');
+    await color.dispatchEvent('change');
 
     expect(await page.evaluate((id) => (
       window.tracker.getProject().song.tracks.find((track) => track.id === id).color
