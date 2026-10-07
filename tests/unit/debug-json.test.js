@@ -162,6 +162,21 @@ test('parser menormalisasi sound model R1 lama ke kontrak R2', () => {
   assert.equal(restored.instruments[0].zones[0].sampleId, 'factory.basic');
 });
 
+test('JSON debug menjaga warna Track dan menolak warna invalid', () => {
+  const project = fixture();
+  project.song.tracks[0].color = '#336699';
+
+  const restored = parseDebugProject(serializeDebugProject(project));
+  assert.equal(restored.song.tracks[0].color, '#336699');
+
+  const invalid = fixture();
+  invalid.song.tracks[0].color = 'red';
+  assert.throws(
+    () => parseDebugProject(JSON.stringify(invalid)),
+    (error) => error.code === 'E_DEBUG_JSON_TRACK_COLOR',
+  );
+});
+
 test('parser menolak default instrument track dan sample zone yang tidak ada', () => {
   const brokenTrack = fixture();
   brokenTrack.song.tracks[0].defaultInstrumentId = 'missing';
