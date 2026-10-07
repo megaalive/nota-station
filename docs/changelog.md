@@ -5,6 +5,15 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S10F — property proof reorder chord/tempo (CLOSED · PASS)
+
+- Exit criterion R3 “reorder Order tidak menggeser chord/tempo” kini dikunci oleh property-style regression, bukan hanya satu contoh.
+- Fixture membangun **8 Pattern/occurrence** dengan ChordEvent dan tempoEvents pattern-local yang berbeda, lalu menguji seluruh **64 pasangan** `fromIndex → toIndex`.
+- Untuk setiap move, seluruh `song.patterns`, chord, tempoEvents, dan tick lokal wajib identik; hanya urutan OrderEntry yang boleh berubah. Input project juga wajib tetap immutable.
+- Slice ini test-only; tidak ada perubahan runtime/model.
+- Gate final GitHub run **37705080384**: 0 vulnerability, unit **207/207 PASS**, `npm run check` PASS, build **578,9 KiB**.
+- Milestone R3 tetap aktif karena masih ada gap transport Song/Section untuk shortcut Songwriter `Shift+Space` dan perlu audit final operasi 8-pattern tanpa mouse.
+
 ### R3-S10E — pointer drag block selection (CLOSED · PASS)
 
 - Drag mouse pada cell Pattern kini memilih blok row × channel; cursor berakhir pada cell terakhir tanpa mengubah model lagu.
