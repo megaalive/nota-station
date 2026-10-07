@@ -149,6 +149,83 @@ export function notesAtCell(project, { patternId, trackId, row }) {
     .sort((a, b) => voiceLaneOf(a) - voiceLaneOf(b));
 }
 
+export function setTrackPolyphony(
+  project,
+  { trackId, polyphony },
+  { now = isoNow } = {},
+) {
+  const track = project.song.tracks.find((item) => item.id === trackId);
+  if (!track) {
+    throw projectError('E_PROJECT_TRACK_MISSING', `Track tidak ditemukan: ${trackId}`);
+  }
+  if (!['mono', 'poly'].includes(polyphony)) {
+    throw projectError('E_PROJECT_POLYPHONY', `Mode polyphony tidak valid: ${polyphony}`);
+  }
+  if (track.kind === 'drum' && polyphony !== 'poly') {
+    throw projectError('E_PROJECT_DRUM_POLYPHONY', 'Drum Track harus tetap polyphonic.');
+  }
+  if (track.polyphony === polyphony) return project;
+
+  if (
+    polyphony === 'mono'
+    && project.song.patterns.some((pattern) => pattern.notes.some(
+      (note) => note.trackId === trackId && voiceLaneOf(note) > 0,
+    ))
+  ) {
+    throw projectError(
+      'E_PROJECT_POLYPHONY_ACTIVE_VOICES',
+      'Track masih memiliki voice lane tambahan; hapus chord sebelum kembali ke mono.',
+    );
+  }
+
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      tracks: project.song.tracks.map((item) => (
+        item.id === trackId ? { ...item, polyphony } : item
+      )),
+    },
+  };
+}
+
+export function firstFreeVoiceLane(
+  project,
+  { patternId, trackId, row },
+) {
+  const pattern = project.song.patterns.find((item) => item.id === patternId);
+  if (!pattern) {
+    throw projectError('E_PROJECT_PATTERN_MISSING', `Pattern tidak ditemukan: ${patternId}`);
+  }
+  const track = project.song.tracks.find((item) => item.id === trackId);
+  if (!track) {
+    throw projectError('E_PROJECT_TRACK_MISSING', `Track tidak ditemukan: ${trackId}`);
+  }
+  if (track.polyphony !== 'poly') {
+    throw projectError(
+      'E_PROJECT_POLYPHONY',
+      `Track ${trackId} tidak menerima voice lane polifonik.`,
+    );
+  }
+  if (!Number.isInteger(row) || row < 0 || row >= pattern.lengthTicks / pattern.rowTicks) {
+    throw projectError('E_PROJECT_ROW_RANGE', `Row di luar pattern: ${row}`);
+  }
+
+  const used = new Set(
+    pattern.notes
+      .filter((note) => note.trackId === trackId && note.startTickLocal === row * pattern.rowTicks)
+      .map((note) => voiceLaneOf(note)),
+  );
+  for (let lane = 0; lane <= 31; lane += 1) {
+    if (!used.has(lane)) return lane;
+  }
+  throw projectError(
+    'E_PROJECT_VOICE_LANE_FULL',
+    'Semua 32 voice lane pada sel ini sudah terisi.',
+  );
+}
+
 export function configureDrumTrack(
   project,
   { trackId, instrumentId },
