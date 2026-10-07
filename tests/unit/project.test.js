@@ -10,9 +10,14 @@ import {
   addTrack,
   createBlankProject,
   deleteNote,
+  deleteVoiceRow,
   enterNote,
+  enterVoiceNote,
+  firstFreeVoiceLane,
   noteAtCell,
+  notesAtCell,
   setInitialTempo,
+  setTrackPolyphony,
   updateNoteAtCell,
 } from '../../src/core/project.js';
 
@@ -121,6 +126,84 @@ test('addTrack menerima nama eksplisit tetapi menolak nama kosong atau terlalu p
   assert.throws(
     () => addTrack(project, { name: 'x'.repeat(81) }),
     (error) => error.code === 'E_PROJECT_TRACK_NAME',
+  );
+});
+
+
+test('instrument track dapat diubah poly dan menerima beberapa voice lane pada row yang sama', () => {
+  let project = fixture();
+  const pattern = activePattern(project);
+  const trackId = project.song.tracks[0].id;
+
+  project = setTrackPolyphony(
+    project,
+    { trackId, polyphony: 'poly' },
+    { now: () => '2026-10-07T15:00:00.000Z' },
+  );
+  assert.equal(project.song.tracks[0].kind, 'instrument');
+  assert.equal(project.song.tracks[0].polyphony, 'poly');
+
+  assert.equal(firstFreeVoiceLane(project, { patternId: pattern.id, trackId, row: 4 }), 0);
+  project = enterVoiceNote(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 4,
+    voiceLane: 0,
+    pitch: 60,
+  });
+  assert.equal(firstFreeVoiceLane(project, { patternId: pattern.id, trackId, row: 4 }), 1);
+  project = enterVoiceNote(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 4,
+    voiceLane: 1,
+    pitch: 64,
+  });
+
+  const notes = notesAtCell(project, { patternId: pattern.id, trackId, row: 4 });
+  assert.deepEqual(notes.map((note) => [note.voiceLane ?? 0, note.pitch]), [[0, 60], [1, 64]]);
+});
+
+test('poly instrument menolak kembali mono bila voice lane tambahan masih ada', () => {
+  let project = fixture();
+  const pattern = activePattern(project);
+  const trackId = project.song.tracks[0].id;
+
+  project = setTrackPolyphony(project, { trackId, polyphony: 'poly' });
+  project = enterVoiceNote(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 2,
+    voiceLane: 1,
+    pitch: 67,
+  });
+
+  assert.throws(
+    () => setTrackPolyphony(project, { trackId, polyphony: 'mono' }),
+    (error) => error.code === 'E_PROJECT_POLYPHONY_ACTIVE_VOICES',
+  );
+
+  project = deleteVoiceRow(project, { patternId: pattern.id, trackId, row: 2 });
+  project = setTrackPolyphony(project, { trackId, polyphony: 'mono' });
+  assert.equal(project.song.tracks[0].polyphony, 'mono');
+});
+
+test('drum track tidak dapat diubah kembali mono', () => {
+  let project = fixture();
+  const trackId = project.song.tracks[0].id;
+  project = {
+    ...project,
+    song: {
+      ...project.song,
+      tracks: project.song.tracks.map((track) => (
+        track.id === trackId ? { ...track, kind: 'drum', polyphony: 'poly' } : track
+      )),
+    },
+  };
+
+  assert.throws(
+    () => setTrackPolyphony(project, { trackId, polyphony: 'mono' }),
+    (error) => error.code === 'E_PROJECT_DRUM_POLYPHONY',
   );
 });
 
