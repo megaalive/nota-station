@@ -78,6 +78,9 @@ test.describe('Kapasitas 32 channel R3-S9A', () => {
       };
     });
 
+    await test.info().attach('channel-32-input', {
+      body: JSON.stringify(uiResult), contentType: 'application/json',
+    });
     expect(uiResult.before.channel).toBe(31);
     expect(uiResult.before.field).toBe('note');
     expect(uiResult.noteCount).toBe(1);

@@ -164,6 +164,44 @@ test('instrument track dapat diubah poly dan menerima beberapa voice lane pada r
   assert.deepEqual(notes.map((note) => [note.voiceLane ?? 0, note.pitch]), [[0, 60], [1, 64]]);
 });
 
+test('updateNoteAtCell dapat menarget voice lane tertentu pada track poly', () => {
+  let project = fixture();
+  const pattern = activePattern(project);
+  const trackId = project.song.tracks[0].id;
+
+  project = setTrackPolyphony(project, { trackId, polyphony: 'poly' });
+  project = enterVoiceNote(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 6,
+    voiceLane: 0,
+    pitch: 60,
+    velocity: 100,
+  });
+  project = enterVoiceNote(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 6,
+    voiceLane: 1,
+    pitch: 64,
+    velocity: 100,
+  });
+
+  const next = updateNoteAtCell(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 6,
+    voiceLane: 1,
+    velocity: 64,
+  });
+
+  const notes = notesAtCell(next, { patternId: pattern.id, trackId, row: 6 });
+  assert.equal(notes[0].velocity, 100);
+  assert.equal(notes[1].velocity, 64);
+  assert.equal(notes[0].pitch, 60);
+  assert.equal(notes[1].pitch, 64);
+});
+
 test('poly instrument menolak kembali mono bila voice lane tambahan masih ada', () => {
   let project = fixture();
   const pattern = activePattern(project);
@@ -370,6 +408,30 @@ test('updateNoteAtCell menerima instrument valid dan menolak note/instrument/vel
     () => updateNoteAtCell(project, { patternId: pattern.id, trackId, row: 4, velocity: 128 }),
     (error) => error.code === 'E_PROJECT_VELOCITY_RANGE',
   );
+});
+
+test('updateNoteAtCell memilih lane tanpa mengubah voice lain dan menolak lane invalid', () => {
+  let project = fixture();
+  const patternId = activePattern(project).id;
+  const trackId = project.song.tracks[0].id;
+  project = setTrackPolyphony(project, { trackId, polyphony: 'poly' });
+  for (const [voiceLane, pitch] of [[0, 60], [1, 64]]) {
+    project = enterVoiceNote(project, { patternId, trackId, row: 0, voiceLane, pitch });
+  }
+  const before = project;
+  project = updateNoteAtCell(project, { patternId, trackId, row: 0, voiceLane: 1, velocity: 64 });
+  assert.equal(noteAtCell(project, { patternId, trackId, row: 0 }).velocity, 100);
+  assert.equal(noteAtCell(project, { patternId, trackId, row: 0, voiceLane: 1 }).velocity, 64);
+  assert.equal(noteAtCell(before, { patternId, trackId, row: 0, voiceLane: 1 }).velocity, 100);
+  assert.equal(updateNoteAtCell(project, { patternId, trackId, row: 0, voiceLane: 1, velocity: 64 }), project);
+  for (const voiceLane of [-1, 32, 1.5]) {
+    assert.throws(() => updateNoteAtCell(project, { patternId, trackId, row: 0, voiceLane, velocity: 64 }),
+      (error) => error.code === 'E_PROJECT_VOICE_LANE');
+  }
+  assert.throws(() => updateNoteAtCell(project, { patternId, trackId, row: 0, voiceLane: 2 }),
+    (error) => error.code === 'E_PROJECT_NOTE_MISSING');
+  assert.throws(() => updateNoteAtCell(project, { patternId, trackId, row: 0, voiceLane: 1, instrumentId: 'missing' }),
+    (error) => error.code === 'E_PROJECT_INSTRUMENT_MISSING');
 });
 
 test('row, pitch, velocity, dan instrument invalid gagal dengan kode stabil', () => {

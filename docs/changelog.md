@@ -5,6 +5,17 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S10B — proyeksi voice lane Pattern (CLOSED · PASS)
+
+- Channel poly default tetap collapsed; tombol header dengan `aria-expanded` membuka NOTE/INST/VOL per lane nyata pada Pattern aktif, minimum lane 0. Fold tidak mengubah project atau history (§5.4, §8.6).
+- Cursor menyimpan `voiceLane`; NOTE replacement, INST/VOL, dan Delete bekerja pada lane terpilih saat expanded. Collapsed mempertahankan ringkasan chord, Delete seluruh row, serta Shift+note first-free lane. Helper note/update menerima lane opsional default 0 tanpa schema bump.
+- Geometri memakai prefix offset pixel/kolom per track untuk spacer, window horizontal, navigasi, serta ARIA. DLY/FX tetap track-level. Row/cell DOM dipakai ulang hanya bila identitas track dan geometri cocok; audisi EDIT dijadwalkan ke microtask setelah penulisan sel agar inisialisasi AudioContext tidak memblokir feedback keyboard.
+- Regresi tambahan mencakup lane sparse, NOTE Undo/Redo, pergantian template, ARIA/windowing, FX setelah perubahan lebar, serta acceptance fold/edit per-lane.
+- Gate lokal executor: unit **203/203 PASS**, check/build PASS, targeted Chromium + Firefox **60/60 PASS**; channel 32 **12,4 ms Chromium / 20 ms Firefox** pada full run, batas 50 ms tetap.
+- Gate GitHub final run **37679632813**: 0 vulnerability, unit **203/203 PASS**, `npm run check` PASS, build Linux **565,7 KiB**, full browser Chromium + Firefox **292 PASS + 4 skip**.
+- Empat skip tetap limitation realtime `AudioContext` Firefox headless yang sudah ada; S10B tidak menambah skip dan tidak melemahkan budget performa.
+- Asumsi yang sengaja dipertahankan: fold tidak dipersistenkan; lane sparse hanya menampilkan lane nyata ditambah lane 0; block selection serta DLY/FX tetap track-level. Milestone R3 tetap aktif.
+
 ### R3-S10A — runtime keymap + shortcut overlay (CLOSED · PASS)
 
 - Preset **Songwriter** dan **OpenMPT-like** kini menjadi binding runtime nyata berbasis `KeyboardEvent.code`, bukan sekadar preferensi onboarding. Pengguna dapat mengganti preset setelah first-run dari overlay bantuan.

@@ -870,9 +870,13 @@
 
 .pattern-channel__controls {
   display: grid;
-  grid-template-columns: 20px 20px 20px 1fr;
+  grid-template-columns: repeat(3, 20px) 1fr;
   align-items: center;
   gap: 3px;
+}
+
+.pattern-channel__controls:has([data-action="track-lanes-toggle"]) {
+  grid-template-columns: repeat(4, 20px) 1fr;
 }
 
 .pattern-channel__toggle {
