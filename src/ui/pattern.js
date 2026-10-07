@@ -116,6 +116,8 @@ export function createPatternView({
   let sharedWarningDetails = null;
   let blockAnchor = null;
   let blockSelection = null;
+  let pointerSelection = null;
+  let suppressPointerClick = false;
   let displayPatternId = null;
   let displayLpb = 4;
   let fxColumnsPinned = false;
@@ -992,6 +994,11 @@ export function createPatternView({
         role: 'columnheader',
         'aria-colindex': String(geometry[index].columnOffset + 1),
         'aria-colspan': String(geometry[index].columns.length),
+        dataset: {
+          action: 'pattern-channel-header',
+          channel: String(index),
+          trackId: track.id,
+        },
       }, [label, instrumentSelect, controls, mix]);
       channel.style.setProperty('--track-color', resolvedTrackColor);
       channelRow.append(channel);
@@ -1156,6 +1163,7 @@ export function createPatternView({
             title,
             on: {
               click: () => {
+                if (suppressPointerClick) return;
                 clearInputState();
                 clearBlockSelection();
                 cursorRow = row;
@@ -1261,6 +1269,162 @@ export function createPatternView({
       && channel >= blockSelection.channelStart
       && channel <= blockSelection.channelEnd
     );
+  }
+
+  function pointerCell(target) {
+    return target instanceof Element
+      ? target.closest('[data-action="pattern-cell"]')
+      : null;
+  }
+
+  function pointerHeader(target) {
+    return target instanceof Element
+      ? target.closest('[data-action="pattern-channel-header"]')
+      : null;
+  }
+
+  function pointerCellAt(clientX, clientY) {
+    return pointerCell(document.elementFromPoint(clientX, clientY));
+  }
+
+  function pointerHeaderAt(clientX, clientY) {
+    return pointerHeader(document.elementFromPoint(clientX, clientY));
+  }
+
+  function readPointerCell(cell) {
+    if (!cell) return null;
+    const row = Number(cell.dataset.row);
+    const channel = Number(cell.dataset.channel);
+    const voiceLane = Number(cell.dataset.voiceLane ?? 0);
+    const field = cell.dataset.field;
+    if (!Number.isInteger(row) || !Number.isInteger(channel) || !field) return null;
+    return { row, channel, field, voiceLane: Number.isInteger(voiceLane) ? voiceLane : 0 };
+  }
+
+  function readPointerHeader(channelHeader) {
+    if (!channelHeader) return null;
+    const channel = Number(channelHeader.dataset.channel);
+    return Number.isInteger(channel) ? channel : null;
+  }
+
+  function headerControlTarget(target) {
+    return target instanceof Element
+      && Boolean(target.closest('button, input, select, textarea, [role="button"]'));
+  }
+
+  function beginPointerCellSelection(event, cell) {
+    const point = readPointerCell(cell);
+    if (!point) return;
+
+    clearInputState();
+    clearBlockSelection();
+    cursorRow = point.row;
+    cursorChannel = point.channel;
+    cursorField = point.field;
+    cursorVoiceLane = point.voiceLane;
+    blockAnchor = { row: point.row, channel: point.channel };
+    blockSelection = {
+      rowStart: point.row,
+      rowEnd: point.row,
+      channelStart: point.channel,
+      channelEnd: point.channel,
+    };
+    pointerSelection = {
+      kind: 'cell',
+      pointerId: event.pointerId,
+      startRow: point.row,
+      startChannel: point.channel,
+      moved: false,
+    };
+    scroller.setPointerCapture?.(event.pointerId);
+    scroller.focus({ preventScroll: true });
+    renderWindow();
+    syncStatus();
+    syncEffectEditor();
+  }
+
+  function beginPointerHeaderSelection(event, channelHeader) {
+    const channel = readPointerHeader(channelHeader);
+    if (channel === null) return;
+
+    clearInputState();
+    clearBlockSelection();
+    const { rowCount } = projectInfo();
+    cursorChannel = channel;
+    cursorVoiceLane = 0;
+    blockAnchor = { row: 0, channel };
+    blockSelection = {
+      rowStart: 0,
+      rowEnd: rowCount - 1,
+      channelStart: channel,
+      channelEnd: channel,
+    };
+    pointerSelection = {
+      kind: 'header',
+      pointerId: event.pointerId,
+      startChannel: channel,
+      moved: false,
+    };
+    scroller.setPointerCapture?.(event.pointerId);
+    scroller.focus({ preventScroll: true });
+    renderWindow();
+    syncStatus();
+  }
+
+  function updatePointerSelection(event) {
+    if (!pointerSelection || pointerSelection.pointerId !== event.pointerId) return;
+
+    if (pointerSelection.kind === 'cell') {
+      const point = readPointerCell(pointerCellAt(event.clientX, event.clientY));
+      if (!point) return;
+      if (point.row !== cursorRow || point.channel !== cursorChannel
+        || point.field !== cursorField || point.voiceLane !== cursorVoiceLane) {
+        pointerSelection.moved = true;
+      }
+      cursorRow = point.row;
+      cursorChannel = point.channel;
+      cursorField = point.field;
+      cursorVoiceLane = point.voiceLane;
+      updateBlockSelection();
+      renderWindow();
+      syncStatus();
+      return;
+    }
+
+    const channel = readPointerHeader(pointerHeaderAt(event.clientX, event.clientY));
+    if (channel === null) return;
+    if (channel !== cursorChannel) pointerSelection.moved = true;
+    cursorChannel = channel;
+    cursorVoiceLane = 0;
+    const { rowCount } = projectInfo();
+    blockSelection = {
+      rowStart: 0,
+      rowEnd: rowCount - 1,
+      channelStart: Math.min(pointerSelection.startChannel, channel),
+      channelEnd: Math.max(pointerSelection.startChannel, channel),
+    };
+    renderWindow();
+    syncStatus();
+  }
+
+  function finishPointerSelection(event) {
+    if (!pointerSelection || pointerSelection.pointerId !== event.pointerId) return;
+
+    const finished = pointerSelection;
+    pointerSelection = null;
+    if (scroller.hasPointerCapture?.(event.pointerId)) {
+      scroller.releasePointerCapture(event.pointerId);
+    }
+
+    if (finished.kind === 'cell' && !finished.moved) {
+      clearBlockSelection();
+      renderWindow();
+    } else if (finished.kind === 'cell') {
+      suppressPointerClick = true;
+      setTimeout(() => { suppressPointerClick = false; }, 0);
+    }
+    syncStatus();
+    syncEffectEditor();
   }
 
   function clearBlockSelection() {
@@ -2037,6 +2201,28 @@ export function createPatternView({
   }
 
   scroller.addEventListener('scroll', () => renderWindow());
+  scroller.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || !event.isPrimary || event.pointerType === 'touch') return;
+
+    const cell = pointerCell(event.target);
+    if (cell) {
+      event.preventDefault();
+      beginPointerCellSelection(event, cell);
+      return;
+    }
+
+    const channelHeader = pointerHeader(event.target);
+    if (!channelHeader || headerControlTarget(event.target)) return;
+    event.preventDefault();
+    beginPointerHeaderSelection(event, channelHeader);
+  });
+  scroller.addEventListener('pointermove', (event) => {
+    if (!pointerSelection || pointerSelection.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    updatePointerSelection(event);
+  });
+  scroller.addEventListener('pointerup', finishPointerSelection);
+  scroller.addEventListener('pointercancel', finishPointerSelection);
   scroller.addEventListener('keydown', (event) => {
     if (keymapPreset === 'openmpt' && event.code === 'Tab') {
       event.preventDefault();
