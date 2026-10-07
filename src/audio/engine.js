@@ -310,8 +310,8 @@ export function createAudioEngine({
   }
 
   function ensureTrackMix(trackId) {
-    if (!trackId) return { mute: false, solo: false };
-    if (!trackMix.has(trackId)) trackMix.set(trackId, { mute: false, solo: false });
+    if (!trackId) return { mute: false, solo: false, volume: 1 };
+    if (!trackMix.has(trackId)) trackMix.set(trackId, { mute: false, solo: false, volume: 1 });
     return trackMix.get(trackId);
   }
 
@@ -383,7 +383,7 @@ export function createAudioEngine({
     if (!context) return;
     const now = context.currentTime;
     for (const [trackId, bus] of trackBuses) {
-      const target = trackAudible(trackId) ? 1 : 0;
+      const target = trackAudible(trackId) ? ensureTrackMix(trackId).volume : 0;
       const gain = bus.input.gain;
       gain.cancelScheduledValues(now);
       gain.setTargetAtTime(target, now, 0.005);
@@ -394,14 +394,27 @@ export function createAudioEngine({
     const mix = ensureTrackMix(trackId);
     mix.mute = !mix.mute;
     syncTrackGains();
-    return { trackId, mute: mix.mute, solo: mix.solo, audible: trackAudible(trackId) };
+    return { trackId, mute: mix.mute, solo: mix.solo, volume: mix.volume, audible: trackAudible(trackId) };
   }
 
   function toggleTrackSolo(trackId) {
     const mix = ensureTrackMix(trackId);
     mix.solo = !mix.solo;
     syncTrackGains();
-    return { trackId, mute: mix.mute, solo: mix.solo, audible: trackAudible(trackId) };
+    return { trackId, mute: mix.mute, solo: mix.solo, volume: mix.volume, audible: trackAudible(trackId) };
+  }
+
+  function setTrackVolume(trackId, volume) {
+    if (!Number.isFinite(volume) || volume < 0 || volume > 1) {
+      throw audioError('E_AUDIO_TRACK_VOLUME', `Volume track harus 0..1: ${volume}`);
+    }
+    const mix = ensureTrackMix(trackId);
+    if (mix.volume === volume) {
+      return { trackId, mute: mix.mute, solo: mix.solo, volume: mix.volume, audible: trackAudible(trackId) };
+    }
+    mix.volume = volume;
+    syncTrackGains();
+    return { trackId, mute: mix.mute, solo: mix.solo, volume: mix.volume, audible: trackAudible(trackId) };
   }
 
   function readTrackLevel(trackId) {
@@ -469,6 +482,7 @@ export function createAudioEngine({
         trackId,
         mute: mix.mute,
         solo: mix.solo,
+        volume: mix.volume,
         audible: trackAudible(trackId),
         level: readTrackLevel(trackId),
       };
@@ -1235,6 +1249,7 @@ export function createAudioEngine({
     setTracks,
     toggleTrackMute,
     toggleTrackSolo,
+    setTrackVolume,
     reschedulePattern,
     getState,
   };
