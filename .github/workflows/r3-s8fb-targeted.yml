@@ -14,6 +14,8 @@ jobs:
     timeout-minutes: 20
     env:
       CI: 1
+      PW_PROJECTS: chromium,firefox
+      PW_REPORTER: list
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,47 +25,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run check
+      - run: node --check src/audio/engine.js && node --check src/audio/pitch-effects.js
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
-      - name: Diagnose bootstrap exception
-        shell: bash
-        run: |
-          PORT=4173 BASE_PATH=/nota-station/ node tools/serve.mjs > /tmp/notastation-serve.log 2>&1 &
-          SERVER_PID=$!
-          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
-          sleep 1
-          node --input-type=module <<'NODE'
-          import { chromium } from '@playwright/test';
-          const browser = await chromium.launch({ headless: true });
-          const page = await browser.newPage();
-          page.on('console', (msg) => {
-            const loc = msg.location();
-            console.log('BROWSER_CONSOLE', msg.type(), JSON.stringify(msg.text()), JSON.stringify(loc));
-          });
-          page.on('pageerror', (error) => {
-            console.log(
-              'BROWSER_PAGEERROR_DETAIL',
-              JSON.stringify({
-                name: error?.name ?? null,
-                message: error?.message ?? null,
-                stack: error?.stack ?? null,
-                text: String(error),
-              }),
-            );
-          });
-          page.on('requestfailed', (request) => {
-            console.log('REQUEST_FAILED', request.url(), request.failure()?.errorText);
-          });
-          page.on('response', (response) => {
-            if (response.status() >= 400) console.log('HTTP_ERROR', response.status(), response.url());
-          });
-          const response = await page.goto('http://127.0.0.1:4173/nota-station/', { waitUntil: 'networkidle' });
-          await page.waitForTimeout(500);
-          const count = await page.locator('[data-action="topbar"]').count();
-          console.log('HTTP_STATUS', response?.status());
-          console.log('TOPBAR_COUNT', count);
-          console.log('BODY_PREFIX', JSON.stringify((await page.locator('body').innerText()).slice(0, 1000)));
-          await browser.close();
-          if (count !== 1) process.exit(2);
-          NODE
-          cat /tmp/notastation-serve.log
+      - run: npx playwright install --with-deps chromium firefox
+      - name: Browser pitch/audio regression
+        run: npx playwright test tests/browser/pitch-fx-audio.spec.js tests/browser/pitch-spike.spec.js tests/browser/timing-fx-audio.spec.js tests/browser/mix-fx-audio.spec.js tests/browser/source-fx-audio.spec.js tests/browser/pattern-fx.spec.js
