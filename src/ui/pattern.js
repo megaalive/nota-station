@@ -111,6 +111,7 @@ export function createPatternView({
   let fxColumnsPinned = false;
   let selectedEffectType = 'volume';
   let renderedHeaderSignature = null;
+  let suppressCommandRefresh = false;
   const trackUi = new Map();
 
   const modeButton = Button({
@@ -558,10 +559,10 @@ export function createPatternView({
   }
 
   function runPatternCommand(id, args, onSuccess = null) {
+    let result;
+    suppressCommandRefresh = true;
     try {
-      const result = registry.execute(id, args);
-      onSuccess?.(result);
-      return true;
+      result = registry.execute(id, args);
     } catch (error) {
       if (error?.code !== 'E_SHARED_PATTERN_DECISION_REQUIRED') throw error;
       pendingSharedEdit = {
@@ -571,7 +572,12 @@ export function createPatternView({
       };
       showSharedWarning(error.details);
       return false;
+    } finally {
+      suppressCommandRefresh = false;
     }
+
+    onSuccess?.(result);
+    return true;
   }
 
   function resolveSharedEditAll() {
@@ -1755,6 +1761,10 @@ export function createPatternView({
   }
 
   function refresh() {
+    // Command dari Pattern UI sudah merender sekali setelah cursor/selection final.
+    // Hindari rebuild sinkron kedua dari commitProject pada jalur yang sama.
+    if (suppressCommandRefresh) return;
+
     // Refresh dari history/command eksternal harus membuang input dua-nibble yang
     // belum menjadi transaksi project.
     clearInputState();
