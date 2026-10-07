@@ -5,6 +5,17 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S10C — header channel lengkap (CLOSED · PASS)
+
+- Header Pattern kini memuat nama/nomor channel, picker instrument, **M/S/P**, fold voice lane untuk track poly, tombol **FX**, warna channel, mini-volume, dan meter tanpa memperlebar geometri channel.
+- Mini-volume adalah **mixer runtime** pada gain dasar track bus. Nilainya tidak masuk Project/history dan tidak menulis EffectEvent; automation `volume` pattern-local tetap berada pada jalur FX terpisah. Mute/Solo mempertahankan nilai volume runtime.
+- Warna memakai field kanonik `Track.color`, berubah lewat command/history, dapat Undo, memiliki fallback palet saat null, dan tervalidasi pada debug JSON. JSON schema-1 lama tanpa field `color` dinormalisasi ke `null`.
+- Tombol FX di header memfokuskan channel terkait dan membuka disclosure `FX | PARAM` yang sudah ada; DLY/voice-lane semantics tidak berubah.
+- Tinggi header bertambah hanya 8 px (92→100); lebar channel tetap sehingga budget/windowing 32 channel tidak dibebani oleh kontrol baru.
+- Gate final GitHub run **37681596366**: 0 vulnerability, unit **206/206 PASS**, `npm run check` PASS, build **572,4 KiB**, full browser Chromium + Firefox **300 PASS + 4 skip**.
+- Acceptance S10C lulus di Chromium dan Firefox: runtime volume tanpa mutasi project/history, mute mempertahankan volume, color+Undo, FX per-channel, dan coexistence dengan fold poly.
+- Empat skip tetap limitation realtime `AudioContext` Firefox headless yang sudah ada; S10C tidak menambah skip. Milestone R3 tetap aktif.
+
 ### R3-S10B — proyeksi voice lane Pattern (CLOSED · PASS)
 
 - Channel poly default tetap collapsed; tombol header dengan `aria-expanded` membuka NOTE/INST/VOL per lane nyata pada Pattern aktif, minimum lane 0. Fold tidak mengubah project atau history (§5.4, §8.6).
