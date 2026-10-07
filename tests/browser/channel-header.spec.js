@@ -58,6 +58,7 @@ test.describe('R3-S10C header channel lengkap', () => {
       window.tracker.getProject().song.tracks.find((track) => track.id === id).color
     ), trackId)).toBe('#336699');
 
+    await page.locator('[data-action="pattern-grid"]').focus();
     await page.keyboard.press('Control+z');
     expect(await page.evaluate((id) => (
       window.tracker.getProject().song.tracks.find((track) => track.id === id).color
