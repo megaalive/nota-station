@@ -24,7 +24,7 @@ test.describe('Polyphonic instrument track R3-S9B', () => {
     await grid.focus();
     await page.keyboard.press('Control+e');
     await page.keyboard.press('Shift+z');
-    await page.keyboard.press('Shift+e');
+    await page.keyboard.press('Shift+c');
 
     const state = await page.evaluate(() => {
       const project = window.tracker.getProject();
@@ -62,7 +62,7 @@ test.describe('Polyphonic instrument track R3-S9B', () => {
     await grid.focus();
     await page.keyboard.press('Control+e');
     await page.keyboard.press('Shift+z');
-    await page.keyboard.press('Shift+e');
+    await page.keyboard.press('Shift+c');
 
     await poly.click();
     await expect(poly).toHaveAttribute('aria-pressed', 'true');
