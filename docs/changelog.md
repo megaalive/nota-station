@@ -5,6 +5,18 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S9A — kapasitas 32 channel logis (CLOSED · PASS)
+
+- Project baru tetap ringkas dengan **8 channel default**, tetapi model/command kini dapat menambah channel sampai batas kanonik **32**; channel ke-33 ditolak fail-closed dengan `E_PROJECT_TRACK_LIMIT`.
+- Tambah channel adalah satu transaksi history. Undo/Redo menyinkronkan ulang daftar track pada audio engine sehingga state mute/solo/meter tidak menyisakan track hantu.
+- Pattern menyediakan kontrol **Tambah channel** yang aksesibel; header/grid mengikuti jumlah track aktual dan tombol otomatis disabled pada 32 channel.
+- Jalur input Pattern dioptimalkan agar command dari UI tidak memicu refresh sinkron ganda dan header hanya dibangun ulang bila signature track/field berubah.
+- Regression browser membuktikan channel 32 dapat dicapai murni lewat keyboard, note ditulis ke track ke-32, horizontal auto-scroll bekerja, dan row DOM tetap windowed.
+- Budget PLAN §16.5 `tombol→sel < 50 ms` dijadikan assertion browser pada input channel ke-32 dan PASS di Chromium + Firefox.
+- Gate final run **37639746724** pada HEAD `a0c96c1…`: 0 vulnerability, unit **192/192 PASS**, `npm run check` PASS, build **539,5 KiB**, full browser **264 PASS + 4 skip**.
+- Empat skip tetap limitation realtime `AudioContext` Firefox headless yang sudah terdokumentasi dari slice audio sebelumnya; tidak ada skip baru dari S9A.
+- Berikutnya: **R3-S9B generalisasi polyphonic voice-lane ke semua track instrument**, lalu keymap/help overlay dan exit-task R3.
+
 ### R3-S8F-B — audible vibrato + arpeggio (CLOSED · PASS)
 
 - `vibrato` kini menjadi automation pitch cyclic pada `AudioBufferSourceNode.playbackRate`, dengan `depthSemitones` dan `rateHz` typed. Kurva dijadwalkan terhadap audio clock sampai voice selesai; tidak ada `setTimeout` atau timer musikal kedua.
