@@ -1592,7 +1592,9 @@ function mountShell(activeTab = 'pattern') {
     registry,
     palette,
     shortcutOverlay,
-    shortcutForCommand: (id) => activeShortcut(id),
+    shortcutForCommand: (id) => shortcutFor(id, project.settings.keymapPreset, {
+      context: activeTab === 'pattern' ? 'pattern' : 'global',
+    }),
     store,
     build: buildInfo,
     renderView: renderWorkspace,
