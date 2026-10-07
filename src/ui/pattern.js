@@ -47,7 +47,7 @@ const FIELD_WIDTHS = Object.freeze({
   effect: FX_WIDTH,
   param: PARAM_WIDTH,
 });
-const OVERSCAN = 4;
+const OVERSCAN = 1;
 const CHANNEL_OVERSCAN = 0;
 
 const NOTE_CODES = new Map([
