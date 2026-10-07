@@ -31,7 +31,7 @@ import { Button, Popover, Tooltip } from './kit.js';
 import { playheadFollowScrollTop } from './playhead-follow.js';
 
 const ROW_HEIGHT = 28;
-const HEADER_HEIGHT = 92;
+const HEADER_HEIGHT = 100;
 const ROW_NUMBER_WIDTH = 46;
 const NOTE_WIDTH = 64;
 const INST_WIDTH = 42;
