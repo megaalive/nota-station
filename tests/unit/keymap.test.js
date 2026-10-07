@@ -28,7 +28,7 @@ test('Songwriter memakai Space untuk Play/Stop dan ? untuk bantuan', () => {
 });
 
 test('OpenMPT-like memetakan subset yang diverifikasi dan tidak memakai Space sebagai transport', () => {
-  assert.equal(matchKeyBinding(keyEvent('Space'), 'openmpt', { context: 'pattern' }), undefined);
+  assert.equal(matchKeyBinding(keyEvent('Space'), 'openmpt', { context: 'pattern' }), null);
   assert.equal(
     matchKeyBinding(keyEvent('F7'), 'openmpt', { context: 'pattern' })?.commandId,
     'playback.playPatternStart',
@@ -56,7 +56,7 @@ test('OpenMPT-like memetakan subset yang diverifikasi dan tidak memakai Space se
 });
 
 test('binding Pattern tidak bocor ke view non-Pattern', () => {
-  assert.equal(matchKeyBinding(keyEvent('F10'), 'openmpt', { context: 'global' }), undefined);
+  assert.equal(matchKeyBinding(keyEvent('F10'), 'openmpt', { context: 'global' }), null);
   assert.equal(shortcutFor('audio.toggleActiveTrackMute', 'openmpt', { context: 'global' }), null);
   assert.equal(shortcutFor('audio.toggleActiveTrackMute', 'openmpt', { context: 'pattern' }), 'F10');
 });
