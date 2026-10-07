@@ -30,7 +30,7 @@ import {
   secondsPerTick,
   transportTickAtAudioTime,
 } from './scheduler.js';
-import { scheduleFinitePitchEffect } from './pitch-effects.js';
+import {\n  scheduleFinitePitchEffect,\n  scheduleRepeatingPitchEffect,\n} from './pitch-effects.js';
 import { sampleOffsetSeconds } from './source-note-effects.js';
 import { scheduleSourceCut } from './timing-effects.js';
 import {
@@ -230,7 +230,7 @@ export function createAudioEngine({
     return stopped;
   }
 
-  function scheduleTrackFinitePitchEffect(effect, when) {
+  function scheduleTrackPitchEffect(effect, when) {
     if (!playback || !context) return { applied: 0, unsupported: 0 };
 
     let applied = 0;
@@ -242,7 +242,10 @@ export function createAudioEngine({
       if (scheduled.trackId !== effect.trackId) continue;
       if (scheduled.cycle !== effect.cycle) continue;
       if (scheduled.when > when) continue;
-      if (!Number.isFinite(scheduled.noteEndAt) || scheduled.noteEndAt <= when) continue;
+      const voiceEndTime = Number.isFinite(scheduled.cutAt)
+        ? Math.min(scheduled.noteEndAt, scheduled.cutAt)
+        : scheduled.noteEndAt;
+      if (!Number.isFinite(voiceEndTime) || voiceEndTime <= when) continue;
 
       if (
         !scheduled.pitchParam
@@ -253,7 +256,10 @@ export function createAudioEngine({
         continue;
       }
 
-      const result = scheduleFinitePitchEffect(
+      const schedulePitch = ['pitchSlide', 'porta'].includes(effect.type)
+        ? scheduleFinitePitchEffect
+        : scheduleRepeatingPitchEffect;
+      const result = schedulePitch(
         scheduled.pitchParam,
         effect,
         {
@@ -261,7 +267,7 @@ export function createAudioEngine({
           currentTime: context.currentTime,
           baseRate: scheduled.pitchBaseRate,
           basePitch: scheduled.pitch,
-          voiceEndTime: scheduled.noteEndAt,
+          voiceEndTime,
           tickSeconds,
           priorState: scheduled.pitchAutomation ?? null,
         },
@@ -817,6 +823,8 @@ export function createAudioEngine({
       pitchEffectsScheduled: 0,
       pitchSlideEffectsScheduled: 0,
       portaEffectsScheduled: 0,
+      vibratoEffectsScheduled: 0,
+      arpeggioEffectsScheduled: 0,
       pitchVoicesAutomated: 0,
       pitchUnsupportedVoices: 0,
       clicksScheduled: 0,
@@ -935,15 +943,17 @@ export function createAudioEngine({
 
     const pitchHorizon = now + Math.max(0, LIVE_EDIT_FREEZE_SECONDS - 0.000001);
     for (const pitchEvent of playback.pitchCursor.drainUntil(playback.pitchAnchor, pitchHorizon)) {
-      if (pitchEvent.type !== 'pitchSlide' && pitchEvent.type !== 'porta') continue;
+      if (!['pitchSlide', 'porta', 'vibrato', 'arpeggio'].includes(pitchEvent.type)) continue;
 
       const when = Math.max(pitchEvent.when, now + 0.001);
-      const result = scheduleTrackFinitePitchEffect(pitchEvent, when);
+      const result = scheduleTrackPitchEffect(pitchEvent, when);
       playback.pitchEffectsScheduled += 1;
       playback.pitchVoicesAutomated += result.applied;
       playback.pitchUnsupportedVoices += result.unsupported;
       if (pitchEvent.type === 'pitchSlide') playback.pitchSlideEffectsScheduled += 1;
       if (pitchEvent.type === 'porta') playback.portaEffectsScheduled += 1;
+      if (pitchEvent.type === 'vibrato') playback.vibratoEffectsScheduled += 1;
+      if (pitchEvent.type === 'arpeggio') playback.arpeggioEffectsScheduled += 1;
     }
 
     if (playback.metronomeCursor) {
@@ -1181,6 +1191,8 @@ export function createAudioEngine({
       pitchEffectsScheduled: playback?.pitchEffectsScheduled ?? 0,
       pitchSlideEffectsScheduled: playback?.pitchSlideEffectsScheduled ?? 0,
       portaEffectsScheduled: playback?.portaEffectsScheduled ?? 0,
+      vibratoEffectsScheduled: playback?.vibratoEffectsScheduled ?? 0,
+      arpeggioEffectsScheduled: playback?.arpeggioEffectsScheduled ?? 0,
       pitchVoicesAutomated: playback?.pitchVoicesAutomated ?? 0,
       pitchUnsupportedVoices: playback?.pitchUnsupportedVoices ?? 0,
       clicksScheduled: playback?.clicksScheduled ?? 0,
