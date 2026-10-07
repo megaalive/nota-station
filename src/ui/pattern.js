@@ -90,6 +90,7 @@ export function createPatternView({
   onAudition,
   onInstrumentAudition,
   onStatus,
+  keymapPreset = 'songwriter',
   initialMode = 'audition',
 }) {
   let cursorRow = 0;
@@ -1838,6 +1839,18 @@ export function createPatternView({
 
   scroller.addEventListener('scroll', () => renderWindow());
   scroller.addEventListener('keydown', (event) => {
+    if (keymapPreset === 'openmpt' && event.code === 'Tab') {
+      event.preventDefault();
+      clearInputState();
+      clearBlockSelection();
+      const { tracks } = projectInfo();
+      const delta = event.shiftKey ? -1 : 1;
+      cursorChannel = (cursorChannel + delta + tracks.length) % tracks.length;
+      renderWindow();
+      syncStatus();
+      ensureCursorVisible();
+      return;
+    }
     if (event.ctrlKey && event.code === 'KeyE') {
       event.preventDefault();
       toggleMode();
@@ -2006,6 +2019,10 @@ export function createPatternView({
     focus: () => scroller.focus(),
     refresh,
     setPlaybackState,
+    toggleMode: () => {
+      toggleMode();
+      return mode;
+    },
     getActiveTrackId: () => projectInfo().tracks[cursorChannel]?.id ?? null,
     getUiState: () => ({
       mode,
