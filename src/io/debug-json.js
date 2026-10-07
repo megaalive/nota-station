@@ -34,9 +34,29 @@ export function parseDebugProject(text) {
     throw debugJsonError('E_DEBUG_JSON_PARSE', 'JSON debug tidak valid.');
   }
 
-  project = normalizeLegacySoundModel(project);
+  project = normalizeLegacyTrackMetadata(normalizeLegacySoundModel(project));
   validateDebugProject(project);
   return project;
+}
+
+function normalizeLegacyTrackMetadata(project) {
+  if (!Array.isArray(project?.song?.tracks)) return project;
+
+  let changed = false;
+  const tracks = project.song.tracks.map((track) => {
+    if (Object.hasOwn(track, 'color')) return track;
+    changed = true;
+    return { ...track, color: null };
+  });
+  if (!changed) return project;
+
+  return {
+    ...project,
+    song: {
+      ...project.song,
+      tracks,
+    },
+  };
 }
 
 export function debugJsonFilename(project) {
