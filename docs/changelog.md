@@ -5,11 +5,16 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
-### R3-S9B — perbaikan input regression CI
+### R3-S9B — polyphonic instrument tracks (CLOSED · PASS)
 
-- Tes chord memakai Shift+C untuk E pada oktaf yang sama sesuai §8.14; Shift+E adalah E pada oktaf atas. Assertion pitch 60/64, voice lane, dan row tetap utuh.
-- Workflow gate mengunci checkout/setup-node v4 ke SHA dari repository resmi sesuai §13.3.
-- Unit 196/196, check, dan build lokal PASS. Tes polyphonic 4/4 PASS; browser penuh 265 PASS, 3 FAIL, 4 skip. Isolasi satu worker: 9 PASS, 1 FAIL (budget input channel Chromium). Push ditolak GitHub HTTP 500; perbaikan masih lokal.
+- Fondasi voice lane R2 digeneralisasi ke seluruh instrument track tanpa schema bump; Drum Track tetap wajib `poly`.
+- Header Pattern menambah toggle **P** per channel. Instrument track dapat berpindah mono ↔ poly; kembali ke mono ditolak selama masih ada voice lane tambahan agar chord tidak hilang diam-diam.
+- `Shift+note` pada track poly menambah note ke voice lane kosong pertama pada row yang sama. `Delete` membersihkan seluruh chord row; data tetap `NoteEvent` kanonik pattern-local.
+- Scheduler membawa beberapa voice lane instrument pada tick yang sama tanpa source duplication palsu di model.
+- Input regression chord memakai **Shift+C** sesuai posisi fisik keymap §8.14 dan memverifikasi pitch 60/64, lane 0/1, serta cursor row tetap.
+- Gate final run **37645427242** pada HEAD `c13500f…`: unit **196/196 PASS**, `npm run check` PASS, build PASS, browser Chromium + Firefox **268 PASS + 4 skip**.
+- Empat skip tetap limitation realtime `AudioContext` Firefox headless dari slice audio sebelumnya; S9B tidak menambah skip.
+- Actions gate dikunci ke SHA resmi `actions/checkout` dan `actions/setup-node` sesuai kebijakan supply-chain §13.3.
 
 ### R3-S9A — kapasitas 32 channel logis (CLOSED · PASS)
 
