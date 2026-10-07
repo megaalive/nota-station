@@ -123,7 +123,7 @@ test.describe('Pitch FX audio R3-S8F', () => {
       return {
         vibrato: await render(
           { type: 'vibrato', value: { depthSemitones: 3, rateHz: 5 } },
-          [[0.04, 0.06], [0.14, 0.16]],
+          [[0.025, 0.075], [0.125, 0.175]],
         ),
         arpeggio: await render(
           { type: 'arpeggio', value: { semitones: [0, 12], stepTicks: 120 } },
@@ -166,7 +166,7 @@ test.describe('Pitch FX audio R3-S8F', () => {
         ['retrigger', 0, { intervalTicks: 360, count: 1 }],
         ['porta', 120, { targetPitch: 55, durationTicks: 240 }],
         ['vibrato', 360, { depthSemitones: 1.5, rateHz: 5 }],
-        ['arpeggio', 600, { semitones: [0, 4, 7], stepTicks: 120 }],
+        ['arpeggio', 480, { semitones: [0, 4, 7], stepTicks: 120 }],
       ];
       for (const [type, tickLocal, value] of effects) {
         window.tracker.commands.execute('pattern.addEffect', {
@@ -229,7 +229,7 @@ test.describe('Pitch FX audio R3-S8F', () => {
         { type: 'retrigger', tickLocal: 0, value: { intervalTicks: 360, count: 1 } },
         { type: 'porta', tickLocal: 120, value: { targetPitch: 55, durationTicks: 240 } },
         { type: 'vibrato', tickLocal: 360, value: { depthSemitones: 1.5, rateHz: 5 } },
-        { type: 'arpeggio', tickLocal: 600, value: { semitones: [0, 4, 7], stepTicks: 120 } },
+        { type: 'arpeggio', tickLocal: 480, value: { semitones: [0, 4, 7], stepTicks: 120 } },
       ],
     });
   });
