@@ -48,6 +48,10 @@ const FIELD_WIDTHS = Object.freeze({
   effect: FX_WIDTH,
   param: PARAM_WIDTH,
 });
+const TRACK_COLOR_FALLBACKS = Object.freeze([
+  '#4477AA', '#EE6677', '#228833', '#CCBB44',
+  '#66CCEE', '#AA3377', '#BBBBBB', '#EE8866',
+]);
 const OVERSCAN = 1;
 const CHANNEL_OVERSCAN = 0;
 
@@ -337,6 +341,24 @@ export function createPatternView({
   scroller.append(surface);
   root.textContent = '';
   root.append(toolbar, scroller);
+
+  function openTrackFx(channel) {
+    const { tracks } = projectInfo();
+    if (!tracks[channel]) return;
+    clearInputState();
+    clearBlockSelection();
+    cursorChannel = channel;
+    cursorField = 'effect';
+    cursorVoiceLane = 0;
+    fxColumnsPinned = true;
+    feedback = null;
+    renderHeader();
+    renderWindow();
+    ensureCursorVisible();
+    syncStatus();
+    syncEffectEditor();
+    scroller.focus({ preventScroll: true });
+  }
 
   function toggleFxColumns() {
     const { pattern } = projectInfo();
@@ -744,6 +766,7 @@ export function createPatternView({
         track.kind,
         track.polyphony,
         track.defaultInstrumentId,
+        track.color,
       ]),
       instruments: project.instruments.map((instrument) => [
         instrument.id,
@@ -834,6 +857,55 @@ export function createPatternView({
           },
         },
       });
+      const fx = el('button', {
+        type: 'button',
+        class: 'pattern-channel__toggle pattern-channel__fx',
+        'aria-label': t('pattern.trackFx', { track: index + 1 }),
+        dataset: { action: 'track-fx', trackId: track.id },
+        text: 'FX',
+        on: {
+          click: (event) => {
+            event.stopPropagation();
+            openTrackFx(index);
+          },
+        },
+      });
+      const resolvedTrackColor = track.color ?? TRACK_COLOR_FALLBACKS[index % TRACK_COLOR_FALLBACKS.length];
+      const color = el('input', {
+        class: 'pattern-channel__color',
+        type: 'color',
+        value: resolvedTrackColor,
+        'aria-label': t('pattern.trackColor', { track: index + 1 }),
+        dataset: { action: 'track-color', trackId: track.id },
+        on: {
+          change: (event) => {
+            event.stopPropagation();
+            registry.execute('track.setColor', {
+              trackId: track.id,
+              color: color.value,
+            });
+          },
+        },
+      });
+      const volume = el('input', {
+        class: 'pattern-channel__volume',
+        type: 'range',
+        min: '0',
+        max: '100',
+        step: '1',
+        value: '100',
+        'aria-label': t('pattern.trackVolume', { track: index + 1 }),
+        dataset: { action: 'track-volume', trackId: track.id },
+        on: {
+          input: (event) => {
+            event.stopPropagation();
+            registry.execute('audio.setTrackVolume', {
+              trackId: track.id,
+              volume: Number(volume.value) / 100,
+            });
+          },
+        },
+      });
       const meterFill = el('span', { class: 'pattern-channel__meter-fill' });
       const meter = el('span', {
         class: 'pattern-channel__meter',
@@ -913,15 +985,17 @@ export function createPatternView({
           } },
         }));
       }
-      controls.append(meter);
+      controls.append(fx, color);
+      const mix = el('span', { class: 'pattern-channel__mix' }, [volume, meter]);
       const channel = el('div', {
         class: `pattern-grid__channel${track.kind === 'drum' ? ' is-drum' : ''}`,
         role: 'columnheader',
         'aria-colindex': String(geometry[index].columnOffset + 1),
         'aria-colspan': String(geometry[index].columns.length),
-      }, [label, instrumentSelect, controls]);
+      }, [label, instrumentSelect, controls, mix]);
+      channel.style.setProperty('--track-color', resolvedTrackColor);
       channelRow.append(channel);
-      trackUi.set(track.id, { channel, mute, solo, poly, meter, meterFill });
+      trackUi.set(track.id, { channel, mute, solo, poly, volume, meter, meterFill });
     });
 
     const fieldRow = el('div', { class: 'pattern-grid__header-row pattern-grid__header-row--field', role: 'row' });
@@ -960,6 +1034,7 @@ export function createPatternView({
         level: 0,
         mute: false,
         solo: false,
+        volume: 1,
         audible: true,
       };
       const level = Math.max(0, Math.min(1, Number(state.level) || 0));
@@ -968,6 +1043,9 @@ export function createPatternView({
       ui.meter.setAttribute('aria-valuenow', String(Math.round(level * 100)));
       ui.mute.setAttribute('aria-pressed', state.mute ? 'true' : 'false');
       ui.solo.setAttribute('aria-pressed', state.solo ? 'true' : 'false');
+      const volume = Math.max(0, Math.min(1, Number(state.volume ?? 1)));
+      ui.volume.value = String(Math.round(volume * 100));
+      ui.volume.setAttribute('aria-valuenow', String(Math.round(volume * 100)));
       ui.channel.classList.toggle('is-muted', Boolean(state.mute));
       ui.channel.classList.toggle('is-solo', Boolean(state.solo));
       ui.channel.classList.toggle('is-inaudible', !state.audible);
