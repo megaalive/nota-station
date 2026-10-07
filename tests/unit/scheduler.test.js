@@ -524,3 +524,39 @@ test('vibrato dan arpeggio mempertahankan seek/loop deterministik', () => {
     ],
   );
 });
+
+
+test('instrument polyphonic menghasilkan dua voice lane pada tick scheduler yang sama', () => {
+  const pattern = {
+    lengthTicks: 960,
+    notes: [
+      {
+        id: 'poly-c',
+        trackId: 'track-1',
+        startTickLocal: 0,
+        durationTicks: 120,
+        pitch: 60,
+        velocity: 100,
+        instrumentId: 'factory.basic',
+        voiceLane: 0,
+      },
+      {
+        id: 'poly-e',
+        trackId: 'track-1',
+        startTickLocal: 0,
+        durationTicks: 120,
+        pitch: 64,
+        velocity: 100,
+        instrumentId: 'factory.basic',
+        voiceLane: 1,
+      },
+    ],
+  };
+
+  const events = patternEventTemplates(pattern, 120);
+  assert.equal(events.length, 2);
+  assert.deepEqual(
+    events.map((event) => [event.startTickLocal, event.voiceLane, event.pitch]),
+    [[0, 0, 60], [0, 1, 64]],
+  );
+});
