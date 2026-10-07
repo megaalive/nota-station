@@ -163,6 +163,7 @@ test.describe('Pitch FX audio R3-S8F', () => {
       });
       const effects = [
         ['pitchSlide', 0, { semitones: 7, durationTicks: 240 }],
+        ['retrigger', 0, { intervalTicks: 360, count: 1 }],
         ['porta', 120, { targetPitch: 55, durationTicks: 240 }],
         ['vibrato', 360, { depthSemitones: 1.5, rateHz: 5 }],
         ['arpeggio', 600, { semitones: [0, 4, 7], stepTicks: 120 }],
@@ -196,6 +197,7 @@ test.describe('Pitch FX audio R3-S8F', () => {
     expect(audio.portaEffectsScheduled).toBeGreaterThanOrEqual(1);
     expect(audio.vibratoEffectsScheduled).toBeGreaterThanOrEqual(1);
     expect(audio.arpeggioEffectsScheduled).toBeGreaterThanOrEqual(1);
+    expect(audio.retriggerNotesScheduled).toBeGreaterThanOrEqual(1);
     expect(audio.pitchEffectsScheduled).toBeGreaterThanOrEqual(4);
     expect(audio.pitchVoicesAutomated).toBeGreaterThanOrEqual(4);
     expect(audio.pitchUnsupportedVoices).toBe(0);
@@ -224,6 +226,7 @@ test.describe('Pitch FX audio R3-S8F', () => {
       durationTicks: 1440,
       effects: [
         { type: 'pitchSlide', tickLocal: 0, value: { semitones: 7, durationTicks: 240 } },
+        { type: 'retrigger', tickLocal: 0, value: { intervalTicks: 360, count: 1 } },
         { type: 'porta', tickLocal: 120, value: { targetPitch: 55, durationTicks: 240 } },
         { type: 'vibrato', tickLocal: 360, value: { depthSemitones: 1.5, rateHz: 5 } },
         { type: 'arpeggio', tickLocal: 600, value: { semitones: [0, 4, 7], stepTicks: 120 } },
