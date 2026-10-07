@@ -1727,12 +1727,6 @@ function bindShortcuts() {
       }
     }
 
-    if (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && event.code === 'KeyK') {
-      event.preventDefault();
-      registry.execute('ui.openPalette');
-      return;
-    }
-
     if (event.altKey && /^Digit[1-7]$/.test(event.code)) {
       event.preventDefault();
       const index = Number(event.code.slice(5)) - 1;
