@@ -5,6 +5,15 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S10D — seleksi bertahap Ctrl+A (CLOSED · PASS)
+
+- `Ctrl+A` Pattern kini mengikuti kontrak §8.6 dalam tiga tingkat: event-cell aktif pada row/channel saat ini → seluruh channel aktif → seluruh Pattern.
+- Penekanan berikutnya saat seluruh Pattern sudah terpilih bersifat idempotent. Model block tetap row×channel; tidak ada schema baru atau perubahan pada copy/paste/transpose.
+- Cursor tetap menentukan row/channel tahap pertama, sehingga progression bekerja dari posisi editor aktual, bukan selalu dari channel 1 row 0.
+- Gate final GitHub run **37702080797**: 0 vulnerability, unit **206/206 PASS**, `npm run check` PASS, build **573,1 KiB**, full browser Chromium + Firefox **300 PASS + 4 skip**.
+- Acceptance progressive selection lulus di Chromium dan Firefox. Empat skip tetap limitation realtime `AudioContext` Firefox headless yang sudah ada.
+- Audit lanjutan §8.6 menemukan pointer/drag selection pada header channel dan grid belum ada; itu tetap gap terpisah. Milestone R3 masih aktif.
+
 ### R3-S10C — header channel lengkap (CLOSED · PASS)
 
 - Header Pattern kini memuat nama/nomor channel, picker instrument, **M/S/P**, fold voice lane untuk track poly, tombol **FX**, warna channel, mini-volume, dan meter tanpa memperlebar geometri channel.
