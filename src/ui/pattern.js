@@ -109,6 +109,7 @@ export function createPatternView({
   let displayLpb = 4;
   let fxColumnsPinned = false;
   let selectedEffectType = 'volume';
+  let renderedHeaderSignature = null;
   const trackUi = new Map();
 
   const modeButton = Button({
@@ -654,8 +655,33 @@ export function createPatternView({
     return `${ROW_NUMBER_WIDTH}px ${dataColumns(tracks, fields).map((width) => `${width}px`).join(' ')}`;
   }
 
+  function headerSignature({ project, tracks, fields }) {
+    return JSON.stringify({
+      fields,
+      tracks: tracks.map((track) => [
+        track.id,
+        track.name,
+        track.kind,
+        track.polyphony,
+        track.defaultInstrumentId,
+      ]),
+      instruments: project.instruments.map((instrument) => [
+        instrument.id,
+        instrument.name,
+      ]),
+    });
+  }
+
+  function renderHeaderIfNeeded() {
+    const info = projectInfo();
+    if (headerSignature(info) === renderedHeaderSignature) return false;
+    renderHeader();
+    return true;
+  }
+
   function renderHeader() {
     const { project, pattern, tracks, fields } = projectInfo();
+    renderedHeaderSignature = headerSignature({ project, tracks, fields });
     header.textContent = '';
 
     trackUi.clear();
@@ -1687,7 +1713,7 @@ export function createPatternView({
     const { fields, tracks } = projectInfo();
     cursorChannel = Math.min(cursorChannel, Math.max(0, tracks.length - 1));
     if (!fields.includes(cursorField)) cursorField = 'note';
-    renderHeader();
+    renderHeaderIfNeeded();
     renderWindow();
     syncSharedPatternBadge();
     syncTimingControls();
