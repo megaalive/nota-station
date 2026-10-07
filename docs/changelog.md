@@ -5,6 +5,15 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S10E — pointer drag block selection (CLOSED · PASS)
+
+- Drag mouse pada cell Pattern kini memilih blok row × channel; cursor berakhir pada cell terakhir tanpa mengubah model lagu.
+- Drag/click pada background header channel memilih seluruh channel atau rentang channel. Kontrol interaktif header (instrument, M/S/P, fold, FX, warna, volume) tidak memulai block selection.
+- Pointer selection hanya mengambil mouse/pen; touch sengaja dibiarkan untuk scrolling mobile. Keyboard selection S10D tetap menjadi padanan aksesibel utama.
+- Implementasi memakai pointer capture dan hit-test `elementFromPoint` agar selection tetap stabil saat cursor bergerak antar-cell/header; single click cell tetap mempertahankan semantik cursor biasa.
+- Gate final GitHub run **37704541477**: 0 vulnerability, unit **206/206 PASS**, `npm run check` PASS, build **578,9 KiB**, full browser Chromium + Firefox **306 PASS + 4 skip**.
+- Acceptance pointer drag lulus di Chromium dan Firefox. Empat skip tetap limitation realtime `AudioContext` Firefox headless yang sudah ada. Milestone R3 tetap aktif.
+
 ### R3-S10D — seleksi bertahap Ctrl+A (CLOSED · PASS)
 
 - `Ctrl+A` Pattern kini mengikuti kontrak §8.6 dalam tiga tingkat: event-cell aktif pada row/channel saat ini → seluruh channel aktif → seluruh Pattern.
