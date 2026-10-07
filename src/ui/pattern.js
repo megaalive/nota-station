@@ -1346,15 +1346,7 @@ export function createPatternView({
       && blockSelection.channelStart === 0
       && blockSelection.channelEnd === tracks.length - 1;
 
-    if (fullPattern) {
-      blockAnchor = { row: 0, channel: 0 };
-      blockSelection = {
-        rowStart: 0,
-        rowEnd: rowCount - 1,
-        channelStart: 0,
-        channelEnd: tracks.length - 1,
-      };
-    } else if (fullCurrentChannel) {
+    if (fullPattern || fullCurrentChannel) {
       blockAnchor = { row: 0, channel: 0 };
       blockSelection = {
         rowStart: 0,
