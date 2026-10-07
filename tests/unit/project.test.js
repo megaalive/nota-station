@@ -17,6 +17,7 @@ import {
   noteAtCell,
   notesAtCell,
   setInitialTempo,
+  setTrackColor,
   setTrackPolyphony,
   updateNoteAtCell,
 } from '../../src/core/project.js';
@@ -129,6 +130,34 @@ test('addTrack menerima nama eksplisit tetapi menolak nama kosong atau terlalu p
   );
 });
 
+
+test('setTrackColor menyimpan warna kanonik, uppercase, no-op, dan validasi', () => {
+  const project = fixture();
+  const trackId = project.song.tracks[0].id;
+
+  const colored = setTrackColor(
+    project,
+    { trackId, color: '#336699' },
+    { now: () => '2026-10-08T00:00:00.000Z' },
+  );
+  assert.equal(project.song.tracks[0].color, null);
+  assert.equal(colored.song.tracks[0].color, '#336699');
+  assert.equal(colored.modifiedAt, '2026-10-08T00:00:00.000Z');
+
+  assert.equal(setTrackColor(colored, { trackId, color: '#336699' }), colored);
+
+  const cleared = setTrackColor(colored, { trackId, color: null });
+  assert.equal(cleared.song.tracks[0].color, null);
+
+  assert.throws(
+    () => setTrackColor(project, { trackId: 'missing', color: '#336699' }),
+    (error) => error.code === 'E_PROJECT_TRACK_MISSING',
+  );
+  assert.throws(
+    () => setTrackColor(project, { trackId, color: 'red' }),
+    (error) => error.code === 'E_PROJECT_TRACK_COLOR',
+  );
+});
 
 test('instrument track dapat diubah poly dan menerima beberapa voice lane pada row yang sama', () => {
   let project = fixture();
