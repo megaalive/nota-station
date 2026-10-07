@@ -68,6 +68,11 @@ test.describe('R3-S10A keymap + shortcut overlay', () => {
     await page.keyboard.press('Control+F10');
     state = await page.evaluate(() => window.tracker.getState());
     expect(state.audio.trackMeters.find((item) => item.trackId === activeTrackId)?.solo).toBe(true);
+
+    expect(state.transport.loopPattern).toBe(true);
+    await grid.focus();
+    await page.keyboard.press('Shift+F11');
+    expect((await page.evaluate(() => window.tracker.getState().transport.loopPattern))).toBe(false);
   });
 
   test('Command Palette menampilkan shortcut sesuai preset aktif', async ({ page }) => {
