@@ -48,6 +48,7 @@ const FIELD_WIDTHS = Object.freeze({
   param: PARAM_WIDTH,
 });
 const OVERSCAN = 4;
+const CHANNEL_OVERSCAN = 1;
 
 const NOTE_CODES = new Map([
   ['KeyZ', 0], ['KeyS', 1], ['KeyX', 2], ['KeyD', 3], ['KeyC', 4], ['KeyV', 5],
@@ -655,6 +656,36 @@ export function createPatternView({
     return `${ROW_NUMBER_WIDTH}px ${dataColumns(tracks, fields).map((width) => `${width}px`).join(' ')}`;
   }
 
+  function visibleChannelWindow(tracks, fields) {
+    const width = channelWidth(fields);
+    const viewportLeft = Math.max(0, scroller.scrollLeft - ROW_NUMBER_WIDTH);
+    const viewportRight = viewportLeft + Math.max(1, scroller.clientWidth || 800);
+    const first = Math.max(
+      0,
+      Math.floor(viewportLeft / width) - CHANNEL_OVERSCAN,
+    );
+    const last = Math.min(
+      tracks.length,
+      Math.ceil(viewportRight / width) + CHANNEL_OVERSCAN,
+    );
+    return {
+      first,
+      last,
+      leftSpacer: first * width,
+      rightSpacer: (tracks.length - last) * width,
+    };
+  }
+
+  function windowedRowTemplate(tracks, fields, window) {
+    const columns = [`${ROW_NUMBER_WIDTH}px`];
+    if (window.leftSpacer > 0) columns.push(`${window.leftSpacer}px`);
+    for (let channel = window.first; channel < window.last; channel += 1) {
+      for (const field of fields) columns.push(`${FIELD_WIDTHS[field]}px`);
+    }
+    if (window.rightSpacer > 0) columns.push(`${window.rightSpacer}px`);
+    return columns.join(' ');
+  }
+
   function headerSignature({ project, tracks, fields }) {
     return JSON.stringify({
       fields,
@@ -860,6 +891,7 @@ export function createPatternView({
     const viewportRows = Math.ceil((scroller.clientHeight || 420) / ROW_HEIGHT);
     const first = Math.max(0, Math.floor(Math.max(0, scroller.scrollTop - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN);
     const last = Math.min(rowCount, first + viewportRows + OVERSCAN * 2);
+    const channelWindow = visibleChannelWindow(tracks, fields);
 
     rowsLayer.textContent = '';
     for (let row = first; row < last; row += 1) {
@@ -872,7 +904,7 @@ export function createPatternView({
         dataset: { row: String(row) },
       });
       rowNode.style.top = `${HEADER_HEIGHT + row * ROW_HEIGHT}px`;
-      rowNode.style.gridTemplateColumns = rowTemplate(tracks, fields);
+      rowNode.style.gridTemplateColumns = windowedRowTemplate(tracks, fields, channelWindow);
 
       rowNode.append(el('div', {
         class: 'pattern-grid__row-number',
@@ -880,7 +912,17 @@ export function createPatternView({
         text: row.toString(16).toUpperCase().padStart(2, '0'),
       }));
 
-      tracks.forEach((track, channel) => {
+      if (channelWindow.leftSpacer > 0) {
+        rowNode.append(el('div', {
+          class: 'pattern-grid__channel-spacer',
+          'aria-hidden': 'true',
+        }));
+      }
+
+      tracks
+        .slice(channelWindow.first, channelWindow.last)
+        .forEach((track, offset) => {
+        const channel = channelWindow.first + offset;
         const projectedNotes = notesAtDisplayCell(project, {
           patternId: pattern.id,
           trackId: track.id,
@@ -945,6 +987,12 @@ export function createPatternView({
           }));
         });
       });
+      if (channelWindow.rightSpacer > 0) {
+        rowNode.append(el('div', {
+          class: 'pattern-grid__channel-spacer',
+          'aria-hidden': 'true',
+        }));
+      }
       rowsLayer.append(rowNode);
     }
   }
