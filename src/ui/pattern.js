@@ -21,6 +21,7 @@ import {
 import {
   MAX_CHANNELS,
   activePattern,
+  firstFreeVoiceLane,
   noteAtCell,
   notesAtCell,
 } from '../core/project.js';
@@ -765,6 +766,31 @@ export function createPatternView({
           },
         },
       });
+      const poly = el('button', {
+        type: 'button',
+        class: 'pattern-channel__toggle',
+        'aria-label': t('pattern.trackPolyphony', { track: index + 1 }),
+        'aria-pressed': track.polyphony === 'poly' ? 'true' : 'false',
+        disabled: track.kind === 'drum',
+        dataset: { action: 'track-polyphony', trackId: track.id },
+        text: 'P',
+        on: {
+          click: (event) => {
+            event.stopPropagation();
+            if (track.kind === 'drum') return;
+            try {
+              registry.execute('track.setPolyphony', {
+                trackId: track.id,
+                polyphony: track.polyphony === 'poly' ? 'mono' : 'poly',
+              });
+            } catch (error) {
+              if (error?.code !== 'E_PROJECT_POLYPHONY_ACTIVE_VOICES') throw error;
+              feedback = { key: 'pattern.polyphonyHasVoices' };
+              syncStatus();
+            }
+          },
+        },
+      });
       const meterFill = el('span', { class: 'pattern-channel__meter-fill' });
       const meter = el('span', {
         class: 'pattern-channel__meter',
@@ -822,7 +848,7 @@ export function createPatternView({
       }));
       instrumentSelect.value = track.defaultInstrumentId;
 
-      const controls = el('span', { class: 'pattern-channel__controls' }, [mute, solo, meter]);
+      const controls = el('span', { class: 'pattern-channel__controls' }, [mute, solo, poly, meter]);
       const channel = el('div', {
         class: `pattern-grid__channel${track.kind === 'drum' ? ' is-drum' : ''}`,
         role: 'columnheader',
@@ -830,7 +856,7 @@ export function createPatternView({
         'aria-colspan': String(fields.length),
       }, [label, instrumentSelect, controls]);
       channelRow.append(channel);
-      trackUi.set(track.id, { channel, mute, solo, meter, meterFill });
+      trackUi.set(track.id, { channel, mute, solo, poly, meter, meterFill });
     });
 
     const fieldRow = el('div', { class: 'pattern-grid__header-row pattern-grid__header-row--field', role: 'row' });
@@ -1424,18 +1450,47 @@ export function createPatternView({
     renderWindow();
   }
 
-  function enterPitch(pitch) {
+  function enterPitch(pitch, { appendVoice = false } = {}) {
     if (cursorField !== 'note') return;
 
-    const { pattern, tracks } = projectInfo();
+    const { project, pattern, tracks } = projectInfo();
+    const track = tracks[cursorChannel];
     onAudition?.(pitch);
 
     if (mode !== 'edit') return;
     if (rejectOffGridCellEdit()) return;
 
+    if (appendVoice && track?.polyphony === 'poly' && track.kind !== 'drum') {
+      let voiceLane;
+      try {
+        voiceLane = firstFreeVoiceLane(project, {
+          patternId: pattern.id,
+          trackId: track.id,
+          row: cursorRow,
+        });
+      } catch (error) {
+        if (error?.code !== 'E_PROJECT_VOICE_LANE_FULL') throw error;
+        feedback = { key: 'pattern.polyVoiceFull' };
+        syncStatus();
+        return;
+      }
+      runPatternCommand('pattern.enterVoiceNote', {
+        patternId: pattern.id,
+        trackId: track.id,
+        row: cursorRow,
+        voiceLane,
+        pitch,
+      }, () => {
+        feedback = { key: 'pattern.polyVoiceAdded', vars: { lane: voiceLane + 1 } };
+        renderWindow();
+        syncStatus();
+      });
+      return;
+    }
+
     runPatternCommand('pattern.enterNote', {
       patternId: pattern.id,
-      trackId: tracks[cursorChannel].id,
+      trackId: track.id,
       row: cursorRow,
       pitch,
     }, () => moveVertical(step));
@@ -1701,7 +1756,7 @@ export function createPatternView({
     const { pattern, tracks } = projectInfo();
     const track = tracks[cursorChannel];
     runPatternCommand(
-      track.kind === 'drum' ? 'pattern.clearVoiceRow' : 'pattern.deleteNote',
+      track.polyphony === 'poly' ? 'pattern.clearVoiceRow' : 'pattern.deleteNote',
       {
         patternId: pattern.id,
         trackId: track.id,
@@ -1735,6 +1790,8 @@ export function createPatternView({
       hint.textContent = t(mode === 'edit' ? 'pattern.hintDrum' : 'pattern.hintDrumAudition');
     } else if (mode !== 'edit') {
       hint.textContent = t('pattern.hintAudition');
+    } else if (cursorField === 'note' && currentTrack?.polyphony === 'poly') {
+      hint.textContent = t('pattern.hintPolyEdit');
     } else if (cursorField === 'note') {
       hint.textContent = t('pattern.hintEdit');
     } else if (cursorField === 'instrument') {
@@ -1939,7 +1996,7 @@ export function createPatternView({
     const pitch = octave * 12 + 12 + semitone;
     if (pitch > 127) return;
     event.preventDefault();
-    enterPitch(pitch);
+    enterPitch(pitch, { appendVoice: event.shiftKey });
   });
 
   refresh();

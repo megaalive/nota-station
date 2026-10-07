@@ -5,6 +5,12 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S9B — perbaikan input regression CI
+
+- Tes chord memakai Shift+C untuk E pada oktaf yang sama sesuai §8.14; Shift+E adalah E pada oktaf atas. Assertion pitch 60/64, voice lane, dan row tetap utuh.
+- Workflow gate mengunci checkout/setup-node v4 ke SHA dari repository resmi sesuai §13.3.
+- Unit 196/196, check, dan build lokal PASS. Tes polyphonic 4/4 PASS; browser penuh 265 PASS, 3 FAIL, 4 skip. Isolasi satu worker: 9 PASS, 1 FAIL (budget input channel Chromium). Push ditolak GitHub HTTP 500; perbaikan masih lokal.
+
 ### R3-S9A — kapasitas 32 channel logis (CLOSED · PASS)
 
 - Project baru tetap ringkas dengan **8 channel default**, tetapi model/command kini dapat menambah channel sampai batas kanonik **32**; channel ke-33 ditolak fail-closed dengan `E_PROJECT_TRACK_LIMIT`.
