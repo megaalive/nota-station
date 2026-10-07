@@ -141,18 +141,45 @@ test.describe('Pattern block editing R3-S5', () => {
     })).toBe(3);
   });
 
-  test('Ctrl+A bertahap memilih channel lalu seluruh Pattern', async ({ page }) => {
+  test('Ctrl+A bertahap memilih sel aktif → channel → seluruh Pattern', async ({ page }) => {
     await gotoApp(page);
     await seedBlock(page);
     const grid = page.locator('[data-action="pattern-grid"]');
     await grid.focus();
+
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    expect(await page.evaluate(() => window.tracker.getState().patternUi)).toMatchObject({
+      row: 1,
+      channel: 1,
+      field: 'note',
+      selection: null,
+    });
+
+    await page.keyboard.press('Control+a');
+    expect(await page.evaluate(() => window.tracker.getState().patternUi.selection)).toEqual({
+      rowStart: 1,
+      rowEnd: 1,
+      channelStart: 1,
+      channelEnd: 1,
+    });
+
+    await page.keyboard.press('Control+a');
+    expect(await page.evaluate(() => window.tracker.getState().patternUi.selection)).toEqual({
+      rowStart: 0,
+      rowEnd: 63,
+      channelStart: 1,
+      channelEnd: 1,
+    });
 
     await page.keyboard.press('Control+a');
     expect(await page.evaluate(() => window.tracker.getState().patternUi.selection)).toEqual({
       rowStart: 0,
       rowEnd: 63,
       channelStart: 0,
-      channelEnd: 0,
+      channelEnd: 7,
     });
 
     await page.keyboard.press('Control+a');
