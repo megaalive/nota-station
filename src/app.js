@@ -45,6 +45,7 @@ import {
   enterNote,
   enterVoiceNote,
   setInitialTempo,
+  setTrackColor,
   setTrackPolyphony,
   updateNoteAtCell,
 } from './core/project.js';
@@ -568,6 +569,22 @@ function registerCommands() {
           throw commandError('E_TRACK_NOT_FOUND', `Track tidak dikenal: ${trackId}`);
         }
         const result = audio.toggleTrackSolo(trackId);
+        syncTransportUi();
+        return result;
+      },
+    },
+    {
+      id: 'audio.setTrackVolume',
+      group: 'Mixer',
+      labelKey: 'audio.trackVolume',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('audio.setTrackVolume', args);
+        const trackId = String(args.trackId ?? '');
+        if (!project.song.tracks.some((track) => track.id === trackId)) {
+          throw commandError('E_TRACK_NOT_FOUND', `Track tidak dikenal: ${trackId}`);
+        }
+        const result = audio.setTrackVolume(trackId, Number(args.volume));
         syncTransportUi();
         return result;
       },
@@ -1153,6 +1170,20 @@ function registerCommands() {
       group: 'Tampilan',
       labelKey: 'palette.toggleTheme',
       run: () => cycleTheme(),
+    },
+    {
+      id: 'track.setColor',
+      group: 'Pattern',
+      labelKey: 'pattern.trackColor',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('track.setColor', args);
+        const trackId = String(args.trackId ?? '');
+        const color = args.color === null ? null : String(args.color ?? '');
+        const before = project;
+        commitProject(setTrackColor(project, { trackId, color }), 'track.setColor');
+        return { trackId, color: project.song.tracks.find((track) => track.id === trackId)?.color ?? null, changed: project !== before };
+      },
     },
     {
       id: 'track.setPolyphony',
