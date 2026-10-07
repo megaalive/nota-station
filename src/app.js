@@ -40,6 +40,7 @@ import {
   enterNote,
   enterVoiceNote,
   setInitialTempo,
+  setTrackPolyphony,
   updateNoteAtCell,
 } from './core/project.js';
 import { createAudioEngine } from './audio/engine.js';
@@ -1008,6 +1009,21 @@ function registerCommands() {
       group: 'Tampilan',
       labelKey: 'palette.toggleTheme',
       run: () => cycleTheme(),
+    },
+    {
+      id: 'track.setPolyphony',
+      group: 'Pattern',
+      labelKey: 'pattern.trackPolyphony',
+      requiresArgs: true,
+      run: (args) => {
+        requireCommandArgs('track.setPolyphony', args);
+        const trackId = String(args.trackId ?? '');
+        const polyphony = String(args.polyphony ?? '');
+        const nextProject = setTrackPolyphony(project, { trackId, polyphony });
+        const changed = nextProject !== project;
+        commitProject(nextProject, 'track.setPolyphony');
+        return { trackId, polyphony, changed };
+      },
     },
     {
       id: 'track.setDefaultInstrument',
