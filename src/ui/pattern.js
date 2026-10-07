@@ -778,10 +778,16 @@ export function createPatternView({
           click: (event) => {
             event.stopPropagation();
             if (track.kind === 'drum') return;
-            registry.execute('track.setPolyphony', {
-              trackId: track.id,
-              polyphony: track.polyphony === 'poly' ? 'mono' : 'poly',
-            });
+            try {
+              registry.execute('track.setPolyphony', {
+                trackId: track.id,
+                polyphony: track.polyphony === 'poly' ? 'mono' : 'poly',
+              });
+            } catch (error) {
+              if (error?.code !== 'E_PROJECT_POLYPHONY_ACTIVE_VOICES') throw error;
+              feedback = { key: 'pattern.polyphonyHasVoices' };
+              syncStatus();
+            }
           },
         },
       });
