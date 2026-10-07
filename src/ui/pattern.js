@@ -18,7 +18,12 @@ import {
   rowTicksForLpb,
   SUPPORTED_LPB,
 } from '../core/pattern-grid.js';
-import { activePattern, noteAtCell, notesAtCell } from '../core/project.js';
+import {
+  MAX_CHANNELS,
+  activePattern,
+  noteAtCell,
+  notesAtCell,
+} from '../core/project.js';
 import { isDrumKitInstrument } from '../core/sound-model.js';
 import { el } from './dom.js';
 import { Button, Popover, Tooltip } from './kit.js';
@@ -212,6 +217,21 @@ export function createPatternView({
     quantizeButton,
   ]);
 
+  const addChannelButton = Button({
+    label: t('pattern.addChannel'),
+    variant: 'ghost',
+    onClick: () => {
+      const result = registry.execute('song.addTrack');
+      feedback = {
+        key: 'pattern.channelAdded',
+        vars: { count: result.trackCount },
+      };
+      syncStatus();
+      scroller.focus({ preventScroll: true });
+    },
+  });
+  addChannelButton.dataset.action = 'pattern-add-channel';
+
   const fxToggleButton = Button({
     label: t('pattern.toggleFxColumns'),
     variant: 'ghost',
@@ -284,6 +304,7 @@ export function createPatternView({
     octaveGroup,
     stepGroup,
     timingGroup,
+    addChannelButton,
     fxToggleButton,
     effectEditor,
     sharedPopover,
@@ -314,7 +335,8 @@ export function createPatternView({
     } else {
       feedback = null;
     }
-    const { fields } = projectInfo();
+    const { fields, tracks } = projectInfo();
+    cursorChannel = Math.min(cursorChannel, Math.max(0, tracks.length - 1));
     if (!fields.includes(cursorField)) cursorField = 'note';
     renderHeader();
     renderWindow();
@@ -1620,6 +1642,7 @@ export function createPatternView({
     stepText.textContent = `${t('status.step')} ${step}`;
     const currentInfo = projectInfo();
     const currentTrack = currentInfo.tracks[cursorChannel];
+    addChannelButton.disabled = currentInfo.tracks.length >= MAX_CHANNELS;
     if (feedback) {
       hint.textContent = t(feedback.key, feedback.vars);
     } else if (blockSelection) {
