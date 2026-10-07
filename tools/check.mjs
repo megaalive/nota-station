@@ -1,10 +1,13 @@
 // Gate `npm run check` (§16.1). Sengaja tanpa dependency: yang dicek cuma hal yang
 // bisa salah diam-diam dan mahal diperbaiki nanti — syntax, sisa console.log, path absolut.
 
+import { execFile } from 'node:child_process';
 import { readFile, readdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
+const execFileAsync = promisify(execFile);
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // tools/ dilewati: itu perkakas CLI yang memang boleh mencetak ke stdout.
 // Yang kita jaga tetap runtime yang dikirim ke browser.
@@ -32,6 +35,16 @@ async function main() {
     const rel = file.slice(ROOT.length + 1).replace(/\\/g, '/');
     const source = await readFile(file, 'utf8');
     const lines = source.split('\n');
+
+    try {
+      await execFileAsync(process.execPath, ['--check', file]);
+    } catch (error) {
+      const detail = String(error?.stderr ?? error?.message ?? 'syntax invalid')
+        .split('\n')
+        .find((line) => line.trim().length > 0);
+      problems.push(`${rel}: syntax invalid${detail ? ` — ${detail.trim()}` : ''}`);
+      continue;
+    }
 
     lines.forEach((line, i) => {
       const code = line.replace(/\/\/.*$/, '');

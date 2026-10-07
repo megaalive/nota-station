@@ -5,6 +5,20 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S8F-B — audible vibrato + arpeggio (CLOSED · PASS)
+
+- `vibrato` kini menjadi automation pitch cyclic pada `AudioBufferSourceNode.playbackRate`, dengan `depthSemitones` dan `rateHz` typed. Kurva dijadwalkan terhadap audio clock sampai voice selesai; tidak ada `setTimeout` atau timer musikal kedua.
+- `arpeggio` mengulang `semitones[]` per `stepTicks` sebagai stepwise playback-rate automation yang diturunkan dari tick musik. Data kanonik EffectEvent tetap pattern-local dan `NoteEvent.pitch` tidak pernah dimutasi.
+- Seluruh keluarga pitch sekarang berbagi state/cancel policy yang sama. Effect baru mengambil offset pitch aktual pada waktu event, membatalkan automation setelah titik itu, lalu menjadi pemilik automation berikutnya; slide/porta tidak me-reset vibrato/arpeggio kembali ke pitch note.
+- Usia automation dibatasi oleh usia voice efektif. Note cut dan retrigger yang memotong source juga memotong automation; voice hasil retrigger hanya menerima pitch effect yang memang terjadi pada/ setelah voice restart tersebut.
+- Seek/loop tetap memakai `createEffectScheduleCursor()`; live-edit tetap memakai freeze window **30 ms**. Tidak dibuat scheduler pitch terpisah dan tidak ada absolute song tick yang disimpan.
+- Sampler/factory tetap memakai base playback rate yang sudah mencakup root note/tuning Sample/Zone. Pitch effect diterapkan relatif terhadap base rate itu. Jalur `demo.*` tetap fail-soft/terukur bila tidak memiliki `playbackRate` yang kompatibel.
+- Bukti audible lintas-browser memakai `OfflineAudioContext`: vibrato menunjukkan modulasi frekuensi periodik nyata dan arpeggio menunjukkan lompatan frekuensi stepwise nyata. Realtime Chromium menguji chaining slide → porta → vibrato → arpeggio sekaligus interaksi retrigger tanpa mutasi NoteEvent.
+- Gate final run **37622712378** pada HEAD `be29bdd…`: 0 vulnerability, unit **190/190 PASS**, `npm run check` PASS, build **534,6 KiB**, full browser **258 PASS + 4 skip**.
+- Empat skip tetap hanya realtime `AudioContext` Firefox headless S8B/S8D/S8E/S8F; bukti audible `OfflineAudioContext` termasuk vibrato/arpeggio tetap berjalan pada Firefox.
+- `npm run check` juga diperkeras untuk menjalankan `node --check` pada JS/MJS sehingga syntax error tertangkap sebelum browser gate.
+- Dengan S8F-B, seluruh 10 EffectEvent v0.1 pada §7.4 sudah memiliki jalur audible/semantik runtime yang ditutup per-slice. Exit R3 berikutnya harus ditentukan dari PLAN/changelog aktual, bukan membuka keluarga DSP baru secara otomatis.
+
 ### R3-S8F-A — audible pitch slide + portamento (CLOSED · PASS)
 
 - Spike R1 `pitch-spike.js` diproduksikan menjadi primitive `pitch-effects.js` untuk automation finite pada `AudioParam`.

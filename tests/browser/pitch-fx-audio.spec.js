@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 import { gotoApp } from './helpers.js';
 
-test.describe('Pitch slide + porta audio R3-S8F-A', () => {
+test.describe('Pitch FX audio R3-S8F', () => {
   test('pitch slide dan porta mengubah frekuensi audible pada OfflineAudioContext', async ({ page }) => {
     await gotoApp(page);
 
@@ -72,7 +72,71 @@ test.describe('Pitch slide + porta audio R3-S8F-A', () => {
     }
   });
 
-  test('engine realtime menerapkan slide lalu porta tanpa memutasi NoteEvent', async ({ page }, testInfo) => {
+  test('vibrato dan arpeggio menghasilkan perubahan pitch audible berulang', async ({ page }) => {
+    await gotoApp(page);
+
+    const result = await page.evaluate(async () => {
+      const { scheduleRepeatingPitchEffect } = await import('./src/audio/pitch-effects.js');
+
+      async function render(effect, windows) {
+        const sampleRate = 48000;
+        const duration = 0.5;
+        const context = new OfflineAudioContext(1, Math.ceil(sampleRate * duration), sampleRate);
+        const buffer = context.createBuffer(1, sampleRate, sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i += 1) {
+          data[i] = Math.sin(2 * Math.PI * 220 * i / sampleRate) * 0.5;
+        }
+
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.setValueAtTime(1, 0);
+        source.connect(context.destination);
+
+        scheduleRepeatingPitchEffect(source.playbackRate, effect, {
+          when: 0,
+          currentTime: 0,
+          baseRate: 1,
+          basePitch: 60,
+          voiceEndTime: duration,
+          tickSeconds: 1 / 960,
+        });
+
+        source.start(0);
+        source.stop(duration);
+        const rendered = await context.startRendering();
+        const output = rendered.getChannelData(0);
+
+        const crossings = ([startSeconds, endSeconds]) => {
+          const start = Math.floor(startSeconds * sampleRate);
+          const end = Math.floor(endSeconds * sampleRate);
+          let count = 0;
+          for (let i = start + 1; i < end; i += 1) {
+            if (output[i - 1] <= 0 && output[i] > 0) count += 1;
+          }
+          return count / Math.max(0.001, endSeconds - startSeconds);
+        };
+
+        return windows.map(crossings);
+      }
+
+      return {
+        vibrato: await render(
+          { type: 'vibrato', value: { depthSemitones: 3, rateHz: 5 } },
+          [[0.025, 0.075], [0.125, 0.175]],
+        ),
+        arpeggio: await render(
+          { type: 'arpeggio', value: { semitones: [0, 12], stepTicks: 120 } },
+          [[0.04, 0.09], [0.17, 0.22]],
+        ),
+      };
+    });
+
+    expect(result.vibrato[0]).toBeGreaterThan(result.vibrato[1] * 1.25);
+    expect(result.arpeggio[1]).toBeGreaterThan(result.arpeggio[0] * 1.7);
+  });
+
+  test('engine realtime merantai slide, porta, vibrato, dan arpeggio tanpa mutasi NoteEvent', async ({ page }, testInfo) => {
     test.skip(
       testInfo.project.name === 'firefox',
       'Firefox headless GitHub Actions mempertahankan realtime AudioContext suspended; audible proof tetap berjalan di OfflineAudioContext.',
@@ -97,20 +161,22 @@ test.describe('Pitch slide + porta audio R3-S8F-A', () => {
         velocity: 100,
         durationTicks: 1440,
       });
-      window.tracker.commands.execute('pattern.addEffect', {
-        patternId,
-        trackId,
-        tickLocal: 0,
-        type: 'pitchSlide',
-        value: { semitones: 7, durationTicks: 240 },
-      });
-      window.tracker.commands.execute('pattern.addEffect', {
-        patternId,
-        trackId,
-        tickLocal: 120,
-        type: 'porta',
-        value: { targetPitch: 55, durationTicks: 240 },
-      });
+      const effects = [
+        ['pitchSlide', 0, { semitones: 7, durationTicks: 240 }],
+        ['retrigger', 0, { intervalTicks: 360, count: 1 }],
+        ['porta', 120, { targetPitch: 55, durationTicks: 240 }],
+        ['vibrato', 360, { depthSemitones: 1.5, rateHz: 5 }],
+        ['arpeggio', 480, { semitones: [0, 4, 7], stepTicks: 120 }],
+      ];
+      for (const [type, tickLocal, value] of effects) {
+        window.tracker.commands.execute('pattern.addEffect', {
+          patternId,
+          trackId,
+          tickLocal,
+          type,
+          value,
+        });
+      }
 
       return { patternId, trackId };
     });
@@ -122,17 +188,18 @@ test.describe('Pitch slide + porta audio R3-S8F-A', () => {
       { timeout: 5000 },
     ).toBe('running');
     await expect.poll(
-      () => page.evaluate(() => window.tracker.getState().audio.pitchSlideEffectsScheduled),
-      { timeout: 5000 },
-    ).toBeGreaterThanOrEqual(1);
-    await expect.poll(
-      () => page.evaluate(() => window.tracker.getState().audio.portaEffectsScheduled),
+      () => page.evaluate(() => window.tracker.getState().audio.arpeggioEffectsScheduled),
       { timeout: 5000 },
     ).toBeGreaterThanOrEqual(1);
 
     const audio = await page.evaluate(() => window.tracker.getState().audio);
-    expect(audio.pitchEffectsScheduled).toBeGreaterThanOrEqual(2);
-    expect(audio.pitchVoicesAutomated).toBeGreaterThanOrEqual(2);
+    expect(audio.pitchSlideEffectsScheduled).toBeGreaterThanOrEqual(1);
+    expect(audio.portaEffectsScheduled).toBeGreaterThanOrEqual(1);
+    expect(audio.vibratoEffectsScheduled).toBeGreaterThanOrEqual(1);
+    expect(audio.arpeggioEffectsScheduled).toBeGreaterThanOrEqual(1);
+    expect(audio.retriggerNotesScheduled).toBeGreaterThanOrEqual(1);
+    expect(audio.pitchEffectsScheduled).toBeGreaterThanOrEqual(4);
+    expect(audio.pitchVoicesAutomated).toBeGreaterThanOrEqual(4);
     expect(audio.pitchUnsupportedVoices).toBe(0);
 
     await page.getByRole('button', { name: 'Berhenti' }).click();
@@ -158,16 +225,11 @@ test.describe('Pitch slide + porta audio R3-S8F-A', () => {
       startTickLocal: 0,
       durationTicks: 1440,
       effects: [
-        {
-          type: 'pitchSlide',
-          tickLocal: 0,
-          value: { semitones: 7, durationTicks: 240 },
-        },
-        {
-          type: 'porta',
-          tickLocal: 120,
-          value: { targetPitch: 55, durationTicks: 240 },
-        },
+        { type: 'pitchSlide', tickLocal: 0, value: { semitones: 7, durationTicks: 240 } },
+        { type: 'retrigger', tickLocal: 0, value: { intervalTicks: 360, count: 1 } },
+        { type: 'porta', tickLocal: 120, value: { targetPitch: 55, durationTicks: 240 } },
+        { type: 'vibrato', tickLocal: 360, value: { depthSemitones: 1.5, rateHz: 5 } },
+        { type: 'arpeggio', tickLocal: 480, value: { semitones: [0, 4, 7], stepTicks: 120 } },
       ],
     });
   });
