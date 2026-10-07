@@ -485,3 +485,42 @@ test('mix FX tanpa volume/pan tidak membuat synthetic reset', () => {
   assert.deepEqual(mixEffectEventTemplates(pattern, 120), []);
   assert.equal(createMixEffectScheduleCursor(pattern, 120).eventCount, 0);
 });
+
+
+test('vibrato dan arpeggio mempertahankan seek/loop deterministik', () => {
+  const pattern = {
+    lengthTicks: 960,
+    notes: [],
+    effects: [
+      {
+        id: 'fx-vib',
+        trackId: 't1',
+        tickLocal: 120,
+        type: 'vibrato',
+        value: { depthSemitones: 1, rateHz: 5 },
+      },
+      {
+        id: 'fx-arp',
+        trackId: 't1',
+        tickLocal: 480,
+        type: 'arpeggio',
+        value: { semitones: [0, 4, 7], stepTicks: 120 },
+      },
+    ],
+  };
+
+  const cursor = createEffectScheduleCursor(pattern, 120, {
+    loop: true,
+    startTick: 240,
+  });
+  const due = cursor.drainUntil(3, 4.3);
+
+  assert.deepEqual(
+    due.map((event) => [event.type, event.startTickLocal, event.cycle, Number(event.when.toFixed(3))]),
+    [
+      ['arpeggio', 480, 0, 3.25],
+      ['vibrato', 120, 1, 3.875],
+      ['arpeggio', 480, 1, 4.25],
+    ],
+  );
+});
