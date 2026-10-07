@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 
 import {
   DEFAULT_CHANNELS,
+  MAX_CHANNELS,
   DEFAULT_ROWS,
   DEFAULT_ROW_TICKS,
   activePattern,
+  addTrack,
   createBlankProject,
   deleteNote,
   enterNote,
@@ -69,6 +71,57 @@ test('project kosong R1 punya 8 channel, 64 row, dan satu occurrence', () => {
   assert.equal(pattern.rowTicks, DEFAULT_ROW_TICKS);
   assert.equal(project.song.order.length, 1);
   assert.equal(project.song.initial.tempo, 120);
+});
+
+
+test('channel dapat ditambah sampai 32 tanpa mengubah default 8 channel', () => {
+  let project = fixture();
+  assert.equal(project.song.tracks.length, DEFAULT_CHANNELS);
+
+  while (project.song.tracks.length < MAX_CHANNELS) {
+    const nextIndex = project.song.tracks.length + 1;
+    const before = project;
+    project = addTrack(
+      project,
+      {},
+      {
+        idFactory: (prefix) => `${prefix}-added-${nextIndex}`,
+        now: () => '2026-10-07T14:30:00.000Z',
+      },
+    );
+    assert.notEqual(project, before);
+    assert.equal(before.song.tracks.length, nextIndex - 1);
+  }
+
+  assert.equal(project.song.tracks.length, MAX_CHANNELS);
+  assert.equal(project.song.tracks.at(-1).name, 'Channel 32');
+  assert.equal(project.song.tracks.at(-1).kind, 'instrument');
+  assert.equal(project.song.tracks.at(-1).polyphony, 'mono');
+  assert.equal(project.song.tracks.at(-1).defaultInstrumentId, 'factory.basic');
+
+  assert.throws(
+    () => addTrack(project),
+    (error) => error.code === 'E_PROJECT_TRACK_LIMIT',
+  );
+});
+
+test('addTrack menerima nama eksplisit tetapi menolak nama kosong atau terlalu panjang', () => {
+  const project = fixture();
+  const named = addTrack(
+    project,
+    { name: 'Harmony L' },
+    { idFactory: () => 'track-harmony', now: () => '2026-10-07T14:31:00.000Z' },
+  );
+  assert.equal(named.song.tracks.at(-1).name, 'Harmony L');
+
+  assert.throws(
+    () => addTrack(project, { name: '   ' }),
+    (error) => error.code === 'E_PROJECT_TRACK_NAME',
+  );
+  assert.throws(
+    () => addTrack(project, { name: 'x'.repeat(81) }),
+    (error) => error.code === 'E_PROJECT_TRACK_NAME',
+  );
 });
 
 test('enterNote menulis NoteEvent pattern-local dengan durationTicks kanonik', () => {
