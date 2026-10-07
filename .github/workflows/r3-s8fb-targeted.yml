@@ -27,5 +27,28 @@ jobs:
       - run: npm run check
       - run: npm run build
       - run: npx playwright install --with-deps chromium firefox
+      - name: Diagnose bootstrap
+        shell: bash
+        run: |
+          PORT=4173 BASE_PATH=/nota-station/ node tools/serve.mjs > /tmp/notastation-serve.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          sleep 1
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          const browser = await chromium.launch({ headless: true });
+          const page = await browser.newPage();
+          page.on('console', (msg) => console.log('BROWSER_CONSOLE', msg.type(), msg.text()));
+          page.on('pageerror', (error) => console.log('BROWSER_PAGEERROR', error.stack ?? error.message));
+          page.on('requestfailed', (request) => console.log('REQUEST_FAILED', request.url(), request.failure()?.errorText));
+          const response = await page.goto('http://127.0.0.1:4173/nota-station/', { waitUntil: 'networkidle' });
+          console.log('HTTP_STATUS', response?.status());
+          console.log('FINAL_URL', page.url());
+          console.log('TITLE', await page.title());
+          console.log('TOPBAR_COUNT', await page.locator('[data-action="topbar"]').count());
+          console.log('BODY_PREFIX', (await page.locator('body').innerText()).slice(0, 1000));
+          await browser.close();
+          NODE
+          cat /tmp/notastation-serve.log
       - name: Browser pitch/audio regression
         run: npx playwright test tests/browser/pitch-fx-audio.spec.js tests/browser/pitch-spike.spec.js tests/browser/timing-fx-audio.spec.js tests/browser/mix-fx-audio.spec.js tests/browser/source-fx-audio.spec.js tests/browser/pattern-fx.spec.js
