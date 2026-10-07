@@ -48,7 +48,7 @@ const FIELD_WIDTHS = Object.freeze({
   param: PARAM_WIDTH,
 });
 const OVERSCAN = 4;
-const CHANNEL_OVERSCAN = 1;
+const CHANNEL_OVERSCAN = 0;
 
 const NOTE_CODES = new Map([
   ['KeyZ', 0], ['KeyS', 1], ['KeyX', 2], ['KeyD', 3], ['KeyC', 4], ['KeyV', 5],
