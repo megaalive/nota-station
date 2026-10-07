@@ -1461,11 +1461,19 @@ export function createPatternView({
     if (rejectOffGridCellEdit()) return;
 
     if (appendVoice && track?.polyphony === 'poly' && track.kind !== 'drum') {
-      const voiceLane = firstFreeVoiceLane(project, {
-        patternId: pattern.id,
-        trackId: track.id,
-        row: cursorRow,
-      });
+      let voiceLane;
+      try {
+        voiceLane = firstFreeVoiceLane(project, {
+          patternId: pattern.id,
+          trackId: track.id,
+          row: cursorRow,
+        });
+      } catch (error) {
+        if (error?.code !== 'E_PROJECT_VOICE_LANE_FULL') throw error;
+        feedback = { key: 'pattern.polyVoiceFull' };
+        syncStatus();
+        return;
+      }
       runPatternCommand('pattern.enterVoiceNote', {
         patternId: pattern.id,
         trackId: track.id,
