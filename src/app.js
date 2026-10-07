@@ -31,6 +31,7 @@ import {
 import { createTemplateProject } from './core/templates.js';
 import { createDemoProject, STABILITY_DEMO_ID } from './core/demos.js';
 import {
+  addTrack,
   configureDrumTrack,
   createBlankProject,
   deleteNote,
@@ -688,6 +689,19 @@ function registerCommands() {
       },
     },
     {
+      id: 'song.addTrack',
+      group: 'Song',
+      labelKey: 'pattern.addChannel',
+      run: () => {
+        const nextProject = addTrack(project);
+        commitProject(nextProject, 'song.addTrack');
+        return {
+          trackId: project.song.tracks.at(-1).id,
+          trackCount: project.song.tracks.length,
+        };
+      },
+    },
+    {
       id: 'pattern.allowSharedEdit',
       group: 'Pattern',
       labelKey: 'pattern.sharedEditAll',
@@ -1258,7 +1272,11 @@ function requireCommandArgs(id, args) {
 function commitProject(nextProject, label) {
   if (nextProject === project) return project;
 
+  const previous = project;
   project = history.commit(nextProject, label);
+  if (project.song.tracks !== previous.song.tracks) {
+    audio.setTracks(project.song.tracks);
+  }
   reconcileFocus();
   reconcileSharedPatternGuard();
   persistSessionProjectSnapshot();
@@ -1293,6 +1311,9 @@ function restoreHistory(direction) {
 
   const previous = project;
   project = nextProject;
+  if (project.song.tracks !== previous.song.tracks) {
+    audio.setTracks(project.song.tracks);
+  }
   reconcileFocus();
   reconcileSharedPatternGuard();
   persistSessionProjectSnapshot();

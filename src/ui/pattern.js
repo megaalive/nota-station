@@ -18,7 +18,12 @@ import {
   rowTicksForLpb,
   SUPPORTED_LPB,
 } from '../core/pattern-grid.js';
-import { activePattern, noteAtCell, notesAtCell } from '../core/project.js';
+import {
+  MAX_CHANNELS,
+  activePattern,
+  noteAtCell,
+  notesAtCell,
+} from '../core/project.js';
 import { isDrumKitInstrument } from '../core/sound-model.js';
 import { el } from './dom.js';
 import { Button, Popover, Tooltip } from './kit.js';
@@ -42,7 +47,8 @@ const FIELD_WIDTHS = Object.freeze({
   effect: FX_WIDTH,
   param: PARAM_WIDTH,
 });
-const OVERSCAN = 4;
+const OVERSCAN = 1;
+const CHANNEL_OVERSCAN = 0;
 
 const NOTE_CODES = new Map([
   ['KeyZ', 0], ['KeyS', 1], ['KeyX', 2], ['KeyD', 3], ['KeyC', 4], ['KeyV', 5],
@@ -104,6 +110,8 @@ export function createPatternView({
   let displayLpb = 4;
   let fxColumnsPinned = false;
   let selectedEffectType = 'volume';
+  let renderedHeaderSignature = null;
+  let suppressCommandRefresh = false;
   const trackUi = new Map();
 
   const modeButton = Button({
@@ -212,6 +220,21 @@ export function createPatternView({
     quantizeButton,
   ]);
 
+  const addChannelButton = Button({
+    label: t('pattern.addChannel'),
+    variant: 'ghost',
+    onClick: () => {
+      const result = registry.execute('song.addTrack');
+      feedback = {
+        key: 'pattern.channelAdded',
+        vars: { count: result.trackCount },
+      };
+      syncStatus();
+      scroller.focus({ preventScroll: true });
+    },
+  });
+  addChannelButton.dataset.action = 'pattern-add-channel';
+
   const fxToggleButton = Button({
     label: t('pattern.toggleFxColumns'),
     variant: 'ghost',
@@ -284,6 +307,7 @@ export function createPatternView({
     octaveGroup,
     stepGroup,
     timingGroup,
+    addChannelButton,
     fxToggleButton,
     effectEditor,
     sharedPopover,
@@ -535,10 +559,10 @@ export function createPatternView({
   }
 
   function runPatternCommand(id, args, onSuccess = null) {
+    let result;
+    suppressCommandRefresh = true;
     try {
-      const result = registry.execute(id, args);
-      onSuccess?.(result);
-      return true;
+      result = registry.execute(id, args);
     } catch (error) {
       if (error?.code !== 'E_SHARED_PATTERN_DECISION_REQUIRED') throw error;
       pendingSharedEdit = {
@@ -548,7 +572,12 @@ export function createPatternView({
       };
       showSharedWarning(error.details);
       return false;
+    } finally {
+      suppressCommandRefresh = false;
     }
+
+    onSuccess?.(result);
+    return true;
   }
 
   function resolveSharedEditAll() {
@@ -633,8 +662,63 @@ export function createPatternView({
     return `${ROW_NUMBER_WIDTH}px ${dataColumns(tracks, fields).map((width) => `${width}px`).join(' ')}`;
   }
 
+  function visibleChannelWindow(tracks, fields) {
+    const width = channelWidth(fields);
+    const viewportLeft = Math.max(0, scroller.scrollLeft - ROW_NUMBER_WIDTH);
+    const viewportRight = viewportLeft + Math.max(1, scroller.clientWidth || 800);
+    const first = Math.max(
+      0,
+      Math.floor(viewportLeft / width) - CHANNEL_OVERSCAN,
+    );
+    const last = Math.min(
+      tracks.length,
+      Math.ceil(viewportRight / width) + CHANNEL_OVERSCAN,
+    );
+    return {
+      first,
+      last,
+      leftSpacer: first * width,
+      rightSpacer: (tracks.length - last) * width,
+    };
+  }
+
+  function windowedRowTemplate(tracks, fields, window) {
+    const columns = [`${ROW_NUMBER_WIDTH}px`];
+    if (window.leftSpacer > 0) columns.push(`${window.leftSpacer}px`);
+    for (let channel = window.first; channel < window.last; channel += 1) {
+      for (const field of fields) columns.push(`${FIELD_WIDTHS[field]}px`);
+    }
+    if (window.rightSpacer > 0) columns.push(`${window.rightSpacer}px`);
+    return columns.join(' ');
+  }
+
+  function headerSignature({ project, tracks, fields }) {
+    return JSON.stringify({
+      fields,
+      tracks: tracks.map((track) => [
+        track.id,
+        track.name,
+        track.kind,
+        track.polyphony,
+        track.defaultInstrumentId,
+      ]),
+      instruments: project.instruments.map((instrument) => [
+        instrument.id,
+        instrument.name,
+      ]),
+    });
+  }
+
+  function renderHeaderIfNeeded() {
+    const info = projectInfo();
+    if (headerSignature(info) === renderedHeaderSignature) return false;
+    renderHeader();
+    return true;
+  }
+
   function renderHeader() {
     const { project, pattern, tracks, fields } = projectInfo();
+    renderedHeaderSignature = headerSignature({ project, tracks, fields });
     header.textContent = '';
 
     trackUi.clear();
@@ -813,6 +897,7 @@ export function createPatternView({
     const viewportRows = Math.ceil((scroller.clientHeight || 420) / ROW_HEIGHT);
     const first = Math.max(0, Math.floor(Math.max(0, scroller.scrollTop - HEADER_HEIGHT) / ROW_HEIGHT) - OVERSCAN);
     const last = Math.min(rowCount, first + viewportRows + OVERSCAN * 2);
+    const channelWindow = visibleChannelWindow(tracks, fields);
 
     rowsLayer.textContent = '';
     for (let row = first; row < last; row += 1) {
@@ -825,7 +910,7 @@ export function createPatternView({
         dataset: { row: String(row) },
       });
       rowNode.style.top = `${HEADER_HEIGHT + row * ROW_HEIGHT}px`;
-      rowNode.style.gridTemplateColumns = rowTemplate(tracks, fields);
+      rowNode.style.gridTemplateColumns = windowedRowTemplate(tracks, fields, channelWindow);
 
       rowNode.append(el('div', {
         class: 'pattern-grid__row-number',
@@ -833,7 +918,17 @@ export function createPatternView({
         text: row.toString(16).toUpperCase().padStart(2, '0'),
       }));
 
-      tracks.forEach((track, channel) => {
+      if (channelWindow.leftSpacer > 0) {
+        rowNode.append(el('div', {
+          class: 'pattern-grid__channel-spacer',
+          'aria-hidden': 'true',
+        }));
+      }
+
+      tracks
+        .slice(channelWindow.first, channelWindow.last)
+        .forEach((track, offset) => {
+        const channel = channelWindow.first + offset;
         const projectedNotes = notesAtDisplayCell(project, {
           patternId: pattern.id,
           trackId: track.id,
@@ -898,6 +993,12 @@ export function createPatternView({
           }));
         });
       });
+      if (channelWindow.rightSpacer > 0) {
+        rowNode.append(el('div', {
+          class: 'pattern-grid__channel-spacer',
+          'aria-hidden': 'true',
+        }));
+      }
       rowsLayer.append(rowNode);
     }
   }
@@ -1620,6 +1721,7 @@ export function createPatternView({
     stepText.textContent = `${t('status.step')} ${step}`;
     const currentInfo = projectInfo();
     const currentTrack = currentInfo.tracks[cursorChannel];
+    addChannelButton.disabled = currentInfo.tracks.length >= MAX_CHANNELS;
     if (feedback) {
       hint.textContent = t(feedback.key, feedback.vars);
     } else if (blockSelection) {
@@ -1659,12 +1761,17 @@ export function createPatternView({
   }
 
   function refresh() {
+    // Command dari Pattern UI sudah merender sekali setelah cursor/selection final.
+    // Hindari rebuild sinkron kedua dari commitProject pada jalur yang sama.
+    if (suppressCommandRefresh) return;
+
     // Refresh dari history/command eksternal harus membuang input dua-nibble yang
     // belum menjadi transaksi project.
     clearInputState();
-    const { fields } = projectInfo();
+    const { fields, tracks } = projectInfo();
+    cursorChannel = Math.min(cursorChannel, Math.max(0, tracks.length - 1));
     if (!fields.includes(cursorField)) cursorField = 'note';
-    renderHeader();
+    renderHeaderIfNeeded();
     renderWindow();
     syncSharedPatternBadge();
     syncTimingControls();

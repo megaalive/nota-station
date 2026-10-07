@@ -9,6 +9,7 @@ import {
 
 export const PPQ = 480;
 export const DEFAULT_CHANNELS = 8;
+export const MAX_CHANNELS = 32;
 export const DEFAULT_ROWS = 64;
 export const DEFAULT_ROW_TICKS = PPQ / 4; // LPB 4 = 1/16.
 export const FACTORY_INSTRUMENT_ID = FACTORY_BASIC_INSTRUMENT_ID;
@@ -23,14 +24,9 @@ function isoNow() {
 
 export function createBlankProject({ idFactory = makeId, now = isoNow } = {}) {
   const createdAt = now();
-  const tracks = Array.from({ length: DEFAULT_CHANNELS }, (_, index) => ({
-    id: idFactory(`track-${index + 1}`),
-    name: `Channel ${index + 1}`,
-    color: null,
-    kind: 'instrument',
-    defaultInstrumentId: FACTORY_INSTRUMENT_ID,
-    polyphony: 'mono',
-  }));
+  const tracks = Array.from({ length: DEFAULT_CHANNELS }, (_, index) => (
+    createInstrumentTrack(index + 1, idFactory)
+  ));
 
   const patternId = idFactory('pattern');
   const pattern = {
@@ -76,6 +72,38 @@ export function activePattern(project) {
   const pattern = project.song.patterns.find((item) => item.id === first.patternId);
   if (!pattern) throw projectError('E_PROJECT_PATTERN_MISSING', `Pattern tidak ditemukan: ${first.patternId}`);
   return pattern;
+}
+
+export function addTrack(
+  project,
+  { name = null } = {},
+  { idFactory = makeId, now = isoNow } = {},
+) {
+  const index = project.song.tracks.length + 1;
+  if (index > MAX_CHANNELS) {
+    throw projectError(
+      'E_PROJECT_TRACK_LIMIT',
+      `Project hanya mendukung sampai ${MAX_CHANNELS} channel.`,
+    );
+  }
+
+  const resolvedName = name === null ? `Channel ${index}` : String(name).trim();
+  if (resolvedName.length < 1 || resolvedName.length > 80) {
+    throw projectError(
+      'E_PROJECT_TRACK_NAME',
+      'Nama channel harus berisi 1..80 karakter.',
+    );
+  }
+
+  const track = createInstrumentTrack(index, idFactory, resolvedName);
+  return {
+    ...project,
+    modifiedAt: now(),
+    song: {
+      ...project.song,
+      tracks: [...project.song.tracks, track],
+    },
+  };
 }
 
 export function setInitialTempo(
@@ -540,6 +568,17 @@ export function deleteNote(
       ...project.song,
       patterns,
     },
+  };
+}
+
+function createInstrumentTrack(index, idFactory, name = `Channel ${index}`) {
+  return {
+    id: idFactory(`track-${index}`),
+    name,
+    color: null,
+    kind: 'instrument',
+    defaultInstrumentId: FACTORY_INSTRUMENT_ID,
+    polyphony: 'mono',
   };
 }
 
