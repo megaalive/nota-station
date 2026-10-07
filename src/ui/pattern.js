@@ -335,8 +335,7 @@ export function createPatternView({
     } else {
       feedback = null;
     }
-    const { fields, tracks } = projectInfo();
-    cursorChannel = Math.min(cursorChannel, Math.max(0, tracks.length - 1));
+    const { fields } = projectInfo();
     if (!fields.includes(cursorField)) cursorField = 'note';
     renderHeader();
     renderWindow();
@@ -1685,7 +1684,8 @@ export function createPatternView({
     // Refresh dari history/command eksternal harus membuang input dua-nibble yang
     // belum menjadi transaksi project.
     clearInputState();
-    const { fields } = projectInfo();
+    const { fields, tracks } = projectInfo();
+    cursorChannel = Math.min(cursorChannel, Math.max(0, tracks.length - 1));
     if (!fields.includes(cursorField)) cursorField = 'note';
     renderHeader();
     renderWindow();
