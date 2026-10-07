@@ -113,6 +113,11 @@ export function validateDebugProject(project) {
     }
   }
   for (const track of project.song.tracks) {
+    if (track.color !== null && (
+      typeof track.color !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(track.color)
+    )) {
+      throw debugJsonError('E_DEBUG_JSON_TRACK_COLOR', `Warna Track tidak valid: ${track.color}`);
+    }
     if (!['instrument', 'drum'].includes(track.kind)) {
       throw debugJsonError('E_DEBUG_JSON_TRACK_KIND', `Track kind tidak valid: ${track.kind}`);
     }
