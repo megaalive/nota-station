@@ -1330,13 +1330,23 @@ export function createPatternView({
   function selectProgressively() {
     clearInputState();
     const { rowCount, tracks } = projectInfo();
+    const currentCell = blockSelection
+      && blockSelection.rowStart === cursorRow
+      && blockSelection.rowEnd === cursorRow
+      && blockSelection.channelStart === cursorChannel
+      && blockSelection.channelEnd === cursorChannel;
     const fullCurrentChannel = blockSelection
       && blockSelection.rowStart === 0
       && blockSelection.rowEnd === rowCount - 1
       && blockSelection.channelStart === cursorChannel
       && blockSelection.channelEnd === cursorChannel;
+    const fullPattern = blockSelection
+      && blockSelection.rowStart === 0
+      && blockSelection.rowEnd === rowCount - 1
+      && blockSelection.channelStart === 0
+      && blockSelection.channelEnd === tracks.length - 1;
 
-    if (fullCurrentChannel) {
+    if (fullPattern) {
       blockAnchor = { row: 0, channel: 0 };
       blockSelection = {
         rowStart: 0,
@@ -1344,11 +1354,27 @@ export function createPatternView({
         channelStart: 0,
         channelEnd: tracks.length - 1,
       };
-    } else {
+    } else if (fullCurrentChannel) {
+      blockAnchor = { row: 0, channel: 0 };
+      blockSelection = {
+        rowStart: 0,
+        rowEnd: rowCount - 1,
+        channelStart: 0,
+        channelEnd: tracks.length - 1,
+      };
+    } else if (currentCell) {
       blockAnchor = { row: 0, channel: cursorChannel };
       blockSelection = {
         rowStart: 0,
         rowEnd: rowCount - 1,
+        channelStart: cursorChannel,
+        channelEnd: cursorChannel,
+      };
+    } else {
+      blockAnchor = { row: cursorRow, channel: cursorChannel };
+      blockSelection = {
+        rowStart: cursorRow,
+        rowEnd: cursorRow,
         channelStart: cursorChannel,
         channelEnd: cursorChannel,
       };
