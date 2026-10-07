@@ -129,14 +129,14 @@ export function setInitialTempo(
   };
 }
 
-export function noteAtCell(project, { patternId, trackId, row }) {
+export function noteAtCell(project, { patternId, trackId, row, voiceLane = 0 }) {
   const pattern = project.song.patterns.find((item) => item.id === patternId);
   if (!pattern) return null;
   const tick = row * pattern.rowTicks;
   return pattern.notes.find(
     (note) => note.trackId === trackId
       && note.startTickLocal === tick
-      && voiceLaneOf(note) === 0,
+      && voiceLaneOf(note) === voiceLane,
   ) ?? null;
 }
 
@@ -553,7 +553,7 @@ export function deleteVoiceRow(
 
 export function updateNoteAtCell(
   project,
-  { patternId, trackId, row, instrumentId, velocity },
+  { patternId, trackId, row, instrumentId, velocity, voiceLane = 0 },
   { now = isoNow } = {},
 ) {
   const patternIndex = project.song.patterns.findIndex((item) => item.id === patternId);
@@ -567,11 +567,18 @@ export function updateNoteAtCell(
     throw projectError('E_PROJECT_ROW_RANGE', `Row di luar pattern: ${row}`);
   }
 
+  if (!Number.isInteger(voiceLane) || voiceLane < 0 || voiceLane > 31) {
+    throw projectError('E_PROJECT_VOICE_LANE', `voiceLane di luar 0..31: ${voiceLane}`);
+  }
+  const track = project.song.tracks.find((item) => item.id === trackId);
+  if (voiceLane > 0 && track.polyphony !== 'poly') {
+    throw projectError('E_PROJECT_POLYPHONY', 'Track mono tidak menerima voice lane tambahan.');
+  }
   const startTickLocal = row * pattern.rowTicks;
   const noteIndex = pattern.notes.findIndex(
     (note) => note.trackId === trackId
       && note.startTickLocal === startTickLocal
-      && voiceLaneOf(note) === 0,
+      && voiceLaneOf(note) === voiceLane,
   );
   if (noteIndex < 0) {
     throw projectError('E_PROJECT_NOTE_MISSING', `Note tidak ditemukan pada row ${row}.`);
