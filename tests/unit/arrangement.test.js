@@ -309,6 +309,98 @@ test('moveOrderEntry hanya mengubah urutan occurrence, bukan isi Pattern', () =>
   assert.deepEqual(arranged.song.order.map((entry) => entry.id), orderBefore);
 });
 
+test('property: semua reorder 8 occurrence menjaga chord/tempo pattern-local tetap identik', () => {
+  const { project, idFactory, patternId } = fixture();
+  let arranged = project;
+
+  for (let index = 1; index < 8; index += 1) {
+    arranged = createSectionOccurrence(arranged, {
+      name: `Bagian ${index + 1}`,
+      patternMode: 'clone',
+      sourcePatternId: patternId,
+      index,
+    }, {
+      idFactory,
+      now: () => `2026-10-08T00:0${index}:00.000Z`,
+    });
+  }
+
+  arranged = {
+    ...arranged,
+    song: {
+      ...arranged.song,
+      patterns: arranged.song.patterns.map((pattern, patternIndex) => ({
+        ...pattern,
+        chords: pattern.chords.map((event, eventIndex) => ({
+          ...event,
+          tickLocal: (patternIndex * 120 + eventIndex * 60) % pattern.lengthTicks,
+          rootPitchClass: patternIndex % 12,
+        })),
+        tempoEvents: pattern.tempoEvents.map((event, eventIndex) => ({
+          ...event,
+          tickLocal: (patternIndex * 240 + eventIndex * 120) % pattern.lengthTicks,
+          tempo: 90 + patternIndex * 7,
+        })),
+      })),
+    },
+  };
+
+  const patternsBefore = structuredClone(arranged.song.patterns);
+  const localEventsBefore = new Map(arranged.song.patterns.map((pattern) => [
+    pattern.id,
+    {
+      chords: structuredClone(pattern.chords),
+      tempoEvents: structuredClone(pattern.tempoEvents),
+    },
+  ]));
+  const originalOrder = arranged.song.order.map((entry) => entry.id);
+
+  assert.equal(originalOrder.length, 8);
+  assert.equal(arranged.song.patterns.length, 8);
+
+  for (let fromIndex = 0; fromIndex < originalOrder.length; fromIndex += 1) {
+    for (let toIndex = 0; toIndex < originalOrder.length; toIndex += 1) {
+      const orderEntryId = originalOrder[fromIndex];
+      const moved = moveOrderEntry(arranged, { orderEntryId, toIndex }, {
+        now: () => '2026-10-08T00:10:00.000Z',
+      });
+
+      assert.deepEqual(
+        moved.song.patterns,
+        patternsBefore,
+        `Pattern berubah saat move ${fromIndex} → ${toIndex}`,
+      );
+
+      for (const pattern of moved.song.patterns) {
+        assert.deepEqual(
+          {
+            chords: pattern.chords,
+            tempoEvents: pattern.tempoEvents,
+          },
+          localEventsBefore.get(pattern.id),
+          `event lokal bergeser pada Pattern ${pattern.id}, move ${fromIndex} → ${toIndex}`,
+        );
+      }
+
+      const expected = [...originalOrder];
+      if (fromIndex !== toIndex) {
+        const [entry] = expected.splice(fromIndex, 1);
+        expected.splice(toIndex, 0, entry);
+      }
+      assert.deepEqual(
+        moved.song.order.map((entry) => entry.id),
+        expected,
+        `urutan salah pada move ${fromIndex} → ${toIndex}`,
+      );
+      assert.deepEqual(
+        arranged.song.order.map((entry) => entry.id),
+        originalOrder,
+        'input project tidak boleh dimutasi',
+      );
+    }
+  }
+});
+
 test('makeOrderEntryUnique clone Pattern dan remap ID event lokal hanya untuk occurrence target', () => {
   const { project, idFactory, patternId } = fixture();
   let arranged = insertOrderEntry(project, { patternId, index: 1 }, {
