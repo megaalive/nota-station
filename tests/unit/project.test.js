@@ -164,6 +164,44 @@ test('instrument track dapat diubah poly dan menerima beberapa voice lane pada r
   assert.deepEqual(notes.map((note) => [note.voiceLane ?? 0, note.pitch]), [[0, 60], [1, 64]]);
 });
 
+test('updateNoteAtCell dapat menarget voice lane tertentu pada track poly', () => {
+  let project = fixture();
+  const pattern = activePattern(project);
+  const trackId = project.song.tracks[0].id;
+
+  project = setTrackPolyphony(project, { trackId, polyphony: 'poly' });
+  project = enterVoiceNote(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 6,
+    voiceLane: 0,
+    pitch: 60,
+    velocity: 100,
+  });
+  project = enterVoiceNote(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 6,
+    voiceLane: 1,
+    pitch: 64,
+    velocity: 100,
+  });
+
+  const next = updateNoteAtCell(project, {
+    patternId: pattern.id,
+    trackId,
+    row: 6,
+    voiceLane: 1,
+    velocity: 64,
+  });
+
+  const notes = notesAtCell(next, { patternId: pattern.id, trackId, row: 6 });
+  assert.equal(notes[0].velocity, 100);
+  assert.equal(notes[1].velocity, 64);
+  assert.equal(notes[0].pitch, 60);
+  assert.equal(notes[1].pitch, 64);
+});
+
 test('poly instrument menolak kembali mono bila voice lane tambahan masih ada', () => {
   let project = fixture();
   const pattern = activePattern(project);
