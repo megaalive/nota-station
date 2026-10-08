@@ -5,6 +5,14 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S12 — koreksi friction simulated UAT T4/T5 (ACTIVE)
+
+- Simulated human UAT Luna 6 pada build `f63dd68` lulus ambang numerik PLAN: T4 **4/5** (median 11 dtk, worst 33 dtk) dan T5 **5/5** (median 70 dtk, worst 173 dtk). Hasil ini dicatat terpisah dari UAT manusia nyata.
+- Temuan MEDIUM: kelima persona menghasilkan `Tanpa section → Verse → Chorus → Verse`; occurrence awal tertinggal karena **Tambah section** selalu menambahkan tempat baru.
+- Koreksi: bila occurrence terpilih belum punya Section, **Tambah section** sekarang menetapkan Section baru pada occurrence itu sendiri dalam satu transaksi Undo; field Pattern disembunyikan pada mode assign. Setelah occurrence sudah ber-Section, perilaku append/reuse/clone/new tetap seperti sebelumnya.
+- Command Palette membedakan label command Section teknis dan memakai alasan konteks spesifik yang mengarahkan ke kontrol Song Map, sehingga hasil pencarian `section` tidak lagi berupa duplikasi label dengan pesan generik.
+- Regression baru mengunci project kosong menjadi tepat tiga tempat `Verse → Chorus → Verse` dengan satu Pattern reuse.
+- Gate final dan repeat simulated UAT pada build koreksi masih menunggu.
 ### R3-S11 — transport Song/Section lintas OrderEntry (CLOSED · PASS)
 
 - `Space` tetap menjalankan Pattern; `Shift+Space` menjalankan `playback.playSectionStart` dari awal run Section kontigu occurrence fokus, lalu meneruskan playback melintasi Order dengan satu audio-clock anchor dan look-ahead scheduler.
