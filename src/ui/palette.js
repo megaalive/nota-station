@@ -37,19 +37,32 @@ export function createPalette({ registry, t, onRun }) {
     }
 
     list.textContent = '';
+    const reasons = entries.map((command) => {
+      if (!command.enabled) return command.disabledReason || t('palette.requiresContext');
+      if (command.requiresArgs) return command.requiresArgsReason ?? t('palette.requiresContext');
+      return null;
+    });
+    const reasonCounts = new Map();
+    reasons.forEach((reason) => {
+      if (reason) reasonCounts.set(reason, (reasonCounts.get(reason) ?? 0) + 1);
+    });
+    const repeatedReasons = [...reasonCounts].filter(([, count]) => count > 1)
+      .map(([reason]) => reason);
+    const sharedReasonIds = new Map(repeatedReasons.map((reason, index) => [
+      reason, `palette-guidance-${index}`,
+    ]));
+
     entries.forEach((command, index) => {
       const paletteEnabled = command.enabled && !command.requiresArgs;
-      const paletteReason = !command.enabled
-        ? command.disabledReason
-        : (command.requiresArgs
-          ? (command.requiresArgsReason ?? t('palette.requiresContext'))
-          : null);
+      const paletteReason = reasons[index];
+      const sharedReasonId = sharedReasonIds.get(paletteReason);
       const row = el(
         'div',
         {
           role: 'option',
           id: `palette-option-${index}`,
           'aria-selected': index === activeIndex ? 'true' : 'false',
+          'aria-describedby': sharedReasonId ?? null,
           class: `palette__row${index === activeIndex ? ' is-active' : ''}${paletteEnabled ? '' : ' is-disabled'}`,
           'aria-disabled': paletteEnabled ? 'false' : 'true',
           dataset: { action: 'palette-item', entity: command.id },
@@ -64,10 +77,24 @@ export function createPalette({ registry, t, onRun }) {
         [
           el('span', { class: 'palette__label', text: t(command.labelKey) }),
           command.shortcut ? el('kbd', { class: 'palette__shortcut', text: command.shortcut }) : null,
-          paletteEnabled ? null : el('span', { class: 'palette__reason', text: paletteReason ?? '' }),
+          paletteReason && !sharedReasonId
+            ? el('span', { class: 'palette__reason', text: paletteReason })
+            : null,
         ],
       );
       list.append(row);
+    });
+
+    // Alasan yang sama cukup sekali, tetapi tiap command tetap discoverable dan
+    // punya aria-describedby ke guidance sehingga tidak kehilangan konteks.
+    repeatedReasons.forEach((reason) => {
+      list.append(el('p', {
+        id: sharedReasonIds.get(reason),
+        class: 'palette__guidance',
+        role: 'note',
+        dataset: { action: 'palette-guidance' },
+        text: reason,
+      }));
     });
 
     if (entries.length === 0) {
@@ -79,8 +106,9 @@ export function createPalette({ registry, t, onRun }) {
   function paint() {
     [...list.children].forEach((row, index) => {
       const isOption = row.getAttribute('role') === 'option';
-      row.classList.toggle('is-active', isOption && index === activeIndex);
-      row.setAttribute('aria-selected', isOption && index === activeIndex ? 'true' : 'false');
+      if (!isOption) return;
+      row.classList.toggle('is-active', index === activeIndex);
+      row.setAttribute('aria-selected', index === activeIndex ? 'true' : 'false');
     });
     input.setAttribute('aria-activedescendant', entries.length ? `palette-option-${activeIndex}` : '');
     list.children[activeIndex]?.scrollIntoView?.({ block: 'nearest' });
