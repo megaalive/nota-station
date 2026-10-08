@@ -1,0 +1,385 @@
+import { PPQ } from '../core/project.js';
+import { expandRetriggerTicks } from './source-note-effects.js';
+
+export const SCHEDULE_AHEAD_SECONDS = 0.12;
+export const SCHEDULER_WAKE_MS = 25;
+export const LIVE_EDIT_FREEZE_SECONDS = 0.03;
+
+export function liveEditFreezeTime(nowAudioTime, freezeSeconds = LIVE_EDIT_FREEZE_SECONDS) {
+  if (!Number.isFinite(nowAudioTime) || !Number.isFinite(freezeSeconds) || freezeSeconds < 0) {
+    throw new TypeError('Freeze window live-edit harus angka finite >= 0.');
+  }
+  return nowAudioTime + freezeSeconds;
+}
+
+export function isLiveEditMutable(when, nowAudioTime, freezeSeconds = LIVE_EDIT_FREEZE_SECONDS) {
+  if (!Number.isFinite(when)) throw new TypeError('Waktu event live-edit harus finite.');
+  return when >= liveEditFreezeTime(nowAudioTime, freezeSeconds);
+}
+
+export function secondsPerTick(tempo, ppq = PPQ) {
+  if (!Number.isFinite(tempo) || tempo <= 0) {
+    throw new TypeError('Tempo harus angka > 0.');
+  }
+  return 60 / tempo / ppq;
+}
+
+export function patternDurationSeconds(pattern, tempo, ppq = PPQ) {
+  return pattern.lengthTicks * secondsPerTick(tempo, ppq);
+}
+
+export function patternEventTemplates(pattern, tempo, ppq = PPQ) {
+  const tickSeconds = secondsPerTick(tempo, ppq);
+  const effectsByCell = new Map();
+
+  for (const effect of pattern.effects ?? []) {
+    if (!['delay', 'retrigger', 'offset'].includes(effect.type)) continue;
+    const key = `${effect.trackId}|${effect.tickLocal}`;
+    const current = effectsByCell.get(key) ?? {};
+    current[effect.type] = effect;
+    effectsByCell.set(key, current);
+  }
+
+  return [...pattern.notes]
+    .flatMap((note) => {
+      const key = `${note.trackId}|${note.startTickLocal}`;
+      const cell = effectsByCell.get(key) ?? {};
+      const delayTicks = cell.delay?.value.ticks ?? 0;
+      const sampleOffsetFrames = cell.offset?.value.frames ?? 0;
+      const retrigger = cell.retrigger?.value ?? null;
+      const effectiveStart = note.startTickLocal + delayTicks;
+      const triggerTicks = expandRetriggerTicks({
+        startTick: effectiveStart,
+        durationTicks: note.durationTicks,
+        patternLengthTicks: pattern.lengthTicks,
+        intervalTicks: retrigger?.intervalTicks ?? null,
+        count: retrigger?.count ?? 0,
+      });
+
+      return triggerTicks.map((effectiveTick, retriggerIndex) => {
+        const consumedTicks = retriggerIndex === 0
+          ? 0
+          : retriggerIndex * retrigger.intervalTicks;
+        const remainingTicks = Math.max(1, note.durationTicks - consumedTicks);
+
+        return {
+          id: retriggerIndex === 0 ? note.id : `${note.id}#r${retriggerIndex}`,
+          sourceNoteId: note.id,
+          trackId: note.trackId,
+          instrumentId: note.instrumentId,
+          pitch: note.pitch,
+          velocity: note.velocity,
+          voiceLane: voiceLaneOf(note),
+          sourceStartTickLocal: note.startTickLocal,
+          startTickLocal: effectiveTick,
+          delayTicks,
+          retriggerIndex,
+          sampleOffsetFrames,
+          offsetSeconds: effectiveTick * tickSeconds,
+          durationSeconds: remainingTicks * tickSeconds,
+        };
+      });
+    })
+    .sort((a, b) => (
+      a.startTickLocal - b.startTickLocal
+      || a.trackId.localeCompare(b.trackId)
+      || a.voiceLane - b.voiceLane
+      || a.sourceNoteId.localeCompare(b.sourceNoteId)
+      || a.retriggerIndex - b.retriggerIndex
+    ));
+}
+
+export function effectEventTemplates(pattern, tempo, ppq = PPQ) {
+  const tickSeconds = secondsPerTick(tempo, ppq);
+  return [...(pattern.effects ?? [])]
+    .sort((a, b) => (
+      a.tickLocal - b.tickLocal
+      || a.trackId.localeCompare(b.trackId)
+      || a.type.localeCompare(b.type)
+      || a.id.localeCompare(b.id)
+    ))
+    .map((effect) => ({
+      id: effect.id,
+      trackId: effect.trackId,
+      type: effect.type,
+      value: structuredClone(effect.value),
+      startTickLocal: effect.tickLocal,
+      offsetSeconds: effect.tickLocal * tickSeconds,
+    }));
+}
+
+export function metronomeEventTemplates(pattern, ppq = PPQ) {
+  const meter = pattern.meter ?? { num: 4, den: 4 };
+  const beatTicks = ppq * (4 / meter.den);
+  const barTicks = beatTicks * meter.num;
+  const events = [];
+
+  for (let tick = 0; tick < pattern.lengthTicks; tick += beatTicks) {
+    events.push({
+      id: `metronome-${tick}`,
+      startTickLocal: tick,
+      accent: tick % barTicks === 0,
+    });
+  }
+  return events;
+}
+
+export function transportTickAtAudioTime({
+  anchorAudioTime,
+  anchorTick,
+  nowAudioTime,
+  tempo,
+  patternLengthTicks,
+  loop = false,
+  ppq = PPQ,
+}) {
+  if (![anchorAudioTime, anchorTick, nowAudioTime, patternLengthTicks].every(Number.isFinite)) {
+    throw new TypeError('Posisi transport membutuhkan angka finite.');
+  }
+  if (patternLengthTicks <= 0) return 0;
+
+  const elapsed = Math.max(0, nowAudioTime - anchorAudioTime);
+  const raw = anchorTick + elapsed / secondsPerTick(tempo, ppq);
+  if (loop) return ((raw % patternLengthTicks) + patternLengthTicks) % patternLengthTicks;
+  return Math.max(0, Math.min(patternLengthTicks, raw));
+}
+
+function createTickScheduleCursor(events, patternLengthTicks, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  if (!Number.isFinite(startTick) || startTick < 0 || startTick > patternLengthTicks) {
+    throw new RangeError(`startTick di luar Pattern: ${startTick}`);
+  }
+
+  const tickSeconds = secondsPerTick(tempo, ppq);
+  const normalizedStart = loop && startTick === patternLengthTicks ? 0 : startTick;
+  let cycle = 0;
+  let index = events.findIndex((event) => event.startTickLocal >= normalizedStart);
+  let loopEnabled = Boolean(loop);
+  let exhausted = events.length === 0;
+
+  if (!exhausted && index < 0) {
+    if (loopEnabled) {
+      cycle = 1;
+      index = 0;
+    } else {
+      exhausted = true;
+      index = 0;
+    }
+  }
+
+  function setLoop(enabled) {
+    loopEnabled = Boolean(enabled);
+    if (!loopEnabled && cycle > 0 && index === 0) exhausted = true;
+  }
+
+  function drainUntil(anchor, horizon) {
+    if (!Number.isFinite(anchor) || !Number.isFinite(horizon)) {
+      throw new TypeError('Anchor dan horizon scheduler harus finite.');
+    }
+    if (horizon < anchor || exhausted) return [];
+
+    const due = [];
+    while (!exhausted) {
+      const event = events[index];
+      const absoluteTick = cycle * patternLengthTicks + event.startTickLocal;
+      const when = anchor + (absoluteTick - normalizedStart) * tickSeconds;
+      if (when > horizon) break;
+
+      due.push({ ...event, when, cycle });
+      index += 1;
+      if (index >= events.length) {
+        if (!loopEnabled) {
+          exhausted = true;
+          break;
+        }
+        cycle += 1;
+        index = 0;
+      }
+    }
+    return due;
+  }
+
+  return { drainUntil, setLoop, isExhausted: () => exhausted };
+}
+
+export function createPatternScheduleCursor(pattern, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  const events = patternEventTemplates(pattern, tempo, ppq);
+  const cursor = createTickScheduleCursor(events, pattern.lengthTicks, tempo, { loop, startTick, ppq });
+  return {
+    ...cursor,
+    durationSeconds: patternDurationSeconds(pattern, tempo, ppq),
+    eventCount: events.length,
+  };
+}
+
+export function mixEffectEventTemplates(pattern, tempo, ppq = PPQ) {
+  const tickSeconds = secondsPerTick(tempo, ppq);
+  const effects = (pattern.effects ?? [])
+    .filter((effect) => effect.type === 'volume' || effect.type === 'pan')
+    .map((effect) => ({
+      id: effect.id,
+      kind: 'mix-effect',
+      trackId: effect.trackId,
+      type: effect.type,
+      value: structuredClone(effect.value),
+      startTickLocal: effect.tickLocal,
+      offsetSeconds: effect.tickLocal * tickSeconds,
+    }));
+
+  if (effects.length === 0) return [];
+
+  const trackIds = [...new Set(effects.map((effect) => effect.trackId))].sort();
+  return [
+    {
+      id: 'mix-reset',
+      kind: 'mix-reset',
+      trackIds,
+      startTickLocal: 0,
+      offsetSeconds: 0,
+    },
+    ...effects,
+  ].sort((a, b) => (
+    a.startTickLocal - b.startTickLocal
+    || mixEventPriority(a) - mixEventPriority(b)
+    || String(a.trackId ?? '').localeCompare(String(b.trackId ?? ''))
+    || String(a.type ?? '').localeCompare(String(b.type ?? ''))
+    || a.id.localeCompare(b.id)
+  ));
+}
+
+export function mixEffectStateBeforeTick(pattern, tickLocal) {
+  if (!Number.isFinite(tickLocal) || tickLocal < 0) {
+    throw new RangeError('tickLocal state mix harus angka >= 0.');
+  }
+
+  const state = new Map();
+  const effects = [...(pattern.effects ?? [])]
+    .filter((effect) => (
+      (effect.type === 'volume' || effect.type === 'pan')
+      && effect.tickLocal < tickLocal
+    ))
+    .sort((a, b) => (
+      a.tickLocal - b.tickLocal
+      || a.trackId.localeCompare(b.trackId)
+      || a.type.localeCompare(b.type)
+      || a.id.localeCompare(b.id)
+    ));
+
+  for (const effect of effects) {
+    const current = state.get(effect.trackId) ?? { volume: 127, pan: 0 };
+    state.set(effect.trackId, {
+      volume: effect.type === 'volume' ? effect.value.level : current.volume,
+      pan: effect.type === 'pan' ? effect.value.position : current.pan,
+    });
+  }
+
+  return [...state.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([trackId, value]) => ({ trackId, ...value }));
+}
+
+export function createMixEffectScheduleCursor(pattern, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  const events = mixEffectEventTemplates(pattern, tempo, ppq);
+  const cursor = createTickScheduleCursor(
+    events,
+    pattern.lengthTicks,
+    tempo,
+    { loop, startTick, ppq },
+  );
+  return {
+    ...cursor,
+    durationSeconds: patternDurationSeconds(pattern, tempo, ppq),
+    eventCount: events.length,
+  };
+}
+
+export function cutEffectEventTemplates(pattern, tempo, ppq = PPQ) {
+  const tickSeconds = secondsPerTick(tempo, ppq);
+  return (pattern.effects ?? [])
+    .filter((effect) => effect.type === 'cut')
+    .map((effect) => ({
+      id: effect.id,
+      trackId: effect.trackId,
+      type: effect.type,
+      value: structuredClone(effect.value),
+      sourceTickLocal: effect.tickLocal,
+      startTickLocal: effect.tickLocal + effect.value.afterTicks,
+      offsetSeconds: (effect.tickLocal + effect.value.afterTicks) * tickSeconds,
+    }))
+    .sort((a, b) => (
+      a.startTickLocal - b.startTickLocal
+      || a.trackId.localeCompare(b.trackId)
+      || a.id.localeCompare(b.id)
+    ));
+}
+
+export function createCutScheduleCursor(pattern, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  const events = cutEffectEventTemplates(pattern, tempo, ppq);
+  const cursor = createTickScheduleCursor(
+    events,
+    pattern.lengthTicks,
+    tempo,
+    { loop, startTick, ppq },
+  );
+  return {
+    ...cursor,
+    durationSeconds: patternDurationSeconds(pattern, tempo, ppq),
+    eventCount: events.length,
+  };
+}
+
+export function createEffectScheduleCursor(pattern, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  const events = effectEventTemplates(pattern, tempo, ppq);
+  const cursor = createTickScheduleCursor(
+    events,
+    pattern.lengthTicks,
+    tempo,
+    { loop, startTick, ppq },
+  );
+  return {
+    ...cursor,
+    durationSeconds: patternDurationSeconds(pattern, tempo, ppq),
+    eventCount: events.length,
+  };
+}
+
+export function createMetronomeScheduleCursor(pattern, tempo, {
+  loop = false,
+  startTick = 0,
+  ppq = PPQ,
+} = {}) {
+  return createTickScheduleCursor(
+    metronomeEventTemplates(pattern, ppq),
+    pattern.lengthTicks,
+    tempo,
+    { loop, startTick, ppq },
+  );
+}
+
+
+function mixEventPriority(event) {
+  return event.kind === 'mix-reset' ? 0 : 1;
+}
+
+function voiceLaneOf(note) {
+  return Number.isInteger(note?.voiceLane) ? note.voiceLane : 0;
+}

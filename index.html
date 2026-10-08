@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- CSP lewat meta: GitHub Pages nggak bisa kirim header custom, jadi ini satu-satunya cara.
+     connect-src sengaja 'self' dulu — pelonggaran buat provider LLM diputuskan di R8 (§12.3). -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'" />
+<title>NotaStation</title>
+<link rel="stylesheet" href="./styles/tokens.css" />
+<link rel="stylesheet" href="./styles/app.css" />
+<link rel="stylesheet" href="./styles/shell.css" />
+</head>
+<body>
+<!-- Catatan: role="application" sengaja TIDAK dipakai di wrapper ini. Role itu hanya
+     untuk elemen grid (§8.19); memakainya di level <body> membuat screen reader
+     berhenti membacakan struktur halaman. -->
+<div id="app"></div>
+<script type="module" src="./src/app.js"></script>
+<noscript>NotaStation butuh JavaScript untuk berjalan.</noscript>
+</body>
+</html>
