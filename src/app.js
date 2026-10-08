@@ -35,6 +35,7 @@ import {
   moveOrderEntry,
 } from './core/arrangement.js';
 import { createTemplateProject } from './core/templates.js';
+import { LEARNING_SONG_TEMPLATE_ID } from './core/learning-song.js';
 import { createDemoProject, STABILITY_DEMO_ID } from './core/demos.js';
 import {
   addTrack,
@@ -504,6 +505,20 @@ function registerCommands() {
       run: () => {
         void playActiveSection();
         return 'section';
+      },
+    },
+    {
+      id: 'playback.playSongStart',
+      group: 'Playback',
+      labelKey: 'song.playFromStart',
+      isEnabled: () => project.song.order.length > 0,
+      run: () => {
+        const first = project.song.order[0];
+        if (!first) return null;
+        audio.stop();
+        registry.execute('focus.setOrderEntry', { orderEntryId: first.id });
+        void playActiveSection();
+        return first.id;
       },
     },
     {
@@ -1424,6 +1439,7 @@ function loadTemplateProject(templateId, {
   const nextProject = applyProjectPreferences(createTemplateProject(templateId), { locale, keymap });
   store?.setItem(KEYMAP_STORAGE_KEY, keymap);
   replaceProject(nextProject, 'status.notSaved');
+  if (templateId === LEARNING_SONG_TEMPLATE_ID) shell?.selectTab('song');
   return {
     templateId,
     projectId: project.id,
@@ -1449,7 +1465,16 @@ function loadDemoProject(demoId, {
 }
 
 function loadDemoFromQuery() {
-  const demoId = new URL(window.location.href).searchParams.get('demo');
+  const params = new URL(window.location.href).searchParams;
+  if (params.get('template') === LEARNING_SONG_TEMPLATE_ID) {
+    registry.execute('project.loadTemplate', {
+      templateId: LEARNING_SONG_TEMPLATE_ID,
+      locale: i18n.getLocale(),
+      keymap: readInitialKeymap(),
+    });
+    return true;
+  }
+  const demoId = params.get('demo');
   if (!demoId) return false;
   if (demoId !== STABILITY_DEMO_ID) return false;
 
