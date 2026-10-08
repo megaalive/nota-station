@@ -47,6 +47,32 @@ test.describe('R3-S10A keymap + shortcut overlay', () => {
     await expect(page.locator('[data-action="shortcut-dialog"]')).toBeVisible();
   });
 
+  test('shortcut bantuan tetap bekerja saat fokus pada tombol dan Song Map', async ({ page }) => {
+    await page.getByRole('tab', { name: 'Song' }).click();
+    const button = page.locator('[data-action="song-add-section"]');
+    await button.focus();
+    await page.keyboard.press('Shift+/');
+    await expect(page.locator('[data-action="shortcut-dialog"]')).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    const entry = page.locator('[data-action="song-entry"]').first();
+    await entry.focus();
+    await page.keyboard.press('Control+k');
+    await expect(page.locator('[data-action="palette"]')).toBeVisible();
+    await page.keyboard.press('Escape');
+  });
+
+  test('shortcut bantuan tidak mengambil alih input teks di dialog', async ({ page }) => {
+    await page.getByRole('tab', { name: 'Song' }).click();
+    await page.locator('[data-action="song-add-section"]').click();
+    const name = page.locator('[data-action="song-section-name"]');
+    await name.focus();
+    await page.keyboard.press('Shift+/');
+    await expect(page.locator('[data-action="shortcut-dialog"]')).toHaveCount(0);
+    await expect(name).toContainText('');
+    await expect(name).toHaveValue('Verse?');
+  });
+
   test('OpenMPT-like: Tab pindah channel, Ctrl+Space toggle EDIT, F10 mute, Ctrl+F10 solo', async ({ page }) => {
     await page.evaluate(() => window.tracker.commands.execute('ui.setKeymap', { preset: 'openmpt' }));
 
