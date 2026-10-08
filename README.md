@@ -18,6 +18,9 @@ Song Map: Intro → Verse → Chorus → Bridge → Chorus → Outro. Drum Kit, 
 keys poly, pad, arpeggio, lead, countermelodi, dan fill menggunakan suara bawaan
 tanpa WAV eksternal. Chorus dipakai ulang agar terlihat manfaat Pattern reuse.
 
+Pengguna lama bisa membuka contoh lewat tombol **Buka lagu contoh** di tab **Song**,
+dengan konfirmasi agar proyek yang belum disimpan tidak terganti tanpa sengaja.
+
 Di tab **Song**, tekan **▶ Putar lagu dari awal** untuk mendengar seluruh aransemen,
 atau buka panel **Pelajari lagu ini (8 channel)** untuk latihan Mute/Solo, chord
 poly, dan edit Pattern bersama. [Panduan lengkap](./docs/contoh-lagu.md).
