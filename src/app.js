@@ -1845,19 +1845,27 @@ function bindShortcuts() {
 
     if (isTextInputTarget(event.target)) return;
     const focusedOrderEntry = event.target.closest?.('[data-action="song-entry"]');
-    if (event.target.closest?.('button, [role="tab"]') && !focusedOrderEntry) return;
-
     const context = shell?.getActiveTab() === 'pattern' ? 'pattern' : 'global';
     const binding = matchKeyBinding(event, project.settings.keymapPreset, { context });
-    if (!binding) return;
+
+    // '?' adalah command bantuan, dan boleh punya posisi fisik berbeda pada
+    // keyboard non-US. Shortcut lainnya tetap mengikuti KeyboardEvent.code.
+    const symbolHelp = event.key === '?'
+      && !event.ctrlKey && !event.altKey && !event.metaKey;
+    const commandId = binding?.commandId ?? (symbolHelp ? 'ui.showShortcuts' : null);
+    if (!commandId) return;
+
+    const globalUtility = ['ui.showShortcuts', 'ui.openPalette'].includes(commandId);
+    if (event.target.closest?.('button, [role="tab"]') && !focusedOrderEntry && !globalUtility) return;
     if (
       focusedOrderEntry
-      && !['playback.playSectionStart', 'playback.togglePlayStop'].includes(binding.commandId)
+      && !['playback.playSectionStart', 'playback.togglePlayStop'].includes(commandId)
+      && !globalUtility
     ) return;
-    if (!registry.canRun(binding.commandId)) return;
+    if (!registry.canRun(commandId)) return;
 
     event.preventDefault();
-    registry.execute(binding.commandId);
+    registry.execute(commandId);
   });
 }
 
