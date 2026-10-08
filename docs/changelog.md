@@ -5,6 +5,15 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S10G — 8-Pattern keyboard arrangement exit proof (CLOSED · PASS)
+
+- Exit criterion R3 “lagu 8 Pattern dapat disusun tanpa mouse untuk operasi dasar” kini memiliki browser proof lintas-engine.
+- Fixture memuat 8 Pattern/occurrence; setelah fixture siap, seluruh operasi arrangement dilakukan lewat keyboard: `Alt+1` membuka Song, panah memilih occurrence, `Alt+Arrow` reorder, `Ctrl+D` reuse, dan `Ctrl+Shift+D` membuat occurrence target unik.
+- Test memverifikasi urutan Order, jumlah Pattern, focused OrderEntry, reuse semantics, make-unique semantics, dan label history tanpa mouse.
+- Slice ini test-only; tidak ada perubahan runtime.
+- Gate final GitHub run **37705402063**: 0 vulnerability, unit **207/207 PASS**, `npm run check` PASS, build **578,9 KiB**, targeted browser **2/2 PASS** (Chromium + Firefox).
+- Milestone R3 tetap aktif hanya untuk gap keymap/transport Songwriter `Shift+Space = mulai dari awal section`; exit teknis lain yang tercantum di PLAN sudah memiliki bukti otomatis.
+
 ### R3-S10F — property proof reorder chord/tempo (CLOSED · PASS)
 
 - Exit criterion R3 “reorder Order tidak menggeser chord/tempo” kini dikunci oleh property-style regression, bukan hanya satu contoh.
