@@ -13,6 +13,9 @@ function fakeParam() {
     setValueAtTime(value, when) {
       calls.push({ value, when });
     },
+    cancelScheduledValues(when) {
+      calls.push({ cancelAt: when });
+    },
   };
 }
 
@@ -80,8 +83,8 @@ test('reset mengembalikan gain 1 dan pan center pada waktu yang sama', () => {
   });
 
   assert.equal(when, 5);
-  assert.deepEqual(bus.fxGain.gain.calls, [{ value: 1, when: 5 }]);
-  assert.deepEqual(bus.fxPanner.pan.calls, [{ value: 0, when: 5 }]);
+  assert.deepEqual(bus.fxGain.gain.calls, [{ cancelAt: 5 }, { value: 1, when: 5 }]);
+  assert.deepEqual(bus.fxPanner.pan.calls, [{ cancelAt: 5 }, { value: 0, when: 5 }]);
 });
 
 test('track mix helper fail-closed untuk bus, waktu, dan value invalid', () => {

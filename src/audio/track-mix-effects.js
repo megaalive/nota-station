@@ -47,6 +47,9 @@ export function scheduleTrackMixReset(bus, {
   }
 
   const scheduledWhen = Math.max(when, currentTime);
+  // Otomasi Pattern lama bisa masih antre setelah reset ini, jadi bersihkan dulu pada boundary.
+  bus.fxGain.gain.cancelScheduledValues?.(scheduledWhen);
+  bus.fxPanner?.pan?.cancelScheduledValues?.(scheduledWhen);
   bus.fxGain.gain.setValueAtTime(1, scheduledWhen);
   if (bus.fxPanner?.pan) bus.fxPanner.pan.setValueAtTime(0, scheduledWhen);
   return scheduledWhen;

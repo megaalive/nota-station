@@ -86,6 +86,15 @@ test('awal Section memakai run kontigu, bukan sectionId pertama secara global', 
   );
 });
 
+test('OrderEntry tanpa Section menjadi run tunggal', () => {
+  const project = fixture();
+  project.song.order[0].sectionId = null;
+  project.song.order[1].sectionId = null;
+
+  assert.equal(sectionRunStartIndex(project, 'o1'), 0);
+  assert.equal(sectionRunStartIndex(project, 'o2'), 1);
+});
+
 test('songTickForOrderEntry menambah tick lokal tanpa menyimpan absolute tick', () => {
   const project = fixture();
 
@@ -100,5 +109,15 @@ test('songTickForOrderEntry menambah tick lokal tanpa menyimpan absolute tick', 
   assert.throws(
     () => sectionRunStartIndex(project, 'missing'),
     (error) => error.code === 'E_SONG_TIMELINE_ORDER_MISSING',
+  );
+});
+
+test('SongTimeline gagal tertutup saat Pattern milik OrderEntry hilang', () => {
+  const project = fixture();
+  project.song.order[1].patternId = 'missing-pattern';
+
+  assert.throws(
+    () => buildSongTimeline(project),
+    (error) => error.code === 'E_SONG_TIMELINE_PATTERN_MISSING',
   );
 });
