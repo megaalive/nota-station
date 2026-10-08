@@ -706,8 +706,9 @@ function registerCommands() {
     {
       id: 'song.createSectionOccurrence',
       group: 'Song',
-      labelKey: 'song.addSection',
+      labelKey: 'song.addSectionOccurrence',
       requiresArgs: true,
+      requiresArgsReason: () => i18n.t('palette.songSectionUseMap'),
       run: (args) => {
         requireCommandArgs('song.createSectionOccurrence', args);
         const afterOrderEntryId = String(
@@ -745,10 +746,46 @@ function registerCommands() {
       },
     },
     {
+      id: 'song.createAndAssignSection',
+      group: 'Song',
+      labelKey: 'song.assignNewSection',
+      requiresArgs: true,
+      requiresArgsReason: () => i18n.t('palette.songSectionUseMap'),
+      run: (args) => {
+        requireCommandArgs('song.createAndAssignSection', args);
+        const orderEntryId = String(
+          args.orderEntryId ?? focus.getState().orderEntryId ?? '',
+        );
+        if (!project.song.order.some((entry) => entry.id === orderEntryId)) {
+          throw commandError(
+            'E_PROJECT_ORDER_MISSING',
+            `OrderEntry tidak dikenal: ${orderEntryId}`,
+          );
+        }
+
+        let nextProject = addSection(project, {
+          name: args.name,
+          color: args.color,
+        });
+        const section = nextProject.song.sections[nextProject.song.sections.length - 1];
+        nextProject = assignOrderEntrySection(nextProject, {
+          orderEntryId,
+          sectionId: section.id,
+        });
+        commitProject(nextProject, 'song.createAndAssignSection');
+        return {
+          section: structuredClone(section),
+          orderEntryId,
+          sectionId: section.id,
+        };
+      },
+    },
+    {
       id: 'song.addSection',
       group: 'Song',
-      labelKey: 'song.addSection',
+      labelKey: 'song.createSectionDefinition',
       requiresArgs: true,
+      requiresArgsReason: () => i18n.t('palette.songSectionUseMap'),
       run: (args) => {
         requireCommandArgs('song.addSection', args);
         const nextProject = addSection(project, {
@@ -765,6 +802,7 @@ function registerCommands() {
       group: 'Song',
       labelKey: 'song.assignSection',
       requiresArgs: true,
+      requiresArgsReason: () => i18n.t('palette.songSectionUseMap'),
       run: (args) => {
         requireCommandArgs('song.assignSection', args);
         const orderEntryId = String(args.orderEntryId ?? '');

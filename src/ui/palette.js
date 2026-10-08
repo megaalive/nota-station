@@ -41,7 +41,9 @@ export function createPalette({ registry, t, onRun }) {
       const paletteEnabled = command.enabled && !command.requiresArgs;
       const paletteReason = !command.enabled
         ? command.disabledReason
-        : (command.requiresArgs ? t('palette.requiresContext') : null);
+        : (command.requiresArgs
+          ? (command.requiresArgsReason ?? t('palette.requiresContext'))
+          : null);
       const row = el(
         'div',
         {

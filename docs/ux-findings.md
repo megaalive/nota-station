@@ -20,6 +20,54 @@ Persona minimum:
 | P4 | belum diisi | — | — | — | — | — |
 | P5 | belum diisi | — | — | — | — | — |
 
+## Simulated human UAT — Luna 6 · build f63dd68 (bukan peserta manusia nyata)
+
+**Metode:** Luna 6 memakai browser interaction dalam 10 sesi terpisah (5 persona × T4/T5),
+tanpa DevTools, source, selector, JavaScript injection, Playwright, README, atau PLAN selama tugas.
+Waktu adalah elapsed time simulasi dan **bukan** pengukuran performa manusia nyata.
+
+### T4 — menemukan command lewat Command Palette
+
+| Persona simulasi | Waktu | Hasil | Jalur |
+|---|---:|---|---|
+| Tracker veteran | 8 dtk | PASS | Ctrl+K → Putar dari awal Section |
+| Songwriter/gitaris | 11 dtk | PASS | Tombol Palet perintah |
+| Songwriter pemula DAW | 33 dtk | FAIL | `?` → overlay Shortcut → Palet perintah |
+| Pengguna komputer umum | 14 dtk | PASS | Tombol Palet perintah |
+| Power user teknis | 9 dtk | PASS | Ctrl+K |
+
+**Hasil simulasi:** 4/5 ≤20 dtk · median 11 dtk · worst 33 dtk → **PASS** terhadap
+ambang numerik T4, tetapi bukan pengganti UAT manusia nyata.
+
+### T5 — menyusun Verse–Chorus–Verse di Song Map
+
+| Persona simulasi | Waktu | Hasil | Observasi |
+|---|---:|---|---|
+| Tracker veteran | 173 dtk | PASS | satu dead-end pada command Atur section |
+| Songwriter/gitaris | 104 dtk | PASS | preset sempat bergeser lalu dikoreksi |
+| Songwriter pemula DAW | 70 dtk | PASS | reuse; tidak membuat Pattern baru |
+| Pengguna komputer umum | 52 dtk | PASS | mengikuti kontrol berlabel |
+| Power user teknis | 57 dtk | PASS | reuse; tanpa Ctrl+D |
+
+**Hasil simulasi:** 5/5 ≤180 dtk · median 70 dtk · worst 173 dtk → **PASS** terhadap
+ambang numerik T5.
+
+**Temuan utama:** kelima persona menghasilkan empat tempat:
+`Tanpa section → Verse → Chorus → Verse`. Tombol **Tambah section** selalu membuat occurrence
+baru sehingga occurrence awal tidak pernah menjadi Verse pertama. Ini diklasifikasikan
+**MEDIUM** karena tugas selesai tetapi struktur awal terasa sebagai sisa artefak.
+
+**Koreksi R3-S12:** bila occurrence terpilih belum punya Section, dialog **Tambah section**
+sekarang menetapkan Section baru ke occurrence tersebut tanpa menambah tempat. Field Pattern
+disembunyikan pada mode ini karena tidak relevan. Setelah occurrence sudah punya Section,
+dialog kembali ke perilaku append seperti semula. Command Palette juga membedakan command
+Section teknis dan memberi arahan Song Map yang spesifik agar tidak muncul duplikasi label/
+pesan konteks generik.
+
+**Status provenance:** automated regression = akan dicatat di changelog S12 · simulated human
+UAT = PASS pada build f63dd68 sebelum koreksi · real moderated human UAT = **NOT RUN**.
+Simulasi harus diulang pada build koreksi dengan sesi/persona baru sebelum dipakai sebagai
+pre-UAT terbaru.
 ## Heuristik per PR UI
 
 - [ ] Tidak ada jalan buntu.
@@ -73,4 +121,4 @@ Persona minimum:
 - **Koreksi:** turunkan gain/sustain Lead/Harmony/Bass secukupnya dan naikkan kick/snare/hi-hat secara moderat tanpa menghapus sustain.
 - **Status:** gate otomatis PASS; **menunggu re-test pendengaran user pada build live baru**.
 
-Sesi uji tugas bermoderasi P1–P5 belum dijalankan.
+Sesi uji tugas bermoderasi manusia nyata P1–P5 belum dijalankan.

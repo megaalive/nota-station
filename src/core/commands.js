@@ -8,6 +8,7 @@
  * @property {string} labelKey   // key i18n, bukan teks langsung
  * @property {string|(() => string|null)} [shortcut] // display; boleh dinamis mengikuti preset keymap
  * @property {boolean} [requiresArgs] // tetap discoverable, tetapi palette tidak mengeksekusi tanpa konteks
+ * @property {string|(() => string)} [requiresArgsReason] // alasan spesifik bila palette butuh konteks
  * @property {() => boolean} [isEnabled]
  * @property {() => string} [disabledReason]
  * @property {(args?: any) => any} run
@@ -54,7 +55,7 @@ export function createCommandRegistry(initialCommands = []) {
   function listCommands() {
     return [...commands.values()].map((def) => {
       const enabled = def.isEnabled ? def.isEnabled() : true;
-      return {
+      const descriptor = {
         id: def.id,
         group: def.group,
         labelKey: def.labelKey,
@@ -65,6 +66,11 @@ export function createCommandRegistry(initialCommands = []) {
         enabled,
         disabledReason: enabled ? null : (def.disabledReason?.() ?? null),
       };
+      const requiresArgsReason = typeof def.requiresArgsReason === 'function'
+        ? def.requiresArgsReason()
+        : (def.requiresArgsReason ?? null);
+      if (requiresArgsReason) descriptor.requiresArgsReason = requiresArgsReason;
+      return descriptor;
     });
   }
 

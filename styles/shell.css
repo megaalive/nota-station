@@ -1534,6 +1534,18 @@
   gap: var(--space-1);
 }
 
+.song-section-dialog__field[hidden],
+.song-section-dialog__hint[hidden] {
+  display: none;
+}
+
+.song-section-dialog__hint {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
 .song-section-dialog__label {
   font-weight: 700;
   color: var(--text-2);

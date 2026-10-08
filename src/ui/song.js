@@ -68,18 +68,28 @@ export function createSongView({
     role: 'alert',
     dataset: { action: 'song-section-feedback' },
   });
+  const sectionAssignHint = el('p', {
+    class: 'song-section-dialog__hint',
+    dataset: { action: 'song-section-assign-hint' },
+    text: t('song.sectionAssignSelectedHint'),
+    hidden: true,
+  });
+  const patternModeField = dialogField(t('song.sectionPatternAction'), patternMode);
+  const sourcePatternField = dialogField(t('song.sectionSourcePattern'), sourcePattern);
 
   const sectionDialogBody = el('div', {
     class: 'song-section-dialog',
   }, [
     dialogField(t('song.sectionPreset'), sectionPreset),
     dialogField(t('song.sectionName'), sectionName),
-    dialogField(t('song.sectionPatternAction'), patternMode),
-    dialogField(t('song.sectionSourcePattern'), sourcePattern),
+    sectionAssignHint,
+    patternModeField,
+    sourcePatternField,
     sectionFeedback,
   ]);
 
   let sectionDialog;
+  let sectionDialogMode = 'append';
   const sectionCancel = Button({
     label: t('song.sectionCancel'),
     variant: 'ghost',
@@ -202,17 +212,42 @@ export function createSongView({
     sectionName.value = 'Verse';
     patternMode.value = 'reuse';
     sectionFeedback.textContent = '';
+
+    sectionDialogMode = selected && (selected.sectionId ?? null) === null
+      ? 'assign'
+      : 'append';
+    const assigning = sectionDialogMode === 'assign';
+    sectionAssignHint.hidden = !assigning;
+    patternModeField.hidden = assigning;
+    sourcePatternField.hidden = assigning;
+    const title = sectionDialog.querySelector('.dialog__title');
+    if (title) {
+      title.textContent = t(assigning
+        ? 'song.assignNewSectionDialogTitle'
+        : 'song.addSectionDialogTitle');
+    }
+    const createLabel = sectionCreate.querySelector('.btn__label');
+    if (createLabel) {
+      createLabel.textContent = t(assigning
+        ? 'song.sectionAssignSelected'
+        : 'song.sectionCreate');
+    }
     sectionDialog.open(addSectionButton);
   }
 
   function createSectionFromDialog() {
     try {
-      const result = registry.execute('song.createSectionOccurrence', {
-        name: sectionName.value,
-        patternMode: patternMode.value,
-        sourcePatternId: sourcePattern.value,
-        afterOrderEntryId: selectedOrderId,
-      });
+      const result = sectionDialogMode === 'assign'
+        ? registry.execute('song.createAndAssignSection', {
+          name: sectionName.value,
+          orderEntryId: selectedOrderId,
+        })
+        : registry.execute('song.createSectionOccurrence', {
+          name: sectionName.value,
+          patternMode: patternMode.value,
+          sourcePatternId: sourcePattern.value,
+          afterOrderEntryId: selectedOrderId,
+        });
       selectedOrderId = result.orderEntryId;
       registry.execute('focus.setOrderEntry', {
         orderEntryId: result.orderEntryId,
