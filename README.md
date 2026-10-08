@@ -8,6 +8,20 @@ Status implementasi: **R3 — Kematangan editing tracker + struktur lagu: ACTIVE
 
 Saat ini NotaStation sudah memiliki Pattern editor 8 channel default yang dapat diperluas sampai 32 channel logis × 64 row, transport/loop/metronome, undo/redo, debug JSON, Sound workspace, impor WAV + IndexedDB, editor Sample/Instrument, picker + global WAV drop, satu Drum Track polifonik dengan choke hi-hat, serta fondasi Order/reuse/clone Pattern, Song Map/Order List dengan Section, occurrence focus Song → Pattern → transport, dialog Section Baru/Clone/Pakai ulang, dan guard Pattern bersama dengan pilihan Edit semua/Jadikan unik, plus seleksi blok Pattern dengan copy/paste, transpose, insert/delete row, interpolasi velocity keyboard, serta proyeksi event off-grid dengan marker/kolom DLY, selector LPB projection-only, pencarian resolusi yang cocok, dan kuantisasi timing eksplisit yang dapat di-Undo, serta EffectEvent typed v0.1 dengan validator/scheduler deterministik, efek audible note delay/note cut/volume/pan/retrigger/sample offset/pitch slide/portamento/vibrato/arpeggio, dan progressive Pattern FX | PARAM editor, generalisasi instrument track polifonik dengan voice lane, serta runtime keymap Songwriter/OpenMPT-like dan overlay shortcut kontekstual `?`.
 
+## Contoh lagu untuk belajar
+
+Buka **[Malam Kota — Lagu Contoh](https://megaalive.github.io/nota-station/?template=learning-song)**
+atau pilih **Lagu lengkap — Malam Kota (8 instrumen)** di layar sambutan.
+
+Contoh orisinal 112 BPM ini berisi **8 channel**, 7 Pattern unik, dan 9 posisi
+Song Map: Intro → Verse → Chorus → Bridge → Chorus → Outro. Drum Kit, bass,
+keys poly, pad, arpeggio, lead, countermelodi, dan fill menggunakan suara bawaan
+tanpa WAV eksternal. Chorus dipakai ulang agar terlihat manfaat Pattern reuse.
+
+Di tab **Song**, tekan **▶ Putar lagu dari awal** untuk mendengar seluruh aransemen,
+atau buka panel **Pelajari lagu ini (8 channel)** untuk latihan Mute/Solo, chord
+poly, dan edit Pattern bersama. [Panduan lengkap](./docs/contoh-lagu.md).
+
 ## Menjalankan
 
 ```bash
