@@ -585,10 +585,11 @@
 }
 
 .palette__row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-1) var(--space-2);
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2);
   border-radius: var(--radius-1);
   cursor: pointer;
 }
@@ -597,18 +598,21 @@
   background: var(--surface-3);
 }
 
-/* Nonaktif tetap kelihatan bentuknya, cuma diberi tanda coret dan alasannya. */
+/* Perintah kontekstual tetap terbaca, tanpa coret yang mengganggu label. */
 .palette__row.is-disabled {
   color: var(--text-2);
   cursor: not-allowed;
-  text-decoration: line-through;
 }
 
 .palette__label {
-  flex: 1;
+  grid-column: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .palette__shortcut {
+  grid-column: 2;
+  white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85em;
   color: var(--text-2);
@@ -618,7 +622,27 @@
 }
 
 .palette__reason {
-  font-style: italic;
+  grid-column: 1 / -1;
+  color: var(--text-2);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+.palette__guidance {
+  margin: var(--space-2) var(--space-2) 0;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border-1);
+  color: var(--text-2);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: break-word;
+}
+
+/* Indikator fokus keyboard konsisten pada dialog Section. */
+.dialog :is(button, input, select, textarea):focus-visible {
+  outline: 3px solid var(--accent-1);
+  outline-offset: 2px;
 }
 
 .palette__empty,

@@ -64,10 +64,42 @@ dialog kembali ke perilaku append seperti semula. Command Palette juga membedaka
 Section teknis dan memberi arahan Song Map yang spesifik agar tidak muncul duplikasi label/
 pesan konteks generik.
 
-**Status provenance:** automated regression = akan dicatat di changelog S12 · simulated human
-UAT = PASS pada build f63dd68 sebelum koreksi · real moderated human UAT = **NOT RUN**.
-Simulasi harus diulang pada build koreksi dengan sesi/persona baru sebelum dipakai sebagai
-pre-UAT terbaru.
+**Status provenance:** automated regression S12 PASS (221/221 unit, 330 browser PASS +
+4 skip lama). Simulated human UAT sebelum koreksi = PASS numerik pada build f63dd68,
+namun hasil T5 menyisakan occurrence awal. Real moderated human UAT = **NOT RUN**.
+
+## Re-test simulated human UAT sesudah S12 — Luna 6 · build c27d973
+
+**Metode:** Luna 6 melaporkan sepuluh tugas browser menggunakan persona baru P6–P10,
+sesi terpisah, tanpa DevTools/source/DOM/script injection selama tugas. Waktu merupakan
+elapsed simulasi, **bukan** waktu yang diukur dari lima orang sungguhan.
+
+| Persona simulasi | T4 ≤20 dtk | T5 ≤180 dtk | Struktur T5 |
+|---|---:|---:|---|
+| P6 tracker veteran | 26 dtk · FAIL | 51 dtk · PASS | Verse → Chorus → Verse |
+| P7 songwriter/gitaris | 6 dtk · PASS | 39 dtk · PASS | Verse → Chorus → Verse |
+| P8 musisi pemula software | 7 dtk · PASS | 32 dtk · PASS | Verse → Chorus → Verse |
+| P9 pengguna komputer umum | 1 dtk · PASS | 28 dtk · PASS | Verse → Chorus → Verse |
+| P10 power user | 1 dtk · PASS | 75 dtk · PASS | Verse → Chorus → Verse |
+
+**Hasil re-test:** T4 **4/5 PASS** (median 6 dtk, worst 26 dtk);
+T5 **5/5 PASS** (median 39 dtk, worst 75 dtk), dan **5/5**
+menyelesaikan tepat 3 occurrence tanpa `Tanpa section` tambahan.
+Koreksi S12 berupa assign pertama in-place, field Pattern tersembunyi dalam mode
+assign, append Chorus/Verse, serta Undo pertama dilaporkan berfungsi.
+
+**Temuan tersisa:** P6 mencoba shortcut keyboard `?` tetapi tidak berhasil,
+sehingga T4 melewati ambang. Screenshot pencarian Palette memperlihatkan label
+teknis dan guidance yang bertumpuk/pecah menjadi banyak baris pada viewport sekitar
+739×643. P10 tetap dapat menyelesaikan T5 setelah membaca guidance; fokus Tab
+dalam dialog dinilai kurang terlihat. Di R3-S13, koreksi dibatasi pada shortcut
+bantuan, layout Palette, deduplikasi guidance, dan indikator focus-visible.
+
+**Provenance tetap terpisah:** automated regression = lihat gate GitHub terbaru;
+simulated human UAT after S12 = **PASS**; real moderated human UAT = **NOT RUN**.
+Temuan simulated UAT dapat mendukung kesiapan pre-UAT, **bukan menutup syarat
+uji peserta manusia**.
+
 ## Heuristik per PR UI
 
 - [ ] Tidak ada jalan buntu.

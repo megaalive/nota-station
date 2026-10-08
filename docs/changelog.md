@@ -5,6 +5,14 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S13 — keterbacaan Palette dan shortcut bantuan (CLOSED · PASS)
+
+- Simulated UAT ulang pada build `c27d973` lulus T4 **4/5** (median 6 dtk) dan T5 **5/5** (median 39 dtk), dengan **5/5** menghasilkan tepat tiga occurrence `Verse → Chorus → Verse`. Hasil ditaruh terpisah dari UAT manusia nyata di `docs/ux-findings.md`.
+- Koreksi visual hasil pencarian Palette: label/shortcut memakai grid dua kolom, alasan konteks panjang berada di baris tersendiri, dan alasan identik diringkas satu kali dengan `aria-describedby` tetap mengacu pada tiap command nonaktif. Label command tidak lagi dicoret, dan layout 739×643 diverifikasi.
+- Shortcut `?` untuk bantuan dan `Ctrl+K` kini tetap aktif saat fokus pada tombol atau occurrence di Song Map, tetapi tidak mengambil alih input teks. Indikator `focus-visible` pada kontrol dialog diperkuat.
+- Gate GitHub exact-head **37742439250**: 0 vulnerability, unit **221/221 PASS**, `npm run check` PASS, build Linux **608,5 KiB**, browser Chromium + Firefox **336 PASS + 4 skip lama** (2 worker). Acceptance UI/keyboard baru PASS kedua engine.
+- R3 technical + simulated-UAT PASS; **real moderated human UAT tetap NOT RUN**, sehingga R3 tetap ACTIVE.
+
 ### R3-S12 — koreksi friction simulated UAT T4/T5 (CLOSED · PASS)
 
 - Simulated human UAT Luna 6 pada build `f63dd68` lulus ambang numerik PLAN: T4 **4/5** (median 11 dtk, worst 33 dtk) dan T5 **5/5** (median 70 dtk, worst 173 dtk). Hasil ini dicatat terpisah dari UAT manusia nyata.

@@ -282,9 +282,33 @@ test.describe('Song workspace R3-S2', () => {
     await expect(occurrence).toContainText('Tambah tempat ber-section');
     await expect(definition).toContainText('Buat definisi section');
     await expect(assign).toContainText('Atur section');
-    await expect(occurrence).toContainText('Gunakan kontrol Tambah section di Song Map');
-    await expect(definition).toContainText('Gunakan kontrol Tambah section di Song Map');
-    await expect(assign).toContainText('Gunakan kontrol Tambah section di Song Map');
+    const guidance = page.locator('[data-action="palette-guidance"]');
+    await expect(guidance).toHaveCount(1);
+    await expect(guidance).toContainText('Gunakan kontrol Tambah section di Song Map');
+    const guidanceId = await guidance.getAttribute('id');
+    for (const row of [occurrence, definition, assign]) {
+      await expect(row).toHaveAttribute('aria-describedby', guidanceId);
+      await expect(row.locator('.palette__reason')).toHaveCount(0);
+    }
+  });
+
+  test('Palette section tetap terbaca pada viewport sempit tanpa label pecah per kata', async ({ page }) => {
+    await page.setViewportSize({ width: 739, height: 643 });
+    await page.keyboard.press('Control+k');
+    await page.locator('[data-action="palette-input"]').fill('section');
+
+    const row = page.locator('[data-action="palette-item"][data-entity="song.createSectionOccurrence"]');
+    const label = row.locator('.palette__label');
+    const metrics = await label.evaluate((node) => ({
+      width: node.getBoundingClientRect().width,
+      wordBreak: getComputedStyle(node).wordBreak,
+    }));
+    expect(metrics.width).toBeGreaterThan(180);
+    expect(metrics.wordBreak).not.toBe('break-all');
+    await expect(page.locator('[data-action="palette-guidance"]')).toHaveCount(1);
+    expect(await page.locator('[data-action="palette"]').evaluate(
+      (node) => node.scrollWidth <= node.clientWidth + 1,
+    )).toBe(true);
   });
 
   test('Ctrl+D reuse lalu Ctrl+Shift+D membuat occurrence target unik', async ({ page }) => {
