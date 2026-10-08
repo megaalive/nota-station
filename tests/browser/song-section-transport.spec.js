@@ -23,6 +23,35 @@ test.describe('R3-S11 Song/Section transport surface', () => {
     expect(command.enabled).toBe(true);
   });
 
+  test('transport global memutar seluruh lagu dari Order pertama pada tab apa pun', async ({ page }) => {
+    const setup = await page.evaluate(() => {
+      const first = window.tracker.getProject().song.order[0];
+      const second = window.tracker.commands.execute('song.reuseOrderEntry', {
+        orderEntryId: first.id,
+      });
+      window.tracker.commands.execute('focus.setOrderEntry', {
+        orderEntryId: second.orderEntryId,
+      });
+      return { first: first.id };
+    });
+
+    await page.getByRole('tab', { name: 'Pattern' }).click();
+    await page.evaluate(() => window.tracker.commands.execute('playback.stop'));
+    const playSong = page.getByRole('button', { name: 'Mulai lagu dari awal', exact: true });
+    await expect(playSong).toBeVisible();
+    await expect(playSong.locator('xpath=..').locator('[role="tooltip"]'))
+      .toHaveText('Putar lagu dari awal');
+    await playSong.click();
+    await expect.poll(() => page.evaluate(() => window.tracker.getState().audio.transportMode), { timeout: 15000 })
+      .toBe('song');
+
+    const state = await page.evaluate(() => window.tracker.getState());
+    expect(state.audio.orderIndex).toBe(0);
+    expect(state.audio.orderEntryId).toBe(setup.first);
+    expect(state.audio.sectionStartOrderIndex).toBe(0);
+    await page.evaluate(() => window.tracker.commands.execute('playback.stop'));
+  });
+
   test('overlay shortcut menampilkan Shift+Space untuk mulai dari awal Section', async ({ page }) => {
     await page.keyboard.press('Shift+/');
 

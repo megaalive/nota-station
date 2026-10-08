@@ -51,7 +51,7 @@ test('setiap locale punya key yang sama — kalau tidak, ada teks yang akan hila
     'tab.song', 'tab.pattern', 'tab.pianoRoll', 'tab.lyrics', 'tab.guitar', 'tab.score', 'tab.sound',
     'shell.workspaceTabs', 'shell.leftPanel', 'shell.rightPanel', 'shell.dock', 'shell.statusBar',
     'shell.buildUnknown', 'panel.collapse', 'panel.expand', 'panel.resize', 'topbar.transport',
-    'transport.play', 'transport.pause', 'transport.stop', 'transport.loopPattern',
+    'transport.play', 'transport.playSongButton', 'transport.playSongStart', 'transport.pause', 'transport.stop', 'transport.loopPattern',
     'transport.metronome', 'transport.seek', 'transport.tempo',
     'transport.tempoUnit', 'transport.tempoInvalid', 'transport.tempoPlaceholder', 'status.edit', 'status.audisi', 'status.octave', 'status.step',
     'status.audio', 'status.idle', 'status.audioLocked', 'status.audioReady', 'status.audioPlaying',

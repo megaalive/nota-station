@@ -133,6 +133,8 @@ const messages = {
 
     'topbar.transport': 'Transport',
     'transport.play': 'Putar',
+    'transport.playSongButton': 'Mulai lagu dari awal',
+    'transport.playSongStart': 'Putar lagu dari awal',
     'transport.playStop': 'Putar / berhenti',
     'transport.playPatternStart': 'Putar Pattern dari awal',
     'transport.playPatternCursor': 'Putar Pattern dari kursor',
@@ -446,6 +448,8 @@ const messages = {
 
     'topbar.transport': 'Transport',
     'transport.play': 'Play',
+    'transport.playSongButton': 'Start song at beginning',
+    'transport.playSongStart': 'Play song from beginning',
     'transport.playStop': 'Play / stop',
     'transport.playPatternStart': 'Play Pattern from start',
     'transport.playPatternCursor': 'Play Pattern from cursor',
