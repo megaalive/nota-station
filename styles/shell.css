@@ -1448,6 +1448,38 @@
   font-size: 0.82rem;
 }
 
+.song-learning {
+  padding: var(--space-3);
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-2);
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.song-learning[hidden] {
+  display: none;
+}
+
+.song-learning summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.song-learning p {
+  margin: var(--space-2) 0;
+  color: var(--text-2);
+}
+
+.song-learning ol {
+  margin: var(--space-2) 0 0;
+  padding-left: 1.5rem;
+  line-height: 1.5;
+}
+
+.song-learning li + li {
+  margin-top: var(--space-1);
+}
+
 .song-workspace__surface {
   min-width: 0;
   padding: var(--space-3);
