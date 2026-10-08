@@ -69,7 +69,6 @@ test.describe('R3-S10A keymap + shortcut overlay', () => {
     await name.focus();
     await page.keyboard.press('Shift+/');
     await expect(page.locator('[data-action="shortcut-dialog"]')).toHaveCount(0);
-    await expect(name).toContainText('');
     await expect(name).toHaveValue('Verse?');
   });
 
