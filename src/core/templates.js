@@ -8,6 +8,7 @@ import {
   enterNote,
   enterVoiceNote,
 } from './project.js';
+import { createLearningSongProject, LEARNING_SONG_TEMPLATE_ID } from './learning-song.js';
 import {
   createFactoryDrumKitInstrument,
   createFactoryDrumSamples,
@@ -16,10 +17,12 @@ import {
 export const R1_TEMPLATES = Object.freeze([
   { id: 'blank', labelKey: 'template.blank' },
   { id: 'pop-4-4', labelKey: 'template.pop44' },
+  { id: LEARNING_SONG_TEMPLATE_ID, labelKey: 'template.learningSong' },
 ]);
 
 export function createTemplateProject(templateId, options = {}) {
   if (templateId === 'blank') return createBlankProject(options);
+  if (templateId === LEARNING_SONG_TEMPLATE_ID) return createLearningSongProject(options);
   if (templateId !== 'pop-4-4') {
     const error = new Error(`Template tidak dikenal: ${templateId}`);
     error.code = 'E_TEMPLATE_UNKNOWN';
