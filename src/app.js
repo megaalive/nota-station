@@ -510,15 +510,11 @@ function registerCommands() {
     {
       id: 'playback.playSongStart',
       group: 'Playback',
-      labelKey: 'song.playFromStart',
+      labelKey: 'transport.playSongStart',
       isEnabled: () => project.song.order.length > 0,
       run: () => {
-        const first = project.song.order[0];
-        if (!first) return null;
-        audio.stop();
-        registry.execute('focus.setOrderEntry', { orderEntryId: first.id });
-        void playActiveSection();
-        return first.id;
+        void playSongFromStart();
+        return 0;
       },
     },
     {
@@ -1631,6 +1627,18 @@ async function playActivePattern() {
       metronome: transportState.metronome,
     });
     return result;
+  } catch {
+    shell?.setAudioStatus('error');
+    return null;
+  }
+}
+
+async function playSongFromStart() {
+  try {
+    return await audio.playSection(project, 0, {
+      metronome: transportState.metronome,
+      sectionStartOrderIndex: 0,
+    });
   } catch {
     shell?.setAudioStatus('error');
     return null;

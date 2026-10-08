@@ -57,6 +57,13 @@ export function createShell({
     iconOnly: true,
     onClick: () => registry.execute('playback.play'),
   });
+  const playSongButton = Button({
+    label: t('transport.playSongButton'),
+    icon: '♫',
+    iconOnly: true,
+    onClick: () => registry.execute('playback.playSongStart'),
+  });
+  playSongButton.dataset.action = 'transport-play-song';
   const pauseButton = Button({
     label: t('transport.pause'),
     icon: '⏸',
@@ -180,6 +187,7 @@ export function createShell({
     'aria-label': t('topbar.transport'),
   }, [
     Tooltip({ text: t('transport.play'), shortcut: shortcutForCommand('playback.togglePlayStop'), child: playButton }),
+    Tooltip({ text: t('transport.playSongStart'), child: playSongButton }),
     Tooltip({ text: t('transport.pause'), child: pauseButton }),
     Tooltip({ text: t('transport.stop'), shortcut: shortcutForCommand('playback.togglePlayStop'), child: stopButton }),
     Tooltip({ text: t('transport.loopPattern'), shortcut: shortcutForCommand('playback.toggleLoop'), child: loopButton }),
@@ -366,6 +374,7 @@ export function createShell({
     };
     const playing = currentTransport.audioState === 'playing';
     playButton.disabled = playing;
+    playSongButton.disabled = playing;
     pauseButton.disabled = !playing;
     loopButton.setAttribute('aria-pressed', currentTransport.loopPattern ? 'true' : 'false');
     loopButton.classList.toggle('is-active', currentTransport.loopPattern);
