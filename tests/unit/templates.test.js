@@ -12,8 +12,8 @@ function opts() {
   };
 }
 
-test('R1 hanya mengekspos template Kosong dan Pop 4/4', () => {
-  assert.deepEqual(R1_TEMPLATES.map((x) => x.id), ['blank', 'pop-4-4']);
+test('katalog menyediakan Kosong, Pop 4/4, dan lagu belajar lengkap', () => {
+  assert.deepEqual(R1_TEMPLATES.map((x) => x.id), ['blank', 'pop-4-4', 'learning-song']);
 });
 
 test('template Kosong tetap project R1 kosong', () => {

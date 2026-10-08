@@ -1,4 +1,5 @@
 import { patternUsageCount } from '../core/arrangement.js';
+import { LEARNING_SONG_TITLE } from '../core/learning-song.js';
 import { el } from './dom.js';
 import { Button, Dialog } from './kit.js';
 
@@ -110,6 +111,40 @@ export function createSongView({
   });
   sectionDialog.dataset.action = 'song-section-dialog';
 
+  let exampleDialog;
+  const exampleCancel = Button({
+    label: t('song.sectionCancel'),
+    variant: 'ghost',
+    onClick: () => exampleDialog.close(),
+  });
+  const exampleConfirm = Button({
+    label: t('song.openLearningSong'),
+    onClick: () => {
+      // Tutup sebelum shell diganti; jangan tinggalkan dialog di DOM lama.
+      exampleDialog.close();
+      registry.execute('project.loadTemplate', { templateId: 'learning-song' });
+    },
+  });
+  exampleDialog = Dialog({
+    title: t('song.openLearningSong'),
+    body: el('p', { text: t('song.learningSongReplaceWarning') }),
+    actions: [exampleCancel, exampleConfirm],
+  });
+  exampleDialog.dataset.action = 'song-learning-confirm';
+
+  const exampleButton = Button({
+    label: t('song.openLearningSong'),
+    variant: 'ghost',
+    onClick: () => exampleDialog.open(exampleButton),
+  });
+  exampleButton.dataset.action = 'song-open-learning-song';
+
+  const playSongButton = Button({
+    label: t('song.playFromStart'),
+    onClick: () => registry.execute('playback.playSongStart'),
+  });
+  playSongButton.dataset.action = 'song-play-from-start';
+
   const addSectionButton = Button({
     label: t('song.addSection'),
     onClick: openSectionDialog,
@@ -168,7 +203,7 @@ export function createSongView({
     class: 'song-workspace__actions',
     role: 'group',
     'aria-label': t('song.actions'),
-  }, [addSectionButton, reuseButton, uniqueButton, earlierButton, laterButton]);
+  }, [playSongButton, exampleButton, addSectionButton, reuseButton, uniqueButton, earlierButton, laterButton]);
 
   const toolbar = el('div', { class: 'song-workspace__toolbar' }, [
     heading,
@@ -181,6 +216,21 @@ export function createSongView({
     text: t('song.keyboardHint'),
   });
 
+  const learningGuide = el('details', {
+    class: 'song-learning',
+    hidden: true,
+    dataset: { action: 'song-learning-guide' },
+  }, [
+    el('summary', { text: t('song.learningGuideTitle') }),
+    el('p', { text: t('song.learningGuideIntro') }),
+    el('ol', {}, [
+      el('li', { text: t('song.learningGuideStep1') }),
+      el('li', { text: t('song.learningGuideStep2') }),
+      el('li', { text: t('song.learningGuideStep3') }),
+      el('li', { text: t('song.learningGuideStep4') }),
+    ]),
+  ]);
+
   const surface = el('div', {
     class: 'song-workspace__surface',
     tabindex: '0',
@@ -191,7 +241,7 @@ export function createSongView({
     class: 'song-workspace',
     dataset: { action: 'song-workspace' },
     'aria-label': t('song.title'),
-  }, [toolbar, hint, surface]);
+  }, [toolbar, learningGuide, hint, surface]);
 
   root.append(workspace);
   refresh();
@@ -289,6 +339,8 @@ export function createSongView({
       orders: project.song.order.length,
       patterns: project.song.patterns.length,
     });
+    learningGuide.hidden = project.title !== LEARNING_SONG_TITLE;
+    playSongButton.disabled = project.song.order.length === 0;
 
     mapButton.setAttribute('aria-pressed', mode === 'map' ? 'true' : 'false');
     orderButton.setAttribute('aria-pressed', mode === 'order' ? 'true' : 'false');

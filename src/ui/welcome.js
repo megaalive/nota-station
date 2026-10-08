@@ -36,14 +36,28 @@ export function createWelcome({
   }, [
     el('option', { value: 'blank', text: t('template.blank') }),
     el('option', { value: 'pop-4-4', text: t('template.pop44') }),
+    el('option', { value: 'learning-song', text: t('template.learningSong') }),
   ]);
   template.value = initialTemplate;
+
+  const templateHint = el('p', {
+    class: 'welcome__lead',
+    dataset: { action: 'welcome-template-hint' },
+  });
+  function updateTemplateHint() {
+    templateHint.textContent = t(template.value === 'learning-song'
+      ? 'welcome.learningSongHint'
+      : 'welcome.templateHint');
+  }
+  template.addEventListener('change', updateTemplateHint);
+  updateTemplateHint();
 
   const body = el('div', { class: 'welcome', dataset: { action: 'welcome' } }, [
     el('p', { class: 'welcome__lead', text: t('welcome.lead') }),
     field(t('welcome.language'), locale),
     field(t('welcome.keymap'), keymap),
     field(t('welcome.template'), template),
+    templateHint,
   ]);
 
   let dialog;
