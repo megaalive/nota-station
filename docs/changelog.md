@@ -5,6 +5,14 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 
 ## R3 — Kematangan editing tracker + struktur lagu (ACTIVE)
 
+### R3-S14 — lagu contoh 8 channel untuk belajar (ACTIVE)
+
+- Template `learning-song` berisi karya instrumental orisinal **Malam Kota — Lagu Contoh** (112 BPM, A minor): 8 track berinstrumen bawaan, 7 Pattern unik × 4 bar, 9 occurrence, Section Intro–Verse–Chorus–Bridge–Chorus–Outro dengan Chorus A/B di-*reuse*.
+- Drum Kit poly (kick/snare/closed/open hi-hat), bass triangle, Keys Pluck poly, Pad Harmoni sustain, Arpeggio Square, Lead Saw, countermelodi, dan tom fill. Semua note Pattern-local (schema 1), tanpa file WAV luar dan tanpa keluarga DSP baru.
+- Contoh dipilih lewat onboarding atau URL `?template=learning-song`; Song Map menampilkan **Putar lagu dari awal** serta panduan interaktif Mute/Solo, voice lane chord, dan editing Pattern reuse.
+- Regression unit/model/serialization, browser onboarding, Song Map, dan link langsung ditambahkan. Verifikasi audio pendengaran manusia tetap terpisah dari regresi otomatis.
+- Gate GitHub dan deployment Pages: MENUNGGU.
+
 ### R3-S13 — keterbacaan Palette dan shortcut bantuan (CLOSED · PASS)
 
 - Simulated UAT ulang pada build `c27d973` lulus T4 **4/5** (median 6 dtk) dan T5 **5/5** (median 39 dtk), dengan **5/5** menghasilkan tepat tiga occurrence `Verse → Chorus → Verse`. Hasil ditaruh terpisah dari UAT manusia nyata di `docs/ux-findings.md`.
