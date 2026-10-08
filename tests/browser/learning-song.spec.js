@@ -33,6 +33,26 @@ test('pilih lagu lengkap di Welcome lalu pelajari dan putar dari Song Map', asyn
   expect(project.song.order).toHaveLength(9);
 });
 
+test('pengguna lama bisa membuka contoh tanpa mengganti proyek sebelum konfirmasi', async ({ page }) => {
+  await gotoApp(page);
+  await page.getByRole('tab', { name: 'Song' }).click();
+  const before = await page.evaluate(() => window.tracker.getProject().id);
+  const button = page.locator('[data-action="song-open-learning-song"]');
+  await button.click();
+  const dialog = page.locator('[data-action="song-learning-confirm"]');
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('mengganti proyek saat ini');
+  await dialog.getByRole('button', { name: 'Batal' }).click();
+  expect(await page.evaluate(() => window.tracker.getProject().id)).toBe(before);
+
+  await button.click();
+  await dialog.getByRole('button', { name: 'Buka lagu contoh' }).click();
+  await expect(page.locator('[data-action="song-workspace"]')).toBeVisible();
+  await expect(page.locator('[data-action="song-entry"]')).toHaveCount(9);
+  await expect(page.locator('[data-action="song-learning-confirm"]')).toHaveCount(0);
+  expect(await page.evaluate(() => window.tracker.getProject().id)).not.toBe(before);
+});
+
 test('tautan langsung template memuat lagu tanpa dialog first-run', async ({ page }) => {
   await page.goto('./?template=learning-song');
   await waitForApp(page);
