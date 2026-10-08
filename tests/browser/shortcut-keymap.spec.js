@@ -69,7 +69,9 @@ test.describe('R3-S10A keymap + shortcut overlay', () => {
     await name.focus();
     await page.keyboard.press('Shift+/');
     await expect(page.locator('[data-action="shortcut-dialog"]')).toHaveCount(0);
-    await expect(name).toHaveValue('Verse?');
+    // Playwright dapat mengirim '/' atau '?' sesuai layout runner; keduanya
+    // harus tetap masuk ke input tanpa membuka shortcut overlay.
+    await expect(name).toHaveValue(/^Verse[/?]$/);
   });
 
   test('OpenMPT-like: Tab pindah channel, Ctrl+Space toggle EDIT, F10 mute, Ctrl+F10 solo', async ({ page }) => {
