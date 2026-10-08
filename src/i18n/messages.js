@@ -22,6 +22,8 @@ const messages = {
     'tab.sound': 'Suara',
 
     'song.playFromStart': '▶ Putar lagu dari awal',
+    'song.openLearningSong': 'Buka lagu contoh',
+    'song.learningSongReplaceWarning': 'Membuka contoh akan mengganti proyek saat ini. Pastikan pekerjaan Anda sudah disimpan sebelum melanjutkan.',
     'song.learningGuideTitle': 'Pelajari lagu ini (8 channel)',
     'song.learningGuideIntro': 'Mulai dengan Putar lagu dari awal. Semua instrumen memakai sound bawaan dan bisa diedit.',
     'song.learningGuideStep1': 'Song Map: perhatikan urutan Intro, Verse, Chorus, Bridge, Chorus, Outro. Chorus memakai Pattern yang sama (×2).',
@@ -333,6 +335,8 @@ const messages = {
     'tab.sound': 'Sound',
 
     'song.playFromStart': '▶ Play song from start',
+    'song.openLearningSong': 'Open example song',
+    'song.learningSongReplaceWarning': 'Opening the example replaces your current project. Save your work before continuing.',
     'song.learningGuideTitle': 'Explore this song (8 tracks)',
     'song.learningGuideIntro': 'Start with Play song from start. All instruments use built-in sounds and are editable.',
     'song.learningGuideStep1': 'Song Map: follow Intro, Verse, Chorus, Bridge, Chorus, Outro. Both Choruses reuse the same Patterns (×2).',
