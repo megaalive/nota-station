@@ -111,6 +111,34 @@ export function createSongView({
   });
   sectionDialog.dataset.action = 'song-section-dialog';
 
+  let exampleDialog;
+  const exampleCancel = Button({
+    label: t('song.sectionCancel'),
+    variant: 'ghost',
+    onClick: () => exampleDialog.close(),
+  });
+  const exampleConfirm = Button({
+    label: t('song.openLearningSong'),
+    onClick: () => {
+      // Tutup sebelum shell diganti; jangan tinggalkan dialog di DOM lama.
+      exampleDialog.close();
+      registry.execute('project.loadTemplate', { templateId: 'learning-song' });
+    },
+  });
+  exampleDialog = Dialog({
+    title: t('song.openLearningSong'),
+    body: el('p', { text: t('song.learningSongReplaceWarning') }),
+    actions: [exampleCancel, exampleConfirm],
+  });
+  exampleDialog.dataset.action = 'song-learning-confirm';
+
+  const exampleButton = Button({
+    label: t('song.openLearningSong'),
+    variant: 'ghost',
+    onClick: () => exampleDialog.open(exampleButton),
+  });
+  exampleButton.dataset.action = 'song-open-learning-song';
+
   const playSongButton = Button({
     label: t('song.playFromStart'),
     onClick: () => registry.execute('playback.playSongStart'),
@@ -175,7 +203,7 @@ export function createSongView({
     class: 'song-workspace__actions',
     role: 'group',
     'aria-label': t('song.actions'),
-  }, [playSongButton, addSectionButton, reuseButton, uniqueButton, earlierButton, laterButton]);
+  }, [playSongButton, exampleButton, addSectionButton, reuseButton, uniqueButton, earlierButton, laterButton]);
 
   const toolbar = el('div', { class: 'song-workspace__toolbar' }, [
     heading,
