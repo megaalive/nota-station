@@ -10,7 +10,7 @@ Milestone ditutup hanya bila Exit criteria di PLAN.md terpenuhi semua.
 - `Space` tetap menjalankan Pattern; `Shift+Space` menjalankan `playback.playSectionStart` dari awal run Section kontigu occurrence fokus, lalu meneruskan playback melintasi Order dengan satu audio-clock anchor dan look-ahead scheduler.
 - SongTimeline hanya proyeksi; tick song-global tidak masuk data tersimpan. Event runtime memiliki identitas occurrence, FX volume/pan kembali ke baseline di boundary, metronome memakai meter Pattern aktif, dan focus mengikuti occurrence tanpa menulis Project.
 - Live edit menjadwalkan ulang semua occurrence future Pattern yang dipakai ulang setelah freeze window. Stop membersihkan source, scheduler, dan FX future. Pause Song menghentikan scheduler dengan state konsisten; resume Song-mode belum didukung.
-- Gate lokal Windows: `npm ci` 0 vulnerability; unit **221/221 PASS**; check PASS; build **618,2 KiB**; targeted Chromium + Firefox **84 PASS + 4 skip lama**; full Chromium + Firefox **324 PASS + 4 skip lama** pada dua worker.
+- Gate final GitHub run **37721700958**: `npm ci` 0 vulnerability; unit **221/221 PASS**; `npm run check` PASS; build Linux **602,1 KiB**; full Chromium + Firefox **324 PASS + 4 skip lama** pada dua worker. Gate lokal Windows sebelumnya juga PASS (targeted **84 + 4 skip**, full **324 + 4 skip**).
 - Run penuh empat worker sempat memunculkan tiga timeout Firefox lama; keenam tes terkait lulus saat diisolasi dan run penuh dua worker lulus. Empat skip realtime AudioContext Firefox tetap sama.
 - Gap teknis transport R3 tertutup. Milestone tetap **ACTIVE** sampai uji tugas moderator §8.20 T4/T5 terpenuhi; hasil manual belum tersedia.
 
