@@ -27,6 +27,21 @@ test('Songwriter memakai Space untuk Play/Stop dan ? untuk bantuan', () => {
   );
 });
 
+test('Songwriter Shift+Space memulai playback dari awal Section', () => {
+  assert.equal(
+    matchKeyBinding(
+      keyEvent('Space', { shiftKey: true }),
+      'songwriter',
+      { context: 'pattern' },
+    )?.commandId,
+    'playback.playSectionStart',
+  );
+  assert.equal(
+    shortcutFor('playback.playSectionStart', 'songwriter', { context: 'pattern' }),
+    'Shift+Space',
+  );
+});
+
 test('OpenMPT-like memetakan subset yang diverifikasi dan tidak memakai Space sebagai transport', () => {
   assert.equal(matchKeyBinding(keyEvent('Space'), 'openmpt', { context: 'pattern' }), null);
   assert.equal(
