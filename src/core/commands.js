@@ -55,7 +55,7 @@ export function createCommandRegistry(initialCommands = []) {
   function listCommands() {
     return [...commands.values()].map((def) => {
       const enabled = def.isEnabled ? def.isEnabled() : true;
-      return {
+      const descriptor = {
         id: def.id,
         group: def.group,
         labelKey: def.labelKey,
@@ -63,12 +63,14 @@ export function createCommandRegistry(initialCommands = []) {
           ? (def.shortcut() ?? null)
           : (def.shortcut ?? null),
         requiresArgs: def.requiresArgs ?? false,
-        requiresArgsReason: typeof def.requiresArgsReason === 'function'
-          ? def.requiresArgsReason()
-          : (def.requiresArgsReason ?? null),
         enabled,
         disabledReason: enabled ? null : (def.disabledReason?.() ?? null),
       };
+      const requiresArgsReason = typeof def.requiresArgsReason === 'function'
+        ? def.requiresArgsReason()
+        : (def.requiresArgsReason ?? null);
+      if (requiresArgsReason) descriptor.requiresArgsReason = requiresArgsReason;
+      return descriptor;
     });
   }
 
