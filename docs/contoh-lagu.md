@@ -10,6 +10,8 @@ bukan emulasi instrumen akustik sungguhan.
 ## Cara memulai
 
 1. Pilih **Lagu lengkap — Malam Kota (8 instrumen)** di layar awal, atau buka tautan di atas.
+   Jika sudah pernah membuka NotaStation, masuk tab **Song** lalu pilih **Buka lagu contoh**
+   dan setujui konfirmasi penggantian proyek setelah menyimpan pekerjaan lama.
 2. Di workspace **Song**, tekan **▶ Putar lagu dari awal**. Tombol Play biasa di topbar
    sengaja tetap memutar **Pattern** aktif, bukan seluruh Song.
 3. Lihat struktur **Intro → Verse A/B → Chorus A/B → Bridge → Chorus A/B → Outro**.
