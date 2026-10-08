@@ -8,6 +8,7 @@
  * @property {string} labelKey   // key i18n, bukan teks langsung
  * @property {string|(() => string|null)} [shortcut] // display; boleh dinamis mengikuti preset keymap
  * @property {boolean} [requiresArgs] // tetap discoverable, tetapi palette tidak mengeksekusi tanpa konteks
+ * @property {string|(() => string)} [requiresArgsReason] // alasan spesifik bila palette butuh konteks
  * @property {() => boolean} [isEnabled]
  * @property {() => string} [disabledReason]
  * @property {(args?: any) => any} run
@@ -62,6 +63,9 @@ export function createCommandRegistry(initialCommands = []) {
           ? (def.shortcut() ?? null)
           : (def.shortcut ?? null),
         requiresArgs: def.requiresArgs ?? false,
+        requiresArgsReason: typeof def.requiresArgsReason === 'function'
+          ? def.requiresArgsReason()
+          : (def.requiresArgsReason ?? null),
         enabled,
         disabledReason: enabled ? null : (def.disabledReason?.() ?? null),
       };
