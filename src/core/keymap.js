@@ -12,6 +12,7 @@ const COMMON = Object.freeze([
 const PRESETS = Object.freeze({
   songwriter: Object.freeze([
     binding('playback.togglePlayStop', 'Space', 'Space'),
+    binding('playback.playSectionStart', 'Space', 'Shift+Space', { shift: true }),
   ]),
   openmpt: Object.freeze([
     binding('playback.playPatternStart', 'F7', 'F7', { context: 'pattern' }),

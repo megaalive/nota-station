@@ -10,6 +10,7 @@ import {
   shortcutFor,
 } from './core/keymap.js';
 import { createFocusStore, patternForFocus } from './core/focus.js';
+import { sectionRunStartIndex } from './core/song-timeline.js';
 import { createSharedPatternGuard } from './core/shared-pattern-guard.js';
 import { quantizePatternCell } from './core/pattern-grid.js';
 import {
@@ -154,7 +155,18 @@ const transportState = {
 };
 const audio = createAudioEngine({
   onStateChange: () => syncTransportUi(),
-  onPositionChange: () => syncTransportUi(),
+  onPositionChange: (_tick, audioState) => {
+    if (
+      audioState?.transportMode === 'song'
+      && project.song.order.some((entry) => entry.id === audioState.orderEntryId)
+      && focus.getState().orderEntryId !== audioState.orderEntryId
+    ) {
+      focus.setOrderEntry(project, audioState.orderEntryId);
+      songView?.refresh();
+      patternView?.refresh();
+    }
+    syncTransportUi();
+  },
   getSampleStore,
 });
 audio.setTracks(project.song.tracks);
@@ -478,6 +490,20 @@ function registerCommands() {
         audio.stop();
         void playActivePattern();
         return 0;
+      },
+    },
+    {
+      id: 'playback.playSectionStart',
+      group: 'Playback',
+      labelKey: 'transport.playSectionStart',
+      shortcut: () => activeShortcut('playback.playSectionStart'),
+      isEnabled: () => project.song.order.some(
+        (entry) => entry.id === focus.getState().orderEntryId,
+      ),
+      disabledReason: () => i18n.t('song.orderEntryRequired'),
+      run: () => {
+        void playActiveSection();
+        return 'section';
       },
     },
     {
@@ -1548,6 +1574,19 @@ async function playActivePattern() {
   }
 }
 
+async function playActiveSection() {
+  try {
+    const startOrderIndex = sectionRunStartIndex(project, focus.getState().orderEntryId);
+    return await audio.playSection(project, startOrderIndex, {
+      metronome: transportState.metronome,
+      sectionStartOrderIndex: startOrderIndex,
+    });
+  } catch {
+    shell?.setAudioStatus('error');
+    return null;
+  }
+}
+
 function auditionPitch(pitch) {
   void audio.preview(pitch)
     .then(() => shell?.setAudioStatus('ready'))
@@ -1767,11 +1806,16 @@ function bindShortcuts() {
     }
 
     if (isTextInputTarget(event.target)) return;
-    if (event.target.closest?.('button, [role="tab"]')) return;
+    const focusedOrderEntry = event.target.closest?.('[data-action="song-entry"]');
+    if (event.target.closest?.('button, [role="tab"]') && !focusedOrderEntry) return;
 
     const context = shell?.getActiveTab() === 'pattern' ? 'pattern' : 'global';
     const binding = matchKeyBinding(event, project.settings.keymapPreset, { context });
     if (!binding) return;
+    if (
+      focusedOrderEntry
+      && !['playback.playSectionStart', 'playback.togglePlayStop'].includes(binding.commandId)
+    ) return;
     if (!registry.canRun(binding.commandId)) return;
 
     event.preventDefault();

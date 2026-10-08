@@ -31,6 +31,15 @@ import {
   transportTickAtAudioTime,
 } from './scheduler.js';
 import {
+  createSongEventScheduleCursor,
+  createSongNoteScheduleCursor,
+  songCutEventTemplates,
+  songEffectEventTemplates,
+  songMetronomeEventTemplates,
+  songMixEffectEventTemplates,
+} from './song-scheduler.js';
+import { buildSongTimeline } from '../core/song-timeline.js';
+import {
   scheduleFinitePitchEffect,
   scheduleRepeatingPitchEffect,
 } from './pitch-effects.js';
@@ -125,15 +134,17 @@ export function createAudioEngine({
     const tracks = new Map(project.song.tracks.map((track) => [track.id, track]));
     const requests = new Map();
 
-    for (const note of pattern.notes) {
-      const instrumentId = note.instrumentId
-        ?? tracks.get(note.trackId)?.defaultInstrumentId
-        ?? null;
-      if (!instrumentId || isDemoInstrument(instrumentId)) continue;
+    for (const item of Array.isArray(pattern) ? pattern : [pattern]) {
+      for (const note of item.notes) {
+        const instrumentId = note.instrumentId
+          ?? tracks.get(note.trackId)?.defaultInstrumentId
+          ?? null;
+        if (!instrumentId || isDemoInstrument(instrumentId)) continue;
 
-      const key = voiceProfileKey(instrumentId, note.pitch);
-      if (requests.has(key)) continue;
-      requests.set(key, resolveSamplerVoice(project, { instrumentId, pitch: note.pitch }));
+        const key = voiceProfileKey(instrumentId, note.pitch);
+        if (requests.has(key)) continue;
+        requests.set(key, resolveSamplerVoice(project, { instrumentId, pitch: note.pitch }));
+      }
     }
 
     const profiles = new Map();
@@ -204,6 +215,7 @@ export function createAudioEngine({
 
   function scheduleRetriggerCut({
     sourceNoteId,
+    occurrenceId = null,
     trackId,
     voiceLane,
     cycle,
@@ -213,6 +225,7 @@ export function createAudioEngine({
     for (const [source, scheduled] of activeSources) {
       if (scheduled.kind !== 'note') continue;
       if (scheduled.sourceNoteId !== sourceNoteId) continue;
+      if (occurrenceId && scheduled.occurrenceId !== occurrenceId) continue;
       if (scheduled.trackId !== trackId) continue;
       if ((scheduled.voiceLane ?? 0) !== voiceLane) continue;
       if (scheduled.cycle !== cycle) continue;
@@ -243,6 +256,7 @@ export function createAudioEngine({
     for (const [, scheduled] of activeSources) {
       if (scheduled.kind !== 'note') continue;
       if (scheduled.trackId !== effect.trackId) continue;
+      if (effect.occurrenceId && scheduled.occurrenceId !== effect.occurrenceId) continue;
       if (scheduled.cycle !== effect.cycle) continue;
       if (scheduled.when > when) continue;
       const voiceEndTime = Number.isFinite(scheduled.cutAt)
@@ -497,6 +511,8 @@ export function createAudioEngine({
     kind = 'note',
     noteId = null,
     cycle = null,
+    occurrenceId = null,
+    orderIndex = null,
     instrumentId = null,
     trackId = null,
     voiceProfile = null,
@@ -520,6 +536,8 @@ export function createAudioEngine({
       trackSource(source, when, kind, {
         noteId,
         cycle,
+        occurrenceId,
+        orderIndex,
         instrumentId,
         trackId,
         velocity,
@@ -546,6 +564,8 @@ export function createAudioEngine({
         kind,
         noteId,
         cycle,
+        occurrenceId,
+        orderIndex,
         instrumentId,
         trackId,
         voiceLane,
@@ -572,6 +592,8 @@ export function createAudioEngine({
     trackSource(source, when, kind, {
       noteId,
       cycle,
+      occurrenceId,
+      orderIndex,
       instrumentId,
       trackId,
       velocity,
@@ -614,6 +636,8 @@ export function createAudioEngine({
     kind,
     noteId,
     cycle,
+    occurrenceId,
+    orderIndex,
     instrumentId,
     trackId,
     voiceLane,
@@ -667,6 +691,8 @@ export function createAudioEngine({
     trackSource(source, when, kind, {
       noteId,
       cycle,
+      occurrenceId,
+      orderIndex,
       instrumentId,
       trackId,
       velocity,
@@ -759,6 +785,11 @@ export function createAudioEngine({
 
   function currentTick() {
     if (!playback || state !== 'playing' || !context) return positionTick;
+    if (playback.transportMode === 'song') {
+      const songTick = currentSongTick();
+      const entry = activeSongEntry(playback.songTimeline, songTick);
+      return Math.max(0, Math.min(entry.lengthTicks, songTick - entry.startTickSong));
+    }
     return transportTickAtAudioTime({
       anchorAudioTime: playback.anchor,
       anchorTick: playback.startTick,
@@ -769,7 +800,32 @@ export function createAudioEngine({
     });
   }
 
-  function startPlayback(project, pattern, startTick, voiceProfiles = null) {
+  function currentSongTick() {
+    if (!playback || playback.transportMode !== 'song' || !context) return null;
+    return songTickAt(playback, context.currentTime);
+  }
+
+  function songTickAt(songPlayback, audioTime) {
+    const tickSeconds = secondsPerTick(songPlayback.tempo);
+    return Math.min(
+      songPlayback.songTimeline.totalTicks,
+      songPlayback.startTickSong + Math.max(0, audioTime - songPlayback.anchor) / tickSeconds,
+    );
+  }
+
+  function activeSongEntry(timeline, songTick) {
+    return timeline.entries.find((entry) => (
+      songTick < entry.endTickSong
+    )) ?? timeline.entries[timeline.entries.length - 1];
+  }
+
+  function startPlayback(project, pattern, startTick, voiceProfiles = null, {
+    transportMode = 'pattern',
+    songTimeline = null,
+    startOrderIndex = 0,
+    sectionStartOrderIndex = null,
+    songTick = null,
+  } = {}) {
     const preparedProfiles = voiceProfiles ?? playback?.voiceProfiles ?? new Map();
     clearScheduler();
     stopSources();
@@ -778,52 +834,114 @@ export function createAudioEngine({
 
     const tempo = project.song.initial.tempo;
     lastTempo = tempo;
-    const normalizedTick = loopEnabled && startTick === pattern.lengthTicks ? 0 : startTick;
+    const isSong = transportMode === 'song';
+    const songEntry = isSong ? songTimeline.entries[startOrderIndex] : null;
+    const startTickSong = songEntry
+      ? songTick ?? songEntry.startTickSong
+      : null;
+    const normalizedTick = isSong
+      ? startTickSong - songEntry.startTickSong
+      : loopEnabled && startTick === pattern.lengthTicks
+        ? 0
+        : startTick;
+    const loop = isSong ? false : loopEnabled;
     const anchor = context.currentTime + 0.05;
 
-    const affectedMixTracks = new Set([
-      ...mixEffectTrackIds(playback?.pattern ?? pattern),
-      ...mixEffectTrackIds(pattern),
-    ]);
+    const affectedMixTracks = isSong
+      ? new Set(project.song.patterns.flatMap((item) => mixEffectTrackIds(item)))
+      : new Set([
+        ...mixEffectTrackIds(playback?.pattern ?? pattern),
+        ...mixEffectTrackIds(pattern),
+      ]);
     resetTrackMixEffects(affectedMixTracks, context.currentTime);
     applyTrackMixStateBeforeTick(pattern, normalizedTick, anchor);
+
+    const songCursorOptions = {
+      startOrderIndex,
+      startTickSong,
+      anchorTickSong: startTickSong,
+    };
+    const tickSeconds = secondsPerTick(tempo);
 
     playback = {
       project,
       pattern,
       tempo,
+      transportMode,
+      songTimeline: isSong ? songTimeline : null,
+      startOrderIndex: isSong ? startOrderIndex : null,
+      sectionStartOrderIndex: isSong
+        ? (sectionStartOrderIndex ?? startOrderIndex)
+        : null,
+      startTickSong,
+      affectedMixTracks,
       voiceProfiles: preparedProfiles,
       anchor,
       startTick: normalizedTick,
-      loop: loopEnabled,
+      loop,
       noteAnchor: anchor,
-      noteCursor: createPatternScheduleCursor(pattern, tempo, {
-        loop: loopEnabled,
-        startTick: normalizedTick,
-      }),
-      cutAnchor: anchor,
-      cutCursor: createCutScheduleCursor(pattern, tempo, {
-        loop: loopEnabled,
-        startTick: normalizedTick,
-      }),
-      mixAnchor: anchor,
-      mixCursor: createMixEffectScheduleCursor(pattern, tempo, {
-        loop: loopEnabled,
-        startTick: normalizedTick,
-      }),
-      pitchAnchor: anchor,
-      pitchCursor: createEffectScheduleCursor(pattern, tempo, {
-        loop: loopEnabled,
-        startTick: normalizedTick,
-      }),
-      metronomeCursor: metronomeEnabled
-        ? createMetronomeScheduleCursor(pattern, tempo, {
-          loop: loopEnabled,
+      noteCursor: isSong
+        ? createSongNoteScheduleCursor(project, tempo, songCursorOptions)
+        : createPatternScheduleCursor(pattern, tempo, {
+          loop,
           startTick: normalizedTick,
-        })
+        }),
+      cutAnchor: anchor,
+      cutCursor: isSong
+        ? createSongEventScheduleCursor(
+          songCutEventTemplates(project, tempo),
+          project,
+          tempo,
+          songCursorOptions,
+        )
+        : createCutScheduleCursor(pattern, tempo, {
+          loop,
+          startTick: normalizedTick,
+        }),
+      mixAnchor: anchor,
+      mixCursor: isSong
+        ? createSongEventScheduleCursor(
+          songMixEffectEventTemplates(project, tempo),
+          project,
+          tempo,
+          songCursorOptions,
+        )
+        : createMixEffectScheduleCursor(pattern, tempo, {
+          loop,
+          startTick: normalizedTick,
+        }),
+      pitchAnchor: anchor,
+      pitchCursor: isSong
+        ? createSongEventScheduleCursor(
+          songEffectEventTemplates(project, tempo),
+          project,
+          tempo,
+          songCursorOptions,
+        )
+        : createEffectScheduleCursor(pattern, tempo, {
+          loop,
+          startTick: normalizedTick,
+        }),
+      metronomeAnchor: anchor,
+      metronomeCursor: metronomeEnabled
+        ? isSong
+          ? createSongEventScheduleCursor(
+            songMetronomeEventTemplates(project),
+            project,
+            tempo,
+            songCursorOptions,
+          )
+          : createMetronomeScheduleCursor(pattern, tempo, {
+            loop,
+            startTick: normalizedTick,
+          })
         : null,
-      durationSeconds: pattern.lengthTicks * secondsPerTick(tempo),
-      endAt: anchor + Math.max(0, pattern.lengthTicks - normalizedTick) * secondsPerTick(tempo),
+      durationSeconds: isSong
+        ? songTimeline.totalTicks * tickSeconds
+        : pattern.lengthTicks * tickSeconds,
+      endAt: anchor + (isSong
+        ? Math.max(0, songTimeline.totalTicks - startTickSong) * tickSeconds
+        : Math.max(0, pattern.lengthTicks - normalizedTick) * tickSeconds),
       revision: ++scheduleRevision,
       notesScheduled: 0,
       delayedNotesScheduled: 0,
@@ -872,6 +990,32 @@ export function createAudioEngine({
     return getState();
   }
 
+  async function playSection(project, startOrderIndex, {
+    metronome = metronomeEnabled,
+    sectionStartOrderIndex = startOrderIndex,
+  } = {}) {
+    await ensureReady();
+    const songTimeline = buildSongTimeline(project);
+    const entry = songTimeline.entries[startOrderIndex];
+    if (!entry) {
+      throw audioError('E_AUDIO_ORDER_INDEX', `Indeks OrderEntry tidak valid: ${startOrderIndex}`);
+    }
+    const patternsById = new Map(project.song.patterns.map((item) => [item.id, item]));
+    const patterns = [...new Set(songTimeline.entries
+      .slice(startOrderIndex)
+      .map((item) => item.patternId))]
+      .map((patternId) => patternsById.get(patternId));
+    const voiceProfiles = await prepareVoiceProfiles(project, patterns);
+    metronomeEnabled = Boolean(metronome);
+    startPlayback(project, patternsById.get(entry.patternId), 0, voiceProfiles, {
+      transportMode: 'song',
+      songTimeline,
+      startOrderIndex,
+      sectionStartOrderIndex,
+    });
+    return getState();
+  }
+
   function scheduleWindow() {
     if (!context || !playback || state !== 'playing') return;
 
@@ -899,6 +1043,7 @@ export function createAudioEngine({
       if (event.retriggerIndex > 0) {
         playback.retriggerStopsScheduled += scheduleRetriggerCut({
           sourceNoteId: event.sourceNoteId,
+          occurrenceId: event.occurrenceId ?? null,
           trackId: event.trackId,
           voiceLane: event.voiceLane,
           cycle: event.cycle,
@@ -913,6 +1058,8 @@ export function createAudioEngine({
         durationSeconds: event.durationSeconds,
         noteId: event.id,
         sourceNoteId: event.sourceNoteId,
+        occurrenceId: event.occurrenceId ?? null,
+        orderIndex: event.orderIndex ?? null,
         retriggerIndex: event.retriggerIndex,
         sampleOffsetFrames: event.sampleOffsetFrames,
         cycle: event.cycle,
@@ -932,7 +1079,9 @@ export function createAudioEngine({
       if (event.sampleOffsetFrames > 0) playback.sampleOffsetNotesScheduled += 1;
     }
 
-    const cutHorizon = now + LIVE_EDIT_FREEZE_SECONDS;
+    const cutHorizon = now + (playback.transportMode === 'song'
+      ? Math.max(0, LIVE_EDIT_FREEZE_SECONDS - 0.000001)
+      : LIVE_EDIT_FREEZE_SECONDS);
     for (const cut of playback.cutCursor.drainUntil(playback.cutAnchor, cutHorizon)) {
       const when = Math.max(cut.when, now + 0.001);
       playback.cutEffectsScheduled += 1;
@@ -974,7 +1123,7 @@ export function createAudioEngine({
     }
 
     if (playback.metronomeCursor) {
-      for (const click of playback.metronomeCursor.drainUntil(playback.anchor, horizon)) {
+      for (const click of playback.metronomeCursor.drainUntil(playback.metronomeAnchor, horizon)) {
         scheduleClick({
           when: Math.max(click.when, now + 0.001),
           accent: click.accent,
@@ -987,7 +1136,7 @@ export function createAudioEngine({
     notifyPosition();
 
     if (!playback.loop && playback.noteCursor.isExhausted() && now >= playback.endAt) {
-      const affectedMixTracks = mixEffectTrackIds(playback.pattern);
+      const affectedMixTracks = playback.affectedMixTracks;
       clearScheduler();
       stopSources();
       resetTrackMixEffects(affectedMixTracks, context.currentTime);
@@ -1002,6 +1151,7 @@ export function createAudioEngine({
     if (!context || !playback || state !== 'playing') {
       return { changed: false, canceledNotes: 0, freezeTick: null };
     }
+    if (playback.transportMode === 'song') return rescheduleSong(project);
 
     if (!extendVoiceProfilesFromLoaded(project, pattern, playback.voiceProfiles)) {
       return { changed: false, canceledNotes: 0, freezeTick: null };
@@ -1073,9 +1223,132 @@ export function createAudioEngine({
     return { changed: true, canceledNotes, freezeTick };
   }
 
+  function rescheduleSong(project) {
+    const nextTimeline = buildSongTimeline(project);
+    const oldEntries = playback.songTimeline.entries;
+    const sameTimeline = nextTimeline.entries.length === oldEntries.length
+      && nextTimeline.entries.every((entry, index) => {
+        const oldEntry = oldEntries[index];
+        return entry.orderEntryId === oldEntry.orderEntryId
+          && entry.patternId === oldEntry.patternId
+          && entry.startTickSong === oldEntry.startTickSong
+          && entry.lengthTicks === oldEntry.lengthTicks;
+      });
+    if (!sameTimeline) {
+      stop();
+      return {
+        changed: false,
+        canceledNotes: 0,
+        freezeTick: null,
+        errorCode: 'E_SONG_LIVE_EDIT_TIMELINE_CHANGED',
+      };
+    }
+
+    const patterns = new Map(project.song.patterns.map((item) => [item.id, item]));
+    const uniquePatterns = [...new Set(nextTimeline.entries.map((entry) => entry.patternId))]
+      .map((patternId) => patterns.get(patternId));
+    if (!uniquePatterns.every((item) => extendVoiceProfilesFromLoaded(project, item, playback.voiceProfiles))) {
+      stop();
+      return {
+        changed: false,
+        canceledNotes: 0,
+        freezeTick: null,
+        errorCode: 'E_AUDIO_PROFILE_MISSING',
+      };
+    }
+
+    const now = context.currentTime;
+    const freezeTime = liveEditFreezeTime(now);
+    const rebuildAudioTime = Math.max(freezeTime, playback.anchor);
+    const freezeSongTick = songTickAt(playback, rebuildAudioTime);
+    const currentEntry = activeSongEntry(nextTimeline, freezeSongTick);
+    const pattern = patterns.get(currentEntry.patternId);
+    const localTick = Math.max(0, Math.min(
+      currentEntry.lengthTicks,
+      freezeSongTick - currentEntry.startTickSong,
+    ));
+
+    let canceledNotes = 0;
+    for (const [source, scheduled] of [...activeSources]) {
+      if (scheduled.kind !== 'note' || !isLiveEditMutable(scheduled.when, now)) continue;
+      try {
+        source.stop();
+      } catch {
+        // Source yang selesai tepat saat pembatalan tidak perlu dipertahankan di map.
+      }
+      activeSources.delete(source);
+      canceledNotes += 1;
+    }
+    for (const [source, scheduled] of [...activeSources]) {
+      if (scheduled.kind !== 'metronome' || !isLiveEditMutable(scheduled.when, now)) continue;
+      try {
+        source.stop();
+      } catch {
+        // Click yang sudah lewat tidak perlu masuk lagi ke jadwal baru.
+      }
+      activeSources.delete(source);
+    }
+
+    const affectedMixTracks = new Set(uniquePatterns.flatMap((item) => mixEffectTrackIds(item)));
+    resetTrackMixEffects(affectedMixTracks, rebuildAudioTime);
+    applyTrackMixStateBeforeTick(pattern, localTick, rebuildAudioTime);
+
+    const cursorOptions = {
+      startOrderIndex: playback.startOrderIndex,
+      startTickSong: freezeSongTick,
+      anchorTickSong: playback.startTickSong,
+    };
+    playback.project = project;
+    playback.pattern = pattern;
+    playback.songTimeline = nextTimeline;
+    playback.affectedMixTracks = affectedMixTracks;
+    playback.noteCursor = createSongNoteScheduleCursor(project, playback.tempo, cursorOptions);
+    playback.cutCursor = createSongEventScheduleCursor(
+      songCutEventTemplates(project, playback.tempo),
+      project,
+      playback.tempo,
+      cursorOptions,
+    );
+    playback.mixCursor = createSongEventScheduleCursor(
+      songMixEffectEventTemplates(project, playback.tempo),
+      project,
+      playback.tempo,
+      cursorOptions,
+    );
+    playback.pitchCursor = createSongEventScheduleCursor(
+      songEffectEventTemplates(project, playback.tempo),
+      project,
+      playback.tempo,
+      cursorOptions,
+    );
+    if (playback.metronomeCursor) {
+      playback.metronomeCursor = createSongEventScheduleCursor(
+        songMetronomeEventTemplates(project),
+        project,
+        playback.tempo,
+        cursorOptions,
+      );
+    }
+
+    liveEditRevision += 1;
+    liveEditCanceledNotes += canceledNotes;
+    lastLiveEditCanceledNotes = canceledNotes;
+    lastLiveEditFreezeTick = localTick;
+    scheduleWindow();
+    return {
+      changed: true,
+      canceledNotes,
+      freezeTick: localTick,
+      freezeSongTick,
+    };
+  }
+
   function pause() {
     if (!playback || state !== 'playing') return false;
     positionTick = currentTick();
+    if (playback.transportMode === 'song' && context) {
+      resetTrackMixEffects(playback.affectedMixTracks, context.currentTime);
+    }
     clearScheduler();
     stopSources();
     playback = null;
@@ -1099,6 +1372,21 @@ export function createAudioEngine({
   function setTempo(project, pattern) {
     lastTempo = project.song.initial.tempo;
     if (state === 'playing' && playback) {
+      if (playback.transportMode === 'song') {
+        const oldPlayback = playback;
+        const songTick = currentSongTick();
+        const activeEntry = activeSongEntry(oldPlayback.songTimeline, songTick);
+        const nextTimeline = buildSongTimeline(project);
+        const nextPattern = project.song.patterns.find((item) => item.id === activeEntry.patternId);
+        startPlayback(project, nextPattern, songTick - activeEntry.startTickSong, oldPlayback.voiceProfiles, {
+          transportMode: 'song',
+          songTimeline: nextTimeline,
+          startOrderIndex: activeEntry.orderIndex,
+          sectionStartOrderIndex: oldPlayback.sectionStartOrderIndex,
+          songTick,
+        });
+        return lastTempo;
+      }
       const tick = currentTick();
       positionTick = tick;
       startPlayback(project, pattern, tick);
@@ -1111,6 +1399,10 @@ export function createAudioEngine({
   function setLoop(project, pattern, enabled) {
     loopEnabled = Boolean(enabled);
     if (state === 'playing' && playback) {
+      if (playback.transportMode === 'song') {
+        notifyPosition();
+        return loopEnabled;
+      }
       const tick = currentTick();
       positionTick = tick;
       startPlayback(project, pattern, tick);
@@ -1123,6 +1415,37 @@ export function createAudioEngine({
   function setMetronome(project, pattern, enabled) {
     metronomeEnabled = Boolean(enabled);
     if (state === 'playing' && playback) {
+      if (playback.transportMode === 'song') {
+        const now = context.currentTime;
+        const freezeTime = liveEditFreezeTime(now);
+        if (!metronomeEnabled) {
+          for (const [source, scheduled] of activeSources) {
+            if (scheduled.kind !== 'metronome' || !isLiveEditMutable(scheduled.when, now)) continue;
+            try {
+              source.stop(freezeTime);
+            } catch {
+              // Click yang selesai sebelum freeze tidak perlu dibatalkan.
+            }
+          }
+          playback.metronomeCursor = null;
+        } else {
+          const rebuildAudioTime = Math.max(freezeTime, playback.anchor);
+          const songTick = songTickAt(playback, rebuildAudioTime);
+          playback.metronomeCursor = createSongEventScheduleCursor(
+            songMetronomeEventTemplates(project),
+            project,
+            playback.tempo,
+            {
+              startOrderIndex: playback.startOrderIndex,
+              startTickSong: songTick,
+              anchorTickSong: playback.startTickSong,
+            },
+          );
+        }
+        scheduleWindow();
+        notifyPosition();
+        return metronomeEnabled;
+      }
       const tick = currentTick();
       positionTick = tick;
       startPlayback(project, pattern, tick);
@@ -1157,11 +1480,12 @@ export function createAudioEngine({
   }
 
   function notifyPosition() {
-    onPositionChange?.(currentTick());
+    onPositionChange?.(currentTick(), getState());
   }
 
   function stop() {
-    const affectedMixTracks = playback ? mixEffectTrackIds(playback.pattern) : [];
+    const affectedMixTracks = playback?.affectedMixTracks
+      ?? (playback ? mixEffectTrackIds(playback.pattern) : []);
     clearScheduler();
     stopSources();
     if (context) resetTrackMixEffects(affectedMixTracks, context.currentTime);
@@ -1173,14 +1497,23 @@ export function createAudioEngine({
 
   function getState() {
     const sources = [...activeSources.values()];
+    const songTick = playback?.transportMode === 'song' ? currentSongTick() : null;
+    const activeEntry = songTick === null
+      ? null
+      : activeSongEntry(playback.songTimeline, songTick);
     return {
       state,
+      transportMode: playback?.transportMode ?? 'pattern',
+      songTick,
+      orderEntryId: activeEntry?.orderEntryId ?? null,
+      orderIndex: activeEntry?.orderIndex ?? null,
+      sectionStartOrderIndex: playback?.sectionStartOrderIndex ?? null,
       contextState: context?.state ?? 'none',
       sampleReady: Boolean(buffer),
       activeVoices: sources.filter((item) => item.kind === 'note' || item.kind === 'preview').length,
       scheduledNoteSources: sources.filter((item) => item.kind === 'note').length,
       activeClicks: sources.filter((item) => item.kind === 'metronome').length,
-      loop: loopEnabled,
+      loop: playback?.transportMode === 'song' ? false : loopEnabled,
       metronome: metronomeEnabled,
       schedulerActive: schedulerTimer !== null,
       anchor: playback?.anchor ?? null,
@@ -1240,6 +1573,7 @@ export function createAudioEngine({
     preview,
     previewInstrument,
     playPattern,
+    playSection,
     pause,
     stop,
     seek,
